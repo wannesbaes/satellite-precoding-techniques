@@ -87,6 +87,7 @@ def demapper(symbols, M, type):
     mc = int(np.log2(M))
     if symbols.ndim == 1: symbols = symbols[np.newaxis, :]
     Nt, Nsymbols = symbols.shape
+    symbols = symbols.flatten()
 
 
     #2 Convert the data symbols to the corresponding decimal values, according to the specified constellation type.
@@ -126,5 +127,3 @@ def demapper(symbols, M, type):
     bits = graycodes.flatten()
     bits = bits.reshape((Nt, Nsymbols * mc))
     return bits
-
-
