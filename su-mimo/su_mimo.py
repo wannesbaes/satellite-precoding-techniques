@@ -89,9 +89,9 @@ class SuMimoSVD:
 
     # BUILDING BLOCKS OF THE COMMUNICATION SYSTEM.
 
-    def mapper(bits, M, type):
+    def mapper(self):
         """
-        Convert bit sequences into data symbol sequences according to the specified modulation constellation.
+        Convert bit sequences into data symbol sequences according to the specified modulation constellation. The mapper is the inverse operation of the demapper.
 
         Args:
             bits (numpy.ndarray): Input bit sequences (1D or 2D array of 0s and 1s).
@@ -99,18 +99,16 @@ class SuMimoSVD:
             type (str): Type of constellation ('PAM', 'PSK', or 'QAM').
 
         Returns:
-            symbols (numpy.ndarray): Output sequences of complex data symbols.
+            symbols (numpy.ndarray): Output data symbol sequences (1D or 2D array of complex numbers).
         """
 
         
         #1 Divide the input bit sequences into blocks of mc bits, where M = 2^mc.
         
-        if bits.ndim == 1: bits = bits[np.newaxis, :]
-        Nt, Nbits = bits.shape
-        mc = int(np.log2(M))
-        if (Nbits % mc != 0) : raise ValueError('The length of the bit sequences is invalid. They must be a multiple of log2(M).')    
+        mc = int(np.log2(self.M))
+        if (self._bits.shape[1] % mc != 0) : raise ValueError('The length of the bit sequences is invalid. They must be a multiple of log2(M).')    
         
-        bits = bits.flatten()
+        bits = self._bits.flatten()
         bits = bits.reshape((bits.size // mc, mc))
 
 
@@ -128,67 +126,65 @@ class SuMimoSVD:
 
         #3 Convert the decimal values to the corresponding data symbols, according to the specified constellation type.
 
-        if type == 'PAM' :
-            dmin = math.sqrt(12/(M**2-1))
-            symbols = (decimals - (M-1)/2) * dmin
+        if self.type == 'PAM' :
+            dmin = math.sqrt(12/(self.M**2-1))
+            symbols = (decimals - (self.M-1)/2) * dmin
         
-        elif type == 'PSK' :
-            symbols = np.exp(2 * np.pi * decimals * 1j / M)
+        elif self.type == 'PSK' :
+            symbols = np.exp(2 * np.pi * decimals * 1j / self.M)
 
-        elif type == 'QAM' :
+        elif self.type == 'QAM' :
             if (mc % 2 != 0) : raise ValueError('The constellation size M is invalid. For QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64).')
-            dmin = math.sqrt(6/(M-1))
-            symbols_real_part = ((decimals//math.sqrt(M)) - (math.sqrt(M)-1)/2) * dmin
-            symbols_imaginary_part = ( np.where( ((decimals//int(math.sqrt(M))) % 2 == 0), (int(math.sqrt(M))-1) - (decimals % int(math.sqrt(M))), (decimals % int(math.sqrt(M))) ) - (int(math.sqrt(M))-1)/2) * dmin
+            dmin = math.sqrt(6/(self.M-1))
+            symbols_real_part = ((decimals//math.sqrt(self.M)) - (math.sqrt(self.M)-1)/2) * dmin
+            symbols_imaginary_part = ( np.where( ((decimals//int(math.sqrt(self.M))) % 2 == 0), (int(math.sqrt(self.M))-1) - (decimals % int(math.sqrt(self.M))), (decimals % int(math.sqrt(self.M))) ) - (int(math.sqrt(self.M))-1)/2) * dmin
             symbols = symbols_real_part + (symbols_imaginary_part * 1j)
 
         else :
             raise ValueError('The constellation type is invalid. Choose between "PAM", "PSK", or "QAM".')
         
 
-        #4 Return the output data symbol sequences.
+        #4 Store the output data symbol sequences.
 
-        symbols = symbols.reshape((Nt, Nbits // mc))
-        return symbols
+        symbols = symbols.reshape((self._bits.shape[0], self._bits.shape[1] // mc)) if self._bits.ndim != 1 else symbols.flatten()
+        self._symbols = symbols
 
-    def demapper(symbols, M, type):
+    def demapper(self):
         """
-        Convert data symbol sequences into bit sequences according to the specified modulation constellation.
+        Convert data symbol sequences into bit sequences according to the specified modulation constellation. The demapper is the inverse operation of the mapper.
 
         Args:
-            symbols (numpy.ndarray): Input data symbol sequence (1D or 2D array of complex symbols).
+            symbols (numpy.ndarray): Input data symbol sequence (1D or 2D array of complex numbers).
             M (int): Size of the constellation (e.g., 2, 4, 16, 64).
             type (str): Type of constellation ('PAM', 'PSK', or 'QAM').
         
         Returns:
-            bits (numpy.ndarray): Output sequences of bits.
+            bits (numpy.ndarray): Output bit sequence (1D or 2D array of bits).
         """
 
         #1 Setup.
 
-        mc = int(np.log2(M))
-        if symbols.ndim == 1: symbols = symbols[np.newaxis, :]
-        Nt, Nsymbols = symbols.shape
-        symbols = symbols.flatten()
+        mc = int(np.log2(self.M))
+        symbols = self._symbols_hat.flatten()
 
 
         #2 Convert the data symbols to the corresponding decimal values, according to the specified constellation type.
         
-        if type == 'PAM':
-            dmin = math.sqrt(12/(M**2-1))
-            decimals = np.round(symbols/dmin + (M-1)/2).astype(int)
+        if self.type == 'PAM':
+            dmin = math.sqrt(12/(self.M**2-1))
+            decimals = np.round(symbols/dmin + (self.M-1)/2).astype(int)
         
-        elif type == 'PSK':
+        elif self.type == 'PSK':
             phases = np.angle(symbols)
             phases[phases < 0] += 2*np.pi
-            decimals = np.round((phases * M) / (2*np.pi)).astype(int)
+            decimals = np.round((phases * self.M) / (2*np.pi)).astype(int)
         
-        elif type == 'QAM':
+        elif self.type == 'QAM':
             if (mc % 2 != 0): raise ValueError('The constellation size M is invalid. For QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64).')
-            dmin = math.sqrt(6/(M-1))
-            real_parts = np.round( np.real(symbols)/dmin + (int(math.sqrt(M))-1)/2 ).astype(int)
-            imaginary_parts = np.round( np.imag(symbols)/dmin + (int(math.sqrt(M))-1)/2 ).astype(int)
-            decimals = (real_parts * int(math.sqrt(M))) + np.where((real_parts % 2 == 0), (int(math.sqrt(M))-1) - imaginary_parts, imaginary_parts)
+            dmin = math.sqrt(6/(self.M-1))
+            real_parts = np.round( np.real(symbols)/dmin + (int(math.sqrt(self.M))-1)/2 ).astype(int)
+            imaginary_parts = np.round( np.imag(symbols)/dmin + (int(math.sqrt(self.M))-1)/2 ).astype(int)
+            decimals = (real_parts * int(math.sqrt(self.M))) + np.where((real_parts % 2 == 0), (int(math.sqrt(self.M))-1) - imaginary_parts, imaginary_parts)
 
         else:
             raise ValueError('The constellation type is invalid. Choose between "PAM", "PSK", or "QAM".')
@@ -204,15 +200,16 @@ class SuMimoSVD:
             graycodes[:, i] = binarycodes[:, i] ^ binarycodes[:, i - 1]
 
 
-        #4 Return the output bit sequences.
+        #4 Store the output bit sequences.
 
         bits = graycodes.flatten()
-        bits = bits.reshape((Nt, Nsymbols * mc))
-        return bits
+        bits = bits.reshape((self._symbols_hat.shape[0], self._symbols_hat.shape[1] * mc)) if self._symbols_hat.ndim != 1 else bits.flatten()
+        self._bits_hat = bits
 
 
     def set_channel(self):
         pass
+
 
     def get_channel(self):
         pass
@@ -227,8 +224,8 @@ class SuMimoSVD:
 
     # PERFORMANCE METRICS OF THE COMMUNICATION SYSTEM.
 
-    def ber():
-        pass
+    def ber(self):
+        return np.mean(self._bits != self._bits_hat)
 
     def plot_ber():
         pass
