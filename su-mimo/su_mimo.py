@@ -227,11 +227,25 @@ class SuMimoSVD:
         return self._H
 
 
-    def set_noise(self, w):
-        pass
+    def generate_noise(self):
+        """
+        Generate complex circularly-symmetric additive white Gaussian noise (AWGN) for the communication system, based on the specified SNR.
+        """
+
+        # Calculate the noise variance based on the specified SNR (in dB) and the average symbol power Es.
+        Es = 1.0
+        SNR_linear = 10.0 ** (self.SNR/10.0)
+        var_n = Es / SNR_linear
+
+        # Sample complex circularly-symmetric AWGN with the calculated noise variance.
+        w = np.sqrt(var_n/2.0) * (np.random.randn(self.Nr, self._symbols.shape[1]) + 1j * np.random.randn(self.Nr, self._symbols.shape[1]))
+
+        # Store the noise.
+        self._w = w
 
     def get_noise(self):
-        pass
+        """ Get the current noise matrix w."""
+        return self._w
 
 
     # PERFORMANCE METRICS OF THE COMMUNICATION SYSTEM.
