@@ -28,7 +28,7 @@ class SuMimoSVD:
 
         H (numpy.ndarray): The MIMO channel matrix of shape (Nr, Nt). The entries of H represent the complex channel gains between each transmit and receive antenna. They are i.i.d. complex Gaussian random variables with zero mean and unit variance by default.
         U (numpy.ndarray): Left singular vectors of the channel matrix H. The columns of U represent the orthogonal basis for the received signal space. The shape of U is (Nr, Nr).
-        SIGMA (numpy.ndarray): A rectangular diagonal matrix of shape (Nr, Nt) containing the singular values of the channel matrix H on its diagonal. The singular values represent the strength of the communication modes between the transmit and receive antennas. They are non-negative real numbers sorted in descending order. The number of non-zero singular values is equal to the rank of H.
+        S (numpy.ndarray): Singular values of the channel matrix H. The singular values represent the strength of the communication modes between the transmit and receive antennas. They are non-negative real numbers sorted in descending order. The number of non-zero singular values is equal to the rank of H.
         Vh (numpy.ndarray): Right singular vectors of the channel matrix H. The rows of Vh represent the orthogonal basis for the transmitted signal space. The shape of Vh is (Nt, Nt).
 
         
@@ -65,14 +65,16 @@ class SuMimoSVD:
         # The channel parameters.
         self._H = H
         self._U = None
-        self._SIGMA = None
+        self._S = None
         self._Vh = None
 
         # The communication system signals.
         self._bits = None
         self._symbols = None
+        self._x = None
         self._w = None
         self._r = None
+        self._y = None
         self._symbols_hat = None
         self._bits_hat = None
 
@@ -214,13 +216,10 @@ class SuMimoSVD:
         """          
         
         # Initialize the MIMO channel matrix H with i.i.d. complex Gaussian (zero mean and unit variance) random variables, if no channel is provided.
-        if self._H is None: H = (np.random.randn(self.Nr, self.Nt) + 1j * np.random.randn(self.Nr, self.Nt)) / np.sqrt(2)
-        self._H = H
+        if self._H is None: self._H = (np.random.randn(self.Nr, self.Nt) + 1j * np.random.randn(self.Nr, self.Nt)) / np.sqrt(2)
         
         # Compute the SVD of the channel matrix H and store the results in U, SIGMA, and Vh.
-        self._U, s, self._Vh = np.linalg.svd(H)
-        self._SIGMA = np.zeros((self.Nr, self.Nt), dtype=complex)
-        np.fill_diagonal(self._SIGMA, s)
+        self._U, self._S, self._Vh = np.linalg.svd(self._H)
 
     def get_channel(self):
         """ Get the current MIMO channel matrix H."""
@@ -246,6 +245,58 @@ class SuMimoSVD:
     def get_noise(self):
         """ Get the current noise matrix w."""
         return self._w
+
+
+
+    def channel(self):
+        """
+        Transmit the precoded symbols through the MIMO channel and add noise.
+        """
+
+        # Transmit the precoded symbols through the MIMO channel and add noise.
+        received_symbols = np.dot(self._H, self._x) + self._w
+
+        # Store the received symbols.
+        self._r = received_symbols
+
+
+    def precoding(self):
+        """
+        Precode the transmitted symbols using the right singular vectors of the channel matrix H.
+        """
+
+        # Precode the transmitted symbols using the right singular vectors of the channel matrix H.
+        precoded_symbols = np.dot(self._Vh.conj().T, self._symbols)
+
+        # Store the precoded symbols.
+        self._x = precoded_symbols
+
+    def postcoding(self):
+        """
+        Postcode the received symbols using the left singular vectors of the channel matrix H.
+        """
+
+        # Postcode the received symbols using the left singular vectors of the channel matrix H.
+        postcoded_symbols = np.dot(self._U.conj().T, self._r)
+
+        # Store the postcoded symbols.
+        self._y = postcoded_symbols
+
+
+    def receiver_processing(self):
+        """
+        ...
+        """
+
+        # ...
+        symbols_hat = np.zeros((self.Nr, self._symbols.shape[1]), dtype=complex)
+        symbols_hat[:self._S.shape[0], :] = self._y[:self._S.shape[0], :] / self._S[:, np.newaxis]
+
+        # Store the estimated symbols.
+        self._symbols_hat = symbols_hat
+
+    def receiver_processing2(self):
+        pass
 
 
     # PERFORMANCE METRICS OF THE COMMUNICATION SYSTEM.
