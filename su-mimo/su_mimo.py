@@ -208,11 +208,23 @@ class SuMimoSVD:
 
 
     def set_channel(self):
-        pass
-
+        """
+        Initialize the MIMO channel matrix and compute its SVD!
+        If no channel is provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
+        """          
+        
+        # Initialize the MIMO channel matrix H with i.i.d. complex Gaussian (zero mean and unit variance) random variables, if no channel is provided.
+        if self._H is None: H = (np.random.randn(self.Nr, self.Nt) + 1j * np.random.randn(self.Nr, self.Nt)) / np.sqrt(2)
+        self._H = H
+        
+        # Compute the SVD of the channel matrix H and store the results in U, SIGMA, and Vh.
+        self._U, s, self._Vh = np.linalg.svd(H)
+        self._SIGMA = np.zeros((self.Nr, self.Nt), dtype=complex)
+        np.fill_diagonal(self._SIGMA, s)
 
     def get_channel(self):
-        pass
+        """ Get the current MIMO channel matrix H."""
+        return self._H
 
 
     def set_noise(self, w):
