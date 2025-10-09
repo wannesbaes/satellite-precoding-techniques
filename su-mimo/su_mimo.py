@@ -2,6 +2,7 @@
 
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 
 class Transmitter:
@@ -111,7 +112,7 @@ class Transmitter:
         #1 Divide the input bit sequences into blocks of mc bits, where M = 2^mc.
         
         mc = int(np.log2(self.M))
-        if (self._bits.shape[1] % mc != 0) : raise ValueError('The length of the bit sequences is invalid. They must be a multiple of log2(M).')    
+        if (self._bits.shape[1] % mc != 0) : raise ValueError(f'The length of the bit sequences is invalid.\nThey must be a multiple of log2(M). Right now, length is {self._bits.shape[1]} and log2(M) is {mc}.')    
         
         bits = self._bits.flatten()
         bits = bits.reshape((bits.size // mc, mc))
@@ -139,14 +140,14 @@ class Transmitter:
             symbols = np.exp(2 * np.pi * decimals * 1j / self.M)
 
         elif self.type == 'QAM' :
-            if (mc % 2 != 0) : raise ValueError('The constellation size M is invalid. For QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64).')
+            if (mc % 2 != 0) : raise ValueError(f'The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {self.M}.')
             dmin = math.sqrt(6/(self.M-1))
             symbols_real_part = ((decimals//math.sqrt(self.M)) - (math.sqrt(self.M)-1)/2) * dmin
             symbols_imaginary_part = ( np.where( ((decimals//int(math.sqrt(self.M))) % 2 == 0), (int(math.sqrt(self.M))-1) - (decimals % int(math.sqrt(self.M))), (decimals % int(math.sqrt(self.M))) ) - (int(math.sqrt(self.M))-1)/2) * dmin
             symbols = symbols_real_part + (symbols_imaginary_part * 1j)
 
         else :
-            raise ValueError('The constellation type is invalid. Choose between "PAM", "PSK", or "QAM".')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {self.type}.')
         
 
         #4 Store the output data symbol sequences.
@@ -475,14 +476,14 @@ class Receiver:
             constellation = np.exp(1j * 2*np.pi * np.arange(self.M) / self.M)
 
         elif self.type == 'QAM':
-            if (math.log2(self.M) % 2 != 0): raise ValueError('The constellation size M is invalid. For QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64).')
+            if (math.log2(self.M) % 2 != 0): raise ValueError(f'The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {self.M}.')
             real_parts = np.linspace(-(math.sqrt(self.M)-1), math.sqrt(self.M)-1) * (np.sqrt(6/(self.M-1)) / 2)
             imaginary_parts = np.linspace(-(math.sqrt(self.M)-1), math.sqrt(self.M)-1) * (np.sqrt(6/(self.M-1)) / 2)
             real_grid, imaginary_grid = np.meshgrid(real_parts, imaginary_parts)
             constellation = (real_grid + 1j*imaginary_grid).flatten()
             
         else :
-            raise ValueError('The constellation type is invalid. Choose between "PAM", "PSK", or "QAM".')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {self.type}.')
         
         # Find the most probable data symbols by minimizing the Euclidean distance between the received symbols and the constellation points.
         distances = np.abs(constellation[:, np.newaxis] - self._estimation_var.flatten())
@@ -512,14 +513,14 @@ class Receiver:
             decimals = np.round((phases * self.M) / (2*np.pi)).astype(int)
         
         elif self.type == 'QAM':
-            if (mc % 2 != 0): raise ValueError('The constellation size M is invalid. For QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64).')
+            if (mc % 2 != 0): raise ValueError(f'The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {self.M}.')
             dmin = math.sqrt(6/(self.M-1))
             real_parts = np.round( np.real(symbols)/dmin + (int(math.sqrt(self.M))-1)/2 ).astype(int)
             imaginary_parts = np.round( np.imag(symbols)/dmin + (int(math.sqrt(self.M))-1)/2 ).astype(int)
             decimals = (real_parts * int(math.sqrt(self.M))) + np.where((real_parts % 2 == 0), (int(math.sqrt(self.M))-1) - imaginary_parts, imaginary_parts)
 
         else:
-            raise ValueError('The constellation type is invalid. Choose between "PAM", "PSK", or "QAM".')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {self.type}.')
 
 
         #3 Convert the decimal values to the corresponding blocks of mc bits in gray code.
@@ -563,7 +564,7 @@ class SuMimoSVD:
     A single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at both the transmitter and receiver. 
     
     The communication system consists of a transmitter, a flat-fading MIMO channel, and a receiver. The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and postcoding at the receiver.
-    
+
     
     Parameters
     ----------
@@ -634,6 +635,8 @@ class SuMimoSVD:
     __call__()
         Allow the communication system object to be called as a function. When called, it executes the simulate() method.
 
+    get_BER()
+        Calculate the bit error rate (BER) of a simulation of the communication system.
     simulate()
         Simulate the communication system: generate the bit sequences, transmit them through the MIMO channel, and estimate the transmitted bits at the receiver. Store all of the internal signals.
     """
@@ -667,6 +670,30 @@ class SuMimoSVD:
         """ Allow the communication system object to be called as a function. When called, it executes the simulate() method. """
         return self.simulate()
 
+    def get_BER(self):
+        """ 
+        Calculate the bit error rate (BER) of a simulation of the communication system.
+
+        Raises
+        ------
+            ValueError: If the transmitted and/or estimated bit sequences are not yet available. Please run a simulation first.
+        
+        Returns
+        -------
+            ber (float): The bit error rate (BER) of a simulation.
+        """
+        # Check if the transmitted and estimated bit sequences are available.
+        if self._bits is None or self._bits_hat is None: raise ValueError(" The transmitted and/or estimated bit sequences are not available. Please run the a simulation first.")
+
+        # QUESTION: what to do if Nt != Nr ??
+        if self.Nt > self.Nr:
+            self._bits_hat = np.vstack([self._bits_hat, np.zeros((self.Nt - self.Nr, self._bits_hat.shape[1]))])
+        elif self.Nr > self.Nt:
+            self._bits = np.vstack([self._bits, np.zeros((self.Nr - self.Nt, self._bits.shape[1]))])
+        
+        # Calculate and return the bit error rate (BER).
+        return np.sum(self._bits != self._bits_hat) / self._bits.size
+
     def simulate(self):
         """
         Simulate the communication system: generate the bit sequences, transmit them through the MIMO channel, and estimate the transmitted bits at the receiver.
@@ -682,3 +709,44 @@ class SuMimoSVD:
         self.receiver.set_r(self._r)
         self._bits_hat = self.receiver()
 
+
+
+if __name__ == "__main__":
+
+    # Initialize the simulation and plot parameters.
+    Nt = 4
+    Nr = 4
+    SNR_dB_range = np.arange(-5, 21, 0.25)
+    Nbits = 12000
+    constellations = [ {'size': 4, 'type': 'PSK', 'color': 'blue', 'label': '4-PSK'}, {'size': 8, 'type': 'PSK', 'color': 'red', 'label': '8-PSK'}, {'size': 16, 'type': 'QAM', 'color': 'green', 'label': '16-QAM'} ]
+    plt.figure(figsize=(10, 7))
+
+    # Simulate each constellation
+    for constellation in constellations:
+        
+        # Determine the BER for each SNR value by running a simulation of the communication system.
+        BER_values = []
+        for SNR_dB in SNR_dB_range:
+            system = SuMimoSVD(Nt, Nr, constellation['size'], constellation['type'], SNR_dB, Nbits=Nbits)
+            system.simulate()
+            BER_values.append(system.get_BER())
+        
+        # Plot the BER vs SNR curve for the current constellation.
+        plt.semilogy(SNR_dB_range, BER_values,  marker='o',  color=constellation['color'], label=constellation['label'], linewidth=2, markersize=6)
+
+        print(f"Simulation completed for {constellation['label']}.")
+
+
+    # Plot settings.
+    plt.xlabel('SNR (dB)', fontsize=12)
+    plt.ylabel('Bit Error Rate (BER)', fontsize=12)
+    plt.suptitle("SU-MIMO SVD System Performance", fontsize=13, fontweight="bold")
+    plt.title(f"{Nt} transmitting antennas and {Nr} receiving antennas. No specific power allocation yet", fontsize=10)
+    plt.grid(True, which='both', linestyle='--', alpha=0.6)
+    plt.legend(fontsize=11)
+    plt.xlim([SNR_dB_range[0], SNR_dB_range[-1]])
+    plt.ylim([1e-5, 1])
+    plt.tight_layout()
+
+    # Show the results.
+    plt.show()
