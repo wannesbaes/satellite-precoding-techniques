@@ -61,7 +61,7 @@ class Transmitter:
 
     def __str__(self):
         """ Return a string representation of the transmitter object. """
-        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.M}-{self.type})"
+        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.M}-{self.type}"
 
     def __call__(self):
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
@@ -140,7 +140,7 @@ class Transmitter:
         self.precoder()
 
         # Return the output signal.
-        return self._x
+        return self._s
 
 
 class Channel:
@@ -172,7 +172,6 @@ class Channel:
         # The noise parameters.
         self.SNR = SNR
         self._w = None
-        self.generate_noise()
 
         # The channel signals.
         self._s = s
@@ -180,7 +179,7 @@ class Channel:
     
     def __str__(self):
         """ Return a string representation of the channel object. """
-        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'})"
+        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
     
     def __call__(self):
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
@@ -216,7 +215,7 @@ class Channel:
         var_n = Es / SNR_linear
 
         # Sample complex circularly-symmetric AWGN with the calculated noise variance.
-        w = np.sqrt(var_n/2.0) * (np.random.randn(self.Nr, self._symbols.shape[1]) + 1j * np.random.randn(self.Nr, self._symbols.shape[1]))
+        w = np.sqrt(var_n/2.0) * (np.random.randn(self.Nr, self._s.shape[1]) + 1j * np.random.randn(self.Nr, self._s.shape[1]))
 
         # Store the noise.
         self._w = w
@@ -228,7 +227,10 @@ class Channel:
         
         Returns:
             _r (numpy.ndarray): The output signal. This is the received data symbol sequences after passing through the MIMO channel and adding noise.
-          """
+        """
+
+        # Generate the noise based on the specified SNR.
+        self.generate_noise()
 
         # Transmit the precoded symbols through the MIMO channel and add noise.
         self._r = np.dot(self._H, self._s) + self._w
@@ -272,7 +274,7 @@ class Receiver:
 
     def __str__(self):
         """ Return a string representation of the receiver object. """
-        return f"Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = {self.M}-{self.type})"
+        return f"Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = {self.M}-{self.type}"
 
     def __call__(self):
         """ Allow the receiver object to be called as a function. When called, it executes the simulate() method. """
@@ -285,12 +287,12 @@ class Receiver:
 
     def postcoder(self):
         """ Postcode the received symbols using the left singular vectors of the channel matrix H and store them. """
-        self._y1 = np.dot(self._U.conj().T, self._r)
+        self._y = np.dot(self._U.conj().T, self._r)
     
     def equalizer(self):
         """ Equalize the postcoded symbols using the singular values of the channel matrix H and store them. """
-        self._estimation_var = np.zeros((self.Nr, self._symbols.shape[1]), dtype=complex)
-        self._estimation_var[:self._S.shape[0], :] = self._r[:self._S.shape[0], :] / self._S[:, np.newaxis]
+        self._estimation_var = np.zeros((self.Nr, self._r.shape[1]), dtype=complex)
+        self._estimation_var[:self._S.shape[0], :] = self._y[:self._S.shape[0], :] / self._S[:, np.newaxis]
 
     def estimator(self):
         """ Convert the received (equalized postcoded) data symbols into the most probable data symbols and store them. """
@@ -421,7 +423,7 @@ class SuMimoSVD:
 
     def __str__(self):
         """ Return a string representation of the communication system object. """
-        return f"SU-MIMO SVD Communication System: \n  - Number of transmitting and receiving antennas = {self.Nt} and {self.Nr}\n  - Constellation = {self.M}-{self.type}\n  - SNR = {self.SNR} dB\n  - Channel Matrix H = {'Provided' if self.channel._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'})"
+        return f"SU-MIMO SVD Communication System: \n  - Number of transmitting and receiving antennas = {self.Nt} and {self.Nr}\n  - Constellation = {self.M}-{self.type}\n  - SNR = {self.SNR} dB\n  - Channel Matrix H = {'Provided' if self.channel._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
 
     def __call__(self):
         """ Allow the communication system object to be called as a function. When called, it executes the simulate() method. """
@@ -441,11 +443,4 @@ class SuMimoSVD:
 
         self.receiver.set_r(self._r)
         self._bits_hat = self.receiver()
-
-    def ber(self):
-        """ Compute the bit error rate (BER) of the communication system. """
-        if self._bits is None or self._bits_hat is None: raise ValueError('The input or output bit sequences are not available. Please run a simulation first.')
-        return np.mean(self._bits != self._bits_hat)
-
-
 
