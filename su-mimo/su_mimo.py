@@ -6,39 +6,71 @@ import math
 
 class Transmitter:
     """
-    ## Description
-    A class representing the transmitter of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the transmitter.
-    The transmitter maps the input bit sequence to a data symbol sequence according to a specified modulation constellation. In addition, the transmitter uses the SVD of the channel matrix to precode the transmitted symbols and (!!TODO!!) allocates power across the transmit antennas.
+    The transmitter of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the transmitter (and receiver).
+
+    The transmitter maps the input bit sequence to a data symbol sequence according to a specified modulation constellation.
+    In addition, the transmitter uses the SVD of the channel matrix to precode the transmitted symbols and (!!TODO!!) allocates power across the transmit antennas.
     
-    ## Attributes ##
+
+    Parameters
+    ----------
+    Nt : int
+        Number of transmit antennas.
+    constellation_size : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    constellation_type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+    Vh : numpy.ndarray
+        Right singular vectors of the channel matrix H (obtained from the SVD of H).
+
         
-        ### The transmitter parameters.
-        Nt (int): Number of transmit antennas.
+    Attributes
+    ----------
 
-        ### The necessary communication system parameters.
-        M (int): Size of the modulation constellation (e.g., 2, 4, 16, 64).
-        type (str): Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+    #### The transmitter parameters.
 
-        ### The channel state information.
-        _Vh (numpy.ndarray): The right singular vectors of the channel matrix H, obtained from the SVD of H.
+    Nt : int
+        Number of transmit antennas.
 
-        ### The transmitter signals.
-        _bits (numpy.ndarray): The input bit sequences of shape (Nt, Nbits).
-        _symbols (numpy.ndarray): The complex data symbol sequences of shape (Nt, Nsymbols).
-        _s (numpy.ndarray): The output signal of shape (Nt, Nsymbols).
+    M : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+
+    #### The necessary channel state information.
+
+    _Vh : numpy.ndarray
+        The right singular vectors of the channel matrix H, obtained from the SVD of H.
+
+    #### The transmitter signals.
+
+    _bits : numpy.ndarray
+        The input bit sequences of shape (Nt, Nbits).
+    _symbols : numpy.ndarray
+        The complex data symbol sequences of shape (Nt, Nsymbols).
+    _s : numpy.ndarray
+        The output signal of shape (Nt, Nsymbols).
     
         
-    ## Methods
-       
-        ### Special methods.
-        __init__(): Initialize the transmitter parameters and signals.
-        __str__(): Return a string representation of the transmitter object.
-        __call__(): Allow the transmitter object to be called as a function. When called, it executes the simulate() method.
+    Methods
+    -------
+    __init__()
+        Initialize the transmitter parameters.
+    __str__()
+        Return a string representation of the transmitter object.
+    __call__()
+        Allow the transmitter object to be called as a function. When called, it executes the simulate() method.
 
-        ### Operations of the transmitter.
-        mapper(): Map the input bit sequences to data symbol sequences according to the specified modulation constellation and store them.
-        precoder(): Precode the data symbols using the precoding matrix and store them.
-        simulate(): Execute the operations of the transmitter.
+
+    set_bits(bits)
+        Set the input bit sequences to be transmitted.
+    mapper()
+        Map the input bit sequences to the corresponding data symbol sequences.
+    precoder()
+        Precode the data symbols using the right singular vectors.
+    simulate()
+        Execute the operations of the transmitter.
+
     """
 
     def __init__(self, Nt, constellation_size, constellation_type, Vh):
@@ -51,7 +83,7 @@ class Transmitter:
         self.M = constellation_size
         self.type = constellation_type
 
-        # The channel state information.
+        # The necessary channel state information.
         self._Vh = Vh
         
         # The transmitter signals.
@@ -73,7 +105,7 @@ class Transmitter:
         self._bits = bits
 
     def mapper(self):
-        """ Convert the bit sequences into data symbol sequences according to the specified modulation constellation. The mapper is the inverse operation of the demapper. """
+        """ Convert the bit sequences into the corresponding data symbol sequences according to the specified modulation constellation. The mapper is the inverse operation of the demapper. """
 
         
         #1 Divide the input bit sequences into blocks of mc bits, where M = 2^mc.
@@ -131,7 +163,8 @@ class Transmitter:
         Simulate the transmitter operations: get the channel state information, generate the bit sequences, map them to complex symbols, and precode the symbols.
         The precoded symbols are ready to be transmitted through the MIMO channel.
 
-        Returns:
+        Returns
+        -------
             _s (numpy.ndarray): The output signal. This is the precoded data symbol sequences ready to be transmitted through the channel.
         """
 
@@ -145,14 +178,81 @@ class Transmitter:
 
 class Channel:
     """
-    ## Description
-    ...
+    The channel of a single-user multiple-input multiple-output (SU-MIMO) communication system. 
+
+    The channel is modeled as a flat-fading MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. The channel adds complex circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR).
+
     
-    ## Attributes
-    ...
+    Parameters
+    ----------
+    Nt : int
+        Number of transmit antennas.
+    Nr : int
+        Number of receive antennas.
+    SNR : float
+        Signal-to-noise ratio in dB.
+    H : numpy.ndarray, optional
+        The MIMO channel matrix of shape (Nr, Nt). If not provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
+    s : numpy.ndarray, optional
+        The input signal of shape (Nt, Nsymbols). This signal is given to the channel by the transmitter. If not provided, it can be set later using the set_s() method.
+
     
-    ## Methods
-    ...
+    Attributes
+    ----------
+    
+    #### The necessary communication system parameters.
+
+    Nt : int
+        Number of transmit antennas.
+    Nr : int
+        Number of receive antennas.
+
+    #### The channel state information (CSI).
+
+    _H : numpy.ndarray
+        The MIMO channel matrix of shape (Nr, Nt).
+    _U : numpy.ndarray
+        The left singular vectors of the channel matrix H, obtained from the SVD of H.
+    _S : numpy.ndarray
+        The singular values of the channel matrix H, obtained from the SVD of H.
+    _Vh : numpy.ndarray
+        The right singular vectors of the channel matrix H, obtained from the SVD of H.
+
+    #### The noise parameters.
+
+    SNR : float
+        Signal-to-noise ratio in dB.
+    _w : numpy.ndarray
+        The complex circularly-symmetric additive white Gaussian noise (AWGN) of shape (Nr, Nsymbols).
+
+    #### The channel signals.
+
+    _s : numpy.ndarray
+        The input signal of shape (Nt, Nsymbols). This signal is given to the channel by the transmitter.
+    _r : numpy.ndarray
+        The output signal of shape (Nr, Nsymbols). This signal is received from the channel by the receiver.
+    
+        
+    Methods
+    -------
+    
+    __init__()
+        Initialize the channel parameters.
+    __str__()
+        Return a string representation of the channel object.
+    __call__()
+        Allow the channel object to be called as a function. When called, it executes the simulate() method.
+
+    set_s()
+        Set the input signal of data symbols to be transmitted through the channel.
+    set_CSI()
+        Initialize the MIMO channel matrix and compute its SVD. Store the results.
+    get_CSI()
+        Get the current channel state information (CSI), in terms of the channel matrix H and its SVD (U, S, Vh).
+    generate_noise()
+        Generate complex circularly-symmetric additive white Gaussian noise (AWGN) on the channel, based on the specified SNR.
+    simulate()
+        Transmit the precoded symbols through the MIMO channel and add noise. The output signal is stored, returned and ready to be processed by the receiver.
     """
 
     def __init__(self, Nt, Nr, SNR, H=None, s=None):
@@ -225,7 +325,8 @@ class Channel:
         Simulete the channel operation: transmit the precoded symbols through the MIMO channel and add noise.
         The output signal is ready to be processed by the receiver.
         
-        Returns:
+        Returns
+        -------
             _r (numpy.ndarray): The output signal. This is the received data symbol sequences after passing through the MIMO channel and adding noise.
         """
 
@@ -241,14 +342,82 @@ class Channel:
 
 class Receiver:
     """
-    ## Description
-    ...
+    The receiver of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the receiver (and transmitter).
+
+    The receiver postcodes the received symbols using the left singular vectors of the channel matrix, equalizes them using the singular values of the channel matrix, estimates the transmitted symbols, and demaps them to bit sequences according to a specified modulation constellation.
     
-    ## Attributes
-    ...
+
+    Parameters
+    ----------
+    Nr : int
+        Number of receive antennas.
+    constellation_size : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    constellation_type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+    U : numpy.ndarray
+        The left singular vectors of the channel matrix H, obtained from the SVD of H.
+    S : numpy.ndarray
+        The singular values of the channel matrix H, obtained from the SVD of H.
+
+    Attributes
+    ----------
     
-    ## Methods
-    ...
+    #### The receiver parameters.
+
+    Nr : int
+        Number of receive antennas.
+
+    #### The necessary communication system parameters.
+
+    M : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+
+    #### The necessary channel state information.
+
+    _U : numpy.ndarray
+        The left singular vectors of the channel matrix H, obtained from the SVD of H.
+    _S : numpy.ndarray
+        The singular values of the channel matrix H, obtained from the SVD of H.
+
+    #### The receiver signals.
+
+    _r : numpy.ndarray
+        The input signal of shape (Nr, Nsymbols). This signal is given to the receiver by the channel.
+    _y : numpy.ndarray
+        The postcoded received symbols of shape (Nr, Nsymbols).
+    _estimation_var : numpy.ndarray
+        The equalized postcoded symbols of shape (Nr, Nsymbols).
+    _symbols_hat : numpy.ndarray
+        The estimated data symbol sequences of shape (Nr, Nsymbols).
+    _bits_hat : numpy.ndarray
+        The output bit sequences of shape (Nr, Nbits).
+
+        
+    Methods
+    -------
+    
+    __init__()
+        Initialize the receiver parameters.
+    __str__()
+        Return a string representation of the receiver object.
+    __call__()
+        Allow the receiver object to be called as a function. When called, it executes the simulate() method.
+
+    set_r()
+        Set the input signal of distorted data symbols received from the channel and to be processed by the receiver.
+    postcode()
+        Postcode the received symbols using the left singular vectors of the channel matrix H and store them.
+    equalizer()
+        Equalize the postcoded symbols using the singular values of the channel matrix H and store them.
+    estimator()
+        Convert the received (equalized postcoded) data symbols into the most probable data symbols and store them.
+    demapper()
+        Convert the data symbol sequences into the corresponding bit sequences according to the specified modulation constellation.
+    simulate()
+        Execute the operations of the receiver. Return the reconstructed bit sequences.
     """
 
     def __init__(self, Nr, constellation_size, constellation_type, U, S):
@@ -261,7 +430,7 @@ class Receiver:
         self.M = constellation_size
         self.type = constellation_type
 
-        # The channel state information.
+        # The necessary channel state information.
         self._U = U
         self._S = S
 
@@ -282,7 +451,7 @@ class Receiver:
 
 
     def set_r(self, r):
-        """ Set the input signal received from the channel. """
+        """ Set the input signal of distorted data symbols received from the channel and to be processed by the receiver. """
         self._r = r
 
     def postcoder(self):
@@ -323,7 +492,7 @@ class Receiver:
         self._symbols_hat = symbols_hat.reshape((self.Nr, self._r.shape[1])) if self._r.ndim != 1 else symbols_hat.flatten()
 
     def demapper(self):
-        """ Convert the data symbol sequences into bit sequences according to the specified modulation constellation. The demapper is the inverse operation of the mapper. """
+        """ Convert the data symbol sequences into the corresponding bit sequences according to the specified modulation constellation. The demapper is the inverse operation of the mapper. """
 
         #1 Setup.
 
@@ -374,7 +543,8 @@ class Receiver:
         Simulate the receiver operations: postcode the received symbols, equalize them, estimate the transmitted symbols, and demap them to bits.
         The estimated bits are the output of the receiver.
 
-        Returns:
+        Returns
+        -------
             _bits_hat (numpy.ndarray): The output bit sequences. This is the estimated bit sequences after processing the received symbols.
         """
 
@@ -390,17 +560,85 @@ class Receiver:
 
 class SuMimoSVD:
     """
-    ## Description
-    ...
+    A single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at both the transmitter and receiver. 
+    
+    The communication system consists of a transmitter, a flat-fading MIMO channel, and a receiver. The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and postcoding at the receiver.
+    
+    
+    Parameters
+    ----------
+    Nt : int
+        Number of transmit antennas.
+    Nr : int
+        Number of receive antennas.
+    constellation_size : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    constellation_type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+    SNR : float
+        Signal-to-noise ratio in dB.
+    Nbits : int, optional
+        Number of bits to be transmitted per antenna. Default is 480.
+    bits : numpy.ndarray, optional
+        The input bit sequences of shape (Nt, Nbits). If not provided, the bit sequences are generated randomly.
+    H : numpy.ndarray, optional
+        The MIMO channel matrix of shape (Nr, Nt). If not provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
 
-    ## Attributes
-    ...
+    
+    Attributes
+    ----------
+    
+    #### The communication system parameters.
 
-    ## Methods
-    ...
+    Nt : int
+        Number of transmit antennas.
+    Nr : int
+        Number of receive antennas.
+    M : int
+        Size of the modulation constellation (e.g., 2, 4, 16, 64).
+    type : str
+        Type of modulation constellation ('PAM', 'PSK', or 'QAM').
+    SNR : float
+        Signal-to-noise ratio in dB.
+
+    #### The communication system components.
+
+    channel : Channel
+        The MIMO channel of the communication system. (see Channel class for details)
+    transmitter : Transmitter
+        The transmitter of the communication system. (see Transmitter class for details)
+    receiver : Receiver
+        The receiver of the communication system. (see Receiver class for details)
+
+    #### The communication system signals.
+
+    Nbits : int
+        Number of bits to be transmitted per antenna.
+    _bits : numpy.ndarray
+        The input bit sequences of shape (Nt, Nbits). These are the information bits to be transmitted.
+    _s : numpy.ndarray
+        The transmitted signal of shape (Nt, Nsymbols). This is the signal fed to the channel by the transmitter.
+    _r : numpy.ndarray
+        The received signal of shape (Nr, Nsymbols). This is the signal received from the channel by the receiver.
+    _bits_hat : numpy.ndarray
+        The output bit sequences of shape (Nr, Nbits). These are the reconstructed information bits after processing by the receiver.
+
+        
+    Methods
+    -------
+    
+    __init__()
+        Initialize the communication system parameters.
+    __str__()
+        Return a string representation of the communication system object.
+    __call__()
+        Allow the communication system object to be called as a function. When called, it executes the simulate() method.
+
+    simulate()
+        Simulate the communication system: generate the bit sequences, transmit them through the MIMO channel, and estimate the transmitted bits at the receiver. Store all of the internal signals.
     """
 
-    def __init__(self, Nt, Nr, constellation_size, constellation_type, SNR, Nbits=64, bits=None, H=None):
+    def __init__(self, Nt, Nr, constellation_size, constellation_type, SNR, Nbits=480, bits=None, H=None):
         """ Initialize the communication system parameters. """
 
         # The necessary communication system parameters.
@@ -410,7 +648,7 @@ class SuMimoSVD:
         self.type = constellation_type
         self.SNR = SNR
         
-        # The channel, transmitter, and receiver of the communication system.
+        # The communication system components (Channel, Transmitter, Receiver).
         self.channel = Channel(self.Nt, self.Nr, self.SNR, H=H)
         self.transmitter = Transmitter(self.Nt, self.M, self.type, self.channel.get_CSI()[3])
         self.receiver = Receiver(Nr, self.M, self.type, self.channel.get_CSI()[1], self.channel.get_CSI()[2])
