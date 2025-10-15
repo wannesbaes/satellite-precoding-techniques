@@ -21,8 +21,8 @@ class Transmitter:
         Size of the modulation constellation (e.g., 2, 4, 16, 64).
     constellation_type : str
         Type of modulation constellation ('PAM', 'PSK', or 'QAM').
-    Vh : numpy.ndarray
-        Right singular vectors of the channel matrix H (obtained from the SVD of H).
+    CSI : tuple
+        The channel state information (CSI), in terms of the channel matrix H and its SVD. CSI = (H, U, S, Vh).
 
         
     Attributes
@@ -40,6 +40,10 @@ class Transmitter:
 
     #### The necessary channel state information.
 
+    _H : numpy.ndarray
+        The MIMO channel matrix of shape (Nr, Nt).
+    _S : numpy.ndarray
+        The singular values of the channel matrix H sorted in descending order, obtained from the SVD of H.
     _Vh : numpy.ndarray
         The right singular vectors of the channel matrix H, obtained from the SVD of H.
 
@@ -74,18 +78,21 @@ class Transmitter:
 
     """
 
-    def __init__(self, Nt, constellation_size, constellation_type, Vh):
+    def __init__(self, Nt, constellation_size, constellation_type, CSI, Pt=1.0):
         """ Initialize the transmitter. """
 
         # The transmitter parameters.
         self.Nt = Nt
+        self.Pt = Pt
 
         # The necessary communication system parameters.
         self.M = constellation_size
         self.type = constellation_type
 
         # The necessary channel state information.
-        self._Vh = Vh
+        self._H = CSI[0]
+        self._S = CSI[2]
+        self._Vh = CSI[3]
         
         # The transmitter signals.
         self._bits = None
@@ -156,12 +163,12 @@ class Transmitter:
         self._symbols = symbols
 
     def precoder(self):
-        """ Precode the data symbols using the right singular vectors of the channel matrix H and store them. So, we assume the channel state information is available at the transmitter. """
-        self._s = np.dot(self._Vh.conj().T, self._symbols)
+        """ Precode the data symbols using the right singular vectors of the channel matrix H and store them. """
+        self._s = np.dot(self._Vh.conj().T, self._powered_symbols)
 
     def simulate(self):
         """
-        Simulate the transmitter operations: get the channel state information, generate the bit sequences, map them to complex symbols, and precode the symbols.
+        Simulate the transmitter operations: get the channel state information, generate the bit sequences, map them to complex symbols, allocate power to the symbols, and precode the symbols.
         The precoded symbols are ready to be transmitted through the MIMO channel.
 
         Returns
@@ -311,7 +318,7 @@ class Channel:
         """ Generate complex circularly-symmetric additive white Gaussian noise (AWGN) on the channel, based on the specified SNR. """
 
         # Calculate the noise variance based on the specified SNR (in dB) and the average symbol power Es.
-        Es = 1.0
+        Es = np.mean(np.abs(self._s)**2)
         SNR_linear = 10.0 ** (self.SNR/10.0)
         var_n = Es / SNR_linear
 
@@ -356,10 +363,8 @@ class Receiver:
         Size of the modulation constellation (e.g., 2, 4, 16, 64).
     constellation_type : str
         Type of modulation constellation ('PAM', 'PSK', or 'QAM').
-    U : numpy.ndarray
-        The left singular vectors of the channel matrix H, obtained from the SVD of H.
-    S : numpy.ndarray
-        The singular values of the channel matrix H, obtained from the SVD of H.
+    CSI : tuple
+        The channel state information (CSI), in terms of the channel matrix H and its SVD. CSI = (H, U, S, Vh).
 
     Attributes
     ----------
@@ -421,7 +426,7 @@ class Receiver:
         Execute the operations of the receiver. Return the reconstructed bit sequences.
     """
 
-    def __init__(self, Nr, constellation_size, constellation_type, U, S):
+    def __init__(self, Nr, constellation_size, constellation_type, CSI):
         """ Initialize the receiver. """
 
         # The receiver parameters.
@@ -432,8 +437,8 @@ class Receiver:
         self.type = constellation_type
 
         # The necessary channel state information.
-        self._U = U
-        self._S = S
+        self._U = CSI[1]
+        self._S = CSI[2]
 
         # The receiver signals.
         self._r = None
@@ -653,8 +658,8 @@ class SuMimoSVD:
         
         # The communication system components (Channel, Transmitter, Receiver).
         self.channel = Channel(self.Nt, self.Nr, self.SNR, H=H)
-        self.transmitter = Transmitter(self.Nt, self.M, self.type, self.channel.get_CSI()[3])
-        self.receiver = Receiver(Nr, self.M, self.type, self.channel.get_CSI()[1], self.channel.get_CSI()[2])
+        self.transmitter = Transmitter(self.Nt, self.M, self.type, self.channel.get_CSI())
+        self.receiver = Receiver(Nr, self.M, self.type, self.channel.get_CSI())
 
         # The communication system signals.
         self._bits = np.random.randint(0, 2, (self.Nt, Nbits)) if bits is None else bits
@@ -681,18 +686,17 @@ class SuMimoSVD:
         Returns
         -------
             ber (float): The bit error rate (BER) of a simulation.
+            N_bit_errors (int): The total number of bit errors.
+            N_bits (int): The total number of transmitted bits.
         """
         # Check if the transmitted and estimated bit sequences are available.
-        if self._bits is None or self._bits_hat is None: raise ValueError(" The transmitted and/or estimated bit sequences are not available. Please run the a simulation first.")
-
-        # QUESTION: what to do if Nt != Nr ??
-        if self.Nt > self.Nr:
-            self._bits_hat = np.vstack([self._bits_hat, np.zeros((self.Nt - self.Nr, self._bits_hat.shape[1]))])
-        elif self.Nr > self.Nt:
-            self._bits = np.vstack([self._bits, np.zeros((self.Nr - self.Nt, self._bits.shape[1]))])
+        if self._bits is None or self._bits_hat is None: raise ValueError("The transmitted and/or estimated bit sequences are not available. Please run the a simulation first.")
         
-        # Calculate and return the bit error rate (BER).
-        return np.sum(self._bits != self._bits_hat) / self._bits.size
+        # Calculate and return the bit error rate (BER), the total number of bit errors, and the total number of transmitted bits.
+        N_bit_errors = np.sum(self._bits != self._bits_hat)
+        N_bits = self._bits.size
+        ber = N_bit_errors / N_bits
+        return ber, N_bit_errors, N_bits
 
     def simulate(self):
         """
@@ -717,31 +721,33 @@ if __name__ == "__main__":
     Nt = 4
     Nr = 4
     SNR_dB_range = np.arange(-5, 21, 0.25)
-    Nbits = 12000
+    Nbits = 120
     constellations = [ {'size': 4, 'type': 'PSK', 'color': 'blue', 'label': '4-PSK'}, {'size': 8, 'type': 'PSK', 'color': 'red', 'label': '8-PSK'}, {'size': 16, 'type': 'QAM', 'color': 'green', 'label': '16-QAM'} ]
     plt.figure(figsize=(10, 7))
 
-    # Simulate each constellation
-    for constellation in constellations:
-        
-        # Determine the BER for each SNR value by running a simulation of the communication system.
+    # Execute a simulation for each constellation. (This corresponds to multiple curves on the same plot.)
+    for constellation in constellations[:-1]:
+
+        # Execute a simulation for each different SNR value in the specified range and store the corresponding BER values. (This results in multiple points on the same curve.)
         BER_values = []
         for SNR_dB in SNR_dB_range:
-            system = SuMimoSVD(Nt, Nr, constellation['size'], constellation['type'], SNR_dB, Nbits=Nbits)
-            system.simulate()
-            BER_values.append(system.get_BER())
-        
-        # Plot the BER vs SNR curve for the current constellation.
-        plt.semilogy(SNR_dB_range, BER_values,  marker='o',  color=constellation['color'], label=constellation['label'], linewidth=2, markersize=6)
 
-        print(f"Simulation completed for {constellation['label']}.")
+            N_bit_errors, N_bits = 0, 0
+            while (N_bit_errors < 200):
+                system = SuMimoSVD(Nt, Nr, constellation['size'], constellation['type'], SNR_dB, Nbits=Nbits)
+                system.simulate()
+                N_bit_errors += system.get_BER()[1]
+                N_bits += system.get_BER()[2]
+            BER_values.append(N_bit_errors / N_bits)
+
+        plt.semilogy(SNR_dB_range, BER_values,  marker='o',  color=constellation['color'], label=constellation['label'], linewidth=2, markersize=6)
 
 
     # Plot settings.
     plt.xlabel('SNR (dB)', fontsize=12)
     plt.ylabel('Bit Error Rate (BER)', fontsize=12)
     plt.suptitle("SU-MIMO SVD System Performance", fontsize=13, fontweight="bold")
-    plt.title(f"{Nt} transmitting antennas and {Nr} receiving antennas. No specific power allocation yet", fontsize=10)
+    plt.title(f"{Nt} transmitting antennas and {Nr} receiving antennas.", fontsize=10)
     plt.grid(True, which='both', linestyle='--', alpha=0.6)
     plt.legend(fontsize=11)
     plt.xlim([SNR_dB_range[0], SNR_dB_range[-1]])
