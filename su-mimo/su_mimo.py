@@ -164,7 +164,7 @@ class Transmitter:
 
     def precoder(self):
         """ Precode the data symbols using the right singular vectors of the channel matrix H and store them. """
-        self._s = np.dot(self._Vh.conj().T, self._powered_symbols)
+        self._s = np.dot(self._Vh.conj().T, self._symbols)
 
     def simulate(self):
         """
@@ -686,17 +686,17 @@ class SuMimoSVD:
         Returns
         -------
             ber (float): The bit error rate (BER) of a simulation.
-            N_bit_errors (int): The total number of bit errors.
-            N_bits (int): The total number of transmitted bits.
+            bit_errors (int): The total number of bit errors.
+            total_bits (int): The total number of transmitted bits.
         """
         # Check if the transmitted and estimated bit sequences are available.
         if self._bits is None or self._bits_hat is None: raise ValueError("The transmitted and/or estimated bit sequences are not available. Please run the a simulation first.")
         
         # Calculate and return the bit error rate (BER), the total number of bit errors, and the total number of transmitted bits.
-        N_bit_errors = np.sum(self._bits != self._bits_hat)
-        N_bits = self._bits.size
-        ber = N_bit_errors / N_bits
-        return ber, N_bit_errors, N_bits
+        bit_errors = np.sum(self._bits != self._bits_hat)
+        total_bits = self._bits.size
+        ber = bit_errors / total_bits
+        return ber, bit_errors, total_bits
 
     def simulate(self):
         """
@@ -720,34 +720,41 @@ if __name__ == "__main__":
     # Initialize the simulation and plot parameters.
     Nt = 4
     Nr = 4
+    N_EXPECTED_ERRORS = 1
+    N_CHANNELS = 250
+    constellations = [  {'size': 2, 'type': 'PAM', 'color': 'cyan', 'label': '2-PAM'},
+                        {'size': 4, 'type': 'PSK', 'color': 'red', 'label': '4-PSK'},
+                        {'size': 8, 'type': 'PSK', 'color': 'green', 'label': '8-PSK'}, 
+                        {'size': 16, 'type': 'QAM', 'color': 'blue', 'label': '16-QAM'} ]
     SNR_dB_range = np.arange(-5, 21, 0.25)
-    Nbits = 120
-    constellations = [ {'size': 4, 'type': 'PSK', 'color': 'blue', 'label': '4-PSK'}, {'size': 8, 'type': 'PSK', 'color': 'red', 'label': '8-PSK'}, {'size': 16, 'type': 'QAM', 'color': 'green', 'label': '16-QAM'} ]
     plt.figure(figsize=(10, 7))
 
     # Execute a simulation for each constellation. (This corresponds to multiple curves on the same plot.)
-    for constellation in constellations[:-1]:
+    for constellation in constellations[1:]:
 
         # Execute a simulation for each different SNR value in the specified range and store the corresponding BER values. (This results in multiple points on the same curve.)
-        BER_values = []
+        BER_values = [0.5]
         for SNR_dB in SNR_dB_range:
 
-            N_bit_errors, N_bits = 0, 0
-            while (N_bit_errors < 200):
-                system = SuMimoSVD(Nt, Nr, constellation['size'], constellation['type'], SNR_dB, Nbits=Nbits)
-                system.simulate()
-                N_bit_errors += system.get_BER()[1]
-                N_bits += system.get_BER()[2]
-            BER_values.append(N_bit_errors / N_bits)
+            N_bits = N_EXPECTED_ERRORS // (BER_values[-1]/2 * Nt)
+            N_bits_per_channel = (N_bits // N_CHANNELS) + ( int(np.log2(constellation['size'])) - ((N_bits // N_CHANNELS) % int(np.log2(constellation['size']))) )
 
-        plt.semilogy(SNR_dB_range, BER_values,  marker='o',  color=constellation['color'], label=constellation['label'], linewidth=2, markersize=6)
+            bit_errors, total_bits = 0, 0
+            for _ in range(N_CHANNELS):
+                system = SuMimoSVD(Nt, Nr, constellation['size'], constellation['type'], SNR_dB, Nbits=int(N_bits_per_channel))
+                system.simulate()
+                bit_errors += system.get_BER()[1]
+                total_bits += system.get_BER()[2]
+            BER_values.append(bit_errors / total_bits)
+
+        plt.semilogy(SNR_dB_range, BER_values[1:],  marker='o',  color=constellation['color'], label=constellation['label'], linewidth=2, markersize=6)
 
 
     # Plot settings.
     plt.xlabel('SNR (dB)', fontsize=12)
     plt.ylabel('Bit Error Rate (BER)', fontsize=12)
-    plt.suptitle("SU-MIMO SVD System Performance", fontsize=13, fontweight="bold")
-    plt.title(f"{Nt} transmitting antennas and {Nr} receiving antennas.", fontsize=10)
+    plt.suptitle("        SU-MIMO SVD System Performance", fontsize=13, fontweight="bold")
+    plt.title(f"{Nt} transmitting antennas and {Nr} receiving antennas", fontsize=10)
     plt.grid(True, which='both', linestyle='--', alpha=0.6)
     plt.legend(fontsize=11)
     plt.xlim([SNR_dB_range[0], SNR_dB_range[-1]])
