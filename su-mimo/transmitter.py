@@ -44,15 +44,23 @@ class Transmitter:
         Allocate power across the transmit antennas based on the power allocation for each antenna.
     precoder()
         Precode the data symbols using the right singular vectors of the channel matrix H.
-    
     simulate()
         Simulate the transmitter operations and return the output signal ready to be transmitted through the MIMO channel.
+    
+    plot_bit_allocation()
+        Plot the bit allocation across the transmit antennas as determined by the waterfilling algorithm.
+    plot_power_allocation()
+        Plot the power allocation across the transmit antennas as determined by the waterfilling algorithm.
+    plot_channel_capacities()
+        Plot the channel capacities and used channel capacities in function of the SNR.
+    plot_data_symbols()
+        Plot the data symbols in the complex plane.
     """
 
 
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt, constellation_type, Pt=1.0, B=0.5):
+    def __init__(self, Nt: int, constellation_type: str, Pt: float = 1.0, B: float = 0.5) -> None:
         """ Initialize the transmitter. """
 
         self.Nt = Nt
@@ -60,9 +68,9 @@ class Transmitter:
         self.B = B
         self.type = constellation_type
 
-    def __str__(self):
+    def __str__(self) -> str:
         """ Return a string representation of the transmitter object. """
-        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.M}-{self.type}"
+        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
 
     def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
@@ -439,7 +447,7 @@ class Transmitter:
         
         return fig, ax
 
-    def plot_channel_capacities(self, CSI=None, N=100, Nr=None) -> None:
+    def plot_channel_capacities(self, CSI: tuple = None, N: int = 100, Nr: int = None) -> None:
         """
         Description
         -----------
@@ -503,7 +511,7 @@ class Transmitter:
         
         return fig, ax
 
-    def plot_data_symbols(self, symbols: np.ndarray, N=1) -> None:
+    def plot_data_symbols(self, symbols: np.ndarray, N: int = 1) -> None:
         """
         Plot the first N data symbols vectors in the complex plane. 
         Each data symbol vector corresponds to the data symbols transmitted from all transmit antennas at a specific time instant. The color of the markers corresponds to the transmit antenna.
@@ -522,12 +530,12 @@ class Transmitter:
         """
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        for i in range(self.Nt):
-            ax.scatter(symbols[i, :N].real, symbols[i, :N].imag, alpha=0.7, s=50, label=f'Antenna {i+1}')
+        for tx_antenna in range(self.Nt):
+            ax.scatter(symbols[tx_antenna, :N].real, symbols[tx_antenna, :N].imag, alpha=0.7, s=50, label=f'Antenna {tx_antenna+1}')
         ax.axhline(0, color='black', linewidth=0.5)
         ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_xlabel('Real')
-        ax.set_ylabel('Imaginary')
+        ax.set_xlabel('Real Part')
+        ax.set_ylabel('Imaginary Part')
         ax.set_title(f'Data Symbols in Complex Plane\n\n{self.Nt} transmit antennas, {self.type} modulation')
         ax.grid()
         ax.axis('equal')
@@ -537,7 +545,7 @@ class Transmitter:
         return fig, ax
 
 
-    def print_simulation_example(self, bits: np.ndarray, K: int, SNR: float, CSI: tuple) -> None:
+    def print_simulation_example(self, bits: np.ndarray, SNR: float, CSI: tuple, K: int = 1) -> None:
         """
         Description
         -----------
@@ -547,28 +555,28 @@ class Transmitter:
         ----------
         bits : numpy.ndarray
             The input bit sequences for each transmit antenna to be transmitted.
-        K : int
-            The maximum number of data symbol vectors to consider in the example.
         SNR : float
             The signal-to-noise ratio in dB.
         CSI : tuple
             The channel state information (H, U, S, Vh).
+        K : int, optional
+            The maximum number of data symbol vectors to consider in the example.
         
         Notes
         -----
-        Only for demonstration purposes.
+        For demonstration purposes only.
         """
 
         # PRINTING EXAMPLE
         print("\n\n========== Transmitter Simulation Example ==========\n")
         
         # 0. Print the input bit sequence.
-        print(f"----- the input bit sequence -----\n b = {bits}\n\n")
+        print(f"----- the input bit sequence -----\n{bits}\n\n")
         
         # 1. Get the channel state information.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
-        print(f"----- the channel state information -----\n\n H = {np.round(H, 2)},\n S = {np.round(S, 2)}\n\n")
+        print(f"----- the channel state information -----\n\n{np.round(H, 2)}\nS = {np.round(S, 2)}\n\n")
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.
         Pi, Ci, Mi = self.waterfilling(H, S, N0)
@@ -582,15 +590,15 @@ class Transmitter:
 
         # 4. Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.
         symbols = self.mapper(bits, Mi)
-        print(f"\n\n----- the data symbols for each transmit antenna -----\n a = {np.round(symbols, 2)}\n\n")
+        print(f"\n\n----- the data symbols for each transmit antenna -----\n{np.round(symbols, 2)}\n\n")
 
         # 5. Allocate power across the transmit antennas.
         powered_symbols = self.power_allocator(symbols, Pi)
-        print(f"----- the data symbols with power allocated for each transmit antenna -----\n a_powered = {np.round(powered_symbols, 2)}\n\n")
+        print(f"----- the data symbols with power allocated for each transmit antenna -----\n{np.round(powered_symbols, 2)}\n\n")
 
         # 6. Precode the data symbols.
         precoded_symbols = self.precoder(powered_symbols, Vh)
-        print(f"----- the precoded data symbols ready for transmission -----\n s = {np.round(precoded_symbols, 2)}\n\n")
+        print(f"----- the precoded data symbols ready for transmission -----\n{np.round(precoded_symbols, 2)}\n\n")
 
         print("======== End of Simulation Example ========")
 
@@ -619,4 +627,4 @@ if __name__ == "__main__":
     CSI = (H, U, S, Vh)
 
     # Transmitter simulation example.
-    transmitter.print_simulation_example(np.random.randint(0, 2, size=100), K=2, SNR=5, CSI=CSI)
+    transmitter.print_simulation_example(np.random.randint(0, 2, size=100), SNR=5, CSI=CSI, K=3)
