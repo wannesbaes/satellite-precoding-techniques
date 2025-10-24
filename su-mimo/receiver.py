@@ -7,7 +7,44 @@ import matplotlib.pyplot as plt
 
 class Receiver:
     """
+    Description
+    -----------
     The receiver of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the receiver (and transmitter).
+
+    When a receiver is called and given an received input signal r containing distorted data symbols, it executes the waterfilling algorithm to determine the constellation size and allocated power on each receive antenna, postcodes and equalizes the received symbols, searches the most probable transmitted data symbols, demaps them into bit sequences, and returns the reconstructed bitstream.
+
+    Attributes
+    ----------
+    Nr : int
+        Number of receiving antennas.
+    Pt : float
+        Total available transmit power.
+    B : float
+        Bandwidth of the communication system.
+    type : str
+        Type of the modulation constellation ('PAM', 'PSK', or 'QAM').
+    
+    Methods
+    -------
+    __init__():
+        Initialize the receiver.
+    __str__():
+        Return a string representation of the receiver object.
+    __call__():
+        Allow the receiver object to be called as a function. When called, it executes the simulate() method.
+    
+    waterfilling():
+        Determine the optimal power allocation and constellation size on each receive antenna using the waterfilling algorithm.
+    postcode():
+        Postcode the received symbols using the left singular vectors of the channel matrix H.
+    equalizer():
+        Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.
+    estimator():
+        Search for the most probable transmitted data symbol vectors from the distorted (equalized & postcoded) data symbol vectors.
+    demapper():
+        Convert the estimated data symbol vectors into the corresponding bit sequence vectors according to the specified modulation constellation on each receive antenna.
+    simulate():
+        Simulate the receiver operations and return the reconstructed bitstream.
     """
 
     
@@ -103,11 +140,8 @@ class Receiver:
         U : np.ndarray
             The left singular vectors of the channel matrix H.
         """
-        print("U shape:", U.shape)
-        print("r shape:", r.shape)
 
         postcoded_symbols = U.conj().T @ r
-
         return postcoded_symbols
 
     def equalizer(self, postcoded_symbols: np.ndarray, S: np.ndarray, Pi: np.ndarray) -> np.ndarray:
@@ -465,8 +499,8 @@ if __name__ == "__main__":
     import channel as ch
     channel = ch.Channel(Nt=5, Nr=4)
 
-    s = transmitter.simulate(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
-    r = channel.simulate(s=s, SNR=15)
+    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
+    r = channel(s=s, SNR=15)
 
     # Receiver simulation example.
     receiver.print_simulation_example(r=r, SNR=15, CSI=channel.get_CSI())

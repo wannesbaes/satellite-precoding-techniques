@@ -1,7 +1,6 @@
 # This module contains the implementation of the transmitter component of a SU-MIMO SVD communication system.
 
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 
 
@@ -9,7 +8,6 @@ class Transmitter:
     """
     Description
     -----------
-
     The transmitter of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the transmitter (and receiver).
 
     When the transmitter is called and given an input bit sequence, it executes the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna, allocates the input bits across the transmit antennas, maps the input bit sequences to the corresponding data symbol sequences according to a specified modulation constellation for each transmit antenna, allocates power across the transmit antennas, and precodes the data symbols using the right singular vectors of the channel matrix H.
@@ -23,7 +21,7 @@ class Transmitter:
     Pt : float, optional
         Total available transmit power. Default is 1.0.
     B : float, optional
-        Bandwidth of the channel. Default is 0.5.
+        Bandwidth of the communication system. Default is 0.5.
     
     Methods
     -------
@@ -39,7 +37,7 @@ class Transmitter:
     bit_allocator()
         Allocate the input bits across the transmit antennas based on the constellation size for each antenna.
     mapper()
-        Convert a bit sequence vector into the corresponding data symbol sequence vector according to the specified modulation constellation for each transmit antenna.
+        Convert bit sequence vectors into the corresponding data symbol vectors according to the specified modulation constellation for each transmit antenna.
     power_allocator()
         Allocate power across the transmit antennas based on the power allocation for each antenna.
     precoder()
@@ -70,7 +68,9 @@ class Transmitter:
 
     def __str__(self) -> str:
         """ Return a string representation of the transmitter object. """
-        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
+
+        str_repr = f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
+        return str_repr
 
     def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
@@ -100,10 +100,10 @@ class Transmitter:
         Returns
         -------
         Pi, Ci, Mi : tuple
-            - Pi (numpy.ndarray): The optimal power allocation for each transmit antenna.
-            - Ci (numpy.ndarray): The capacity of each eigenchannel.
-            - Mi (numpy.ndarray): The constellation size for each transmit antenna.
-        
+            - Pi (1D numpy array): The optimal power allocation for each transmit antenna.
+            - Ci (1D numpy array): The capacity of each eigenchannel.
+            - Mi (1D numpy array): The constellation size for each transmit antenna.
+
         Notes
         -----
         In real-world scenarios, every antenna itself has a power constraint as well. However, in this implementation, we only consider a total power constraint across all antennas.
@@ -122,7 +122,7 @@ class Transmitter:
             waterlevel = (gamma / used_eigenchannels) + (1 / used_eigenchannels) * np.sum(1 / (S[:used_eigenchannels]**2))
 
         # Termination.
-        S = np.concatenate( (S, np.zeros(self.Nt - len(S))) )
+        S = np.pad(S, (0, self.Nt-len(S)))
         Pi =  np.concatenate(( np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*self.B*N0), 0), np.zeros(self.Nt - used_eigenchannels) ))
 
 
@@ -237,7 +237,7 @@ class Transmitter:
         # 3. Convert the decimal values to the corresponding data symbols, according to the specified constellation type.
 
         if type == 'PAM' :
-            dmin = math.sqrt(12/(M**2-1))
+            dmin = int(np.sqrt(12/(M**2-1)))
             symbols = (decimals - (M-1)/2) * dmin
 
         elif type == 'PSK' :
@@ -245,9 +245,9 @@ class Transmitter:
 
         elif type == 'QAM' :
             assert (mc % 2 == 0), f'The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M equals {M}.'
-            dmin = math.sqrt(6/(M-1))
-            symbols_real_part = ((decimals//int(math.sqrt(M))) - (int(math.sqrt(M))-1)/2) * dmin
-            symbols_imaginary_part = ( np.where( ((decimals//int(math.sqrt(M))) % 2 == 0), (int(math.sqrt(M))-1) - (decimals % int(math.sqrt(M))), (decimals % int(math.sqrt(M))) ) - (int(math.sqrt(M))-1)/2) * dmin
+            dmin = int(np.sqrt(6/(M-1)))
+            symbols_real_part = ((decimals//int(np.sqrt(M))) - (int(np.sqrt(M))-1)/2) * dmin
+            symbols_imaginary_part = ( np.where( ((decimals//int(np.sqrt(M))) % 2 == 0), (int(np.sqrt(M))-1) - (decimals % int(np.sqrt(M))), (decimals % int(np.sqrt(M))) ) - (int(np.sqrt(M))-1)/2) * dmin
             symbols = symbols_real_part + (symbols_imaginary_part * 1j)
 
         else :
@@ -261,7 +261,7 @@ class Transmitter:
         """
         Description
         -----------
-        Convert a bit sequence vector into the corresponding data symbol sequence vector according to the specified modulation constellation for each transmit antenna.
+        Convert a bit sequence vector into the corresponding data symbol vectors according to the specified modulation constellation for each transmit antenna.
 
         Parameters
         ----------
@@ -275,7 +275,7 @@ class Transmitter:
         Returns
         -------
         symbols : 2D numpy array
-            Output data symbol sequence vector corresponding to the input bit sequence vector.
+            Output data symbol vectors corresponding to the input bit sequence vectors.
         
         Raises
         ------
@@ -289,8 +289,8 @@ class Transmitter:
         assert self.Nt == len(bits), f'The number of transmit antennas does not match the number of given bit sequences.\nNumber of transmit antennas is {self.Nt}, while number of bit sequences is {len(bits)}.'
 
         symbols = [0] * self.Nt
-        for i in range(self.Nt):
-            symbols[i] = self.map(bits[i], Mi[i], self.type) if Mi[i] >= 2 else np.zeros_like(symbols[i-1], dtype=complex)
+        for tx_antenna in range(self.Nt):
+            symbols[tx_antenna] = self.map(bits[tx_antenna], Mi[tx_antenna], self.type) if Mi[tx_antenna] >= 2 else np.zeros_like(symbols[tx_antenna-1], dtype=complex)
         symbols = np.array(symbols)
         return symbols
 
@@ -312,7 +312,9 @@ class Transmitter:
         powered_symbols : 2D numpy array
             Data symbol sequence with power allocated for each transmit antenna. Shape is (Nt, N_symbols).
         """
-        return np.dot(np.diag(np.sqrt(Pi)), symbols)
+        
+        powered_symbols = np.dot(np.diag(np.sqrt(Pi)), symbols)
+        return powered_symbols
 
     def precoder(self, powered_symbols: np.ndarray, Vh: np.ndarray) -> np.ndarray:
         """ 
@@ -331,7 +333,9 @@ class Transmitter:
         precoded_symbols : 2D numpy array
             Precoded data symbol sequence ready for transmission through the MIMO channel. Shape is (Nt, N_symbols).
         """
-        return np.dot(Vh.conj().T, powered_symbols)
+
+        precoded_symbols = np.dot(Vh.conj().T, powered_symbols)
+        return precoded_symbols
 
     def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """
@@ -340,10 +344,10 @@ class Transmitter:
         Simulate the transmitter operations:\n
         (1) Get the channel state information.\n
         (2) Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.\n
-        (3) Divide the input bits accross the transmit antennas.\n
-        (4) Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.\n
-        (5) Allocate power across the transmit antennas.\n
-        (6) Precode the data symbols using the right singular vectors of the channel matrix H.\n
+        (3) [bit_allocator] Divide the input bits across the transmit antennas.\n
+        (4) [mapper] Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.\n
+        (5) [power_allocator] Allocate power across the transmit antennas.\n
+        (6) [precoder] Precode the data symbols using the right singular vectors of the channel matrix H.\n
         (7) Transmit the precoded symbols through the MIMO channel.\n
 
         The output signal is ready to be transmitted through the MIMO channel.
@@ -543,7 +547,6 @@ class Transmitter:
         fig.tight_layout()
                 
         return fig, ax
-
 
     def print_simulation_example(self, bits: np.ndarray, SNR: float, CSI: tuple, K: int = 1) -> None:
         """

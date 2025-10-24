@@ -2,7 +2,6 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 
 
 class Channel:
@@ -13,12 +12,50 @@ class Channel:
 
     The channel is modeled as a flat-fading MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
     In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR in dB).
+
+    Attributes
+    ----------
+    Nt : int
+        The number of transmitting antennas.
+    Nr : int
+        The number of receiving antennas.
+    H : 2D numpy array (dtype: complex)
+        The MIMO channel matrix (shape: Nr x Nt).
+    U : 2D numpy array (dtype: complex)
+        The left singular vectors of the channel matrix H (shape: Nr x Nr).
+    S : 1D numpy array (dtype: float)
+        The singular values of the channel matrix H (shape: (Rank(H),)).
+    Vh : 2D numpy array (dtype: complex)
+        The right singular vectors of the channel matrix H (shape: Nt x Nt).
+    
+    Methods
+    -------
+    __init__()
+        Initialize the channel object.
+    __str__()
+        Return a string representation of the channel object.
+    __call__()
+        Allow the channel object to be called as a function. When called, it executes the simulate() method.
+    
+    set_CSI()
+        Initialize the MIMO channel matrix and compute its SVD.
+    get_CSI()
+        Get the current channel state information (CSI), in terms of the channel matrix H and its SVD (U, S, Vh).
+    generate_noise()
+        Generate complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors for every transmitted symbol vector, based on the specified SNR.
+    simulate()
+        Simulate the channel operations. Return the channel output signal r.
+    
+    plot_before_after_noise()
+        Plot the received symbol vectors before and after adding noise for a given SNR and input signal.
+    print_simulation_example()
+        Print a step-by-step example of the channel operations for a given SNR and input signal.
     """
 
 
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt: int, Nr: int, H=None) -> None:
+    def __init__(self, Nt: int, Nr: int, H: np.ndarray = None) -> None:
         """ Initialize the channel. """
 
         self.Nt = Nt
@@ -32,8 +69,9 @@ class Channel:
     
     def __str__(self) -> str:
         """ Return a string representation of the channel object. """
-        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
-    
+        str_repr = f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
+        return str_repr
+
     def __call__(self):
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
         return self.simulate()
@@ -224,7 +262,7 @@ if __name__ == "__main__":
     # Initialize the transmitted signal s.
     import transmitter as tx
     transmitter = tx.Transmitter(Nt=5, constellation_type='PSK', Pt=1.0, B=0.5)
-    s = transmitter.simulate(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
+    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
 
     # Channel simulation example.
     channel.print_simulation_example(s=s, SNR=15, K=2)
