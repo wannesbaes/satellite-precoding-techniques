@@ -72,9 +72,9 @@ class Channel:
         str_repr = f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
         return str_repr
 
-    def __call__(self):
+    def __call__(self, s: np.ndarray, SNR: float) -> np.ndarray:
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate()
+        return self.simulate(s, SNR)
 
     
     # FUNCTIONALITY

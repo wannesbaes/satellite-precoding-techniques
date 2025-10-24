@@ -215,7 +215,7 @@ class Transmitter:
         
         # 1. Divide the input bit sequences into blocks of mc bits, where M = 2^mc.
 
-        assert (M & (M - 1) == 0) and M > 1, f'The constellation size M is invalid.\nIt must be greater than 1 and a power of 2. Right now, M equals {M}.'
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
         assert (bits.size % int(np.log2(M)) == 0), f'The length of the bit sequences is invalid.\nThey must be a multiple of log2(M). Right now, length is {bits.size} and log2(M) is {mc}.' 
 
         mc = int(np.log2(M))
@@ -237,18 +237,22 @@ class Transmitter:
         # 3. Convert the decimal values to the corresponding data symbols, according to the specified constellation type.
 
         if type == 'PAM' :
-            dmin = int(np.sqrt(12/(M**2-1)))
-            symbols = (decimals - (M-1)/2) * dmin
+            delta = np.sqrt(3/(M**2-1))
+            symbols = (2*decimals - (M-1)) * delta
 
         elif type == 'PSK' :
-            symbols = np.exp(2 * np.pi * decimals * 1j / M)
+            symbols = np.exp(1j * 2*np.pi * decimals / M)
 
         elif type == 'QAM' :
-            assert (mc % 2 == 0), f'The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M equals {M}.'
-            dmin = int(np.sqrt(6/(M-1)))
-            symbols_real_part = ((decimals//int(np.sqrt(M))) - (int(np.sqrt(M))-1)/2) * dmin
-            symbols_imaginary_part = ( np.where( ((decimals//int(np.sqrt(M))) % 2 == 0), (int(np.sqrt(M))-1) - (decimals % int(np.sqrt(M))), (decimals % int(np.sqrt(M))) ) - (int(np.sqrt(M))-1)/2) * dmin
-            symbols = symbols_real_part + (symbols_imaginary_part * 1j)
+            c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+            real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM[::-1])
+            constellation = (real_grid + 1j*imaginary_grid)
+            constellation[1::2] = constellation[1::2, ::-1]
+            constellation = constellation.flatten()
+
+            symbols = constellation[decimals]
+
+
 
         else :
             raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')

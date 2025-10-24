@@ -1,7 +1,6 @@
 # This module contains the implementation of the receiver component of a SU-MIMO SVD communication system.
 
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 
 
@@ -193,19 +192,19 @@ class Receiver:
 
         # 1. Construct the modulation constellation.
 
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+
         if type == 'PAM':
-            constellation = np.linspace(-(M-1), M-1, M) * (np.sqrt(12/(M**2-1)) / 2)
+            constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
 
         elif type == 'PSK':
             constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
 
         elif type == 'QAM':
-            if (math.log2(M) % 2 != 0): raise ValueError('The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {M}.')
-            real_parts = np.linspace(-(int(math.sqrt(M))-1), int(math.sqrt(M))-1) * (np.sqrt(6/(M-1)) / 2)
-            imaginary_parts = np.linspace(-(int(math.sqrt(M))-1), int(math.sqrt(M))-1) * (np.sqrt(6/(M-1)) / 2)
-            real_grid, imaginary_grid = np.meshgrid(real_parts, imaginary_parts)
+            c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+            real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
             constellation = (real_grid + 1j*imaginary_grid).flatten()
-            
+
         else :
             raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
         
@@ -265,21 +264,27 @@ class Receiver:
         """
 
         # 1. Convert the data symbols to the corresponding decimal values, according to the specified constellation type.
+
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
         
         if type == 'PAM':
-            dmin = math.sqrt(12/(M**2-1))
-            decimals = np.round(symbols_hat/dmin + (M-1)/2).astype(int)
+            delta = np.sqrt(3/(M**2-1))
+            decimals = np.round((1/2) * (symbols_hat / delta + (M-1))).astype(int)
         
         elif type == 'PSK':
-            phases = np.angle(symbols_hat)
+            phases = np.angle(symbols_hat) % (2*np.pi)
             decimals = np.round((phases * M) / (2 * np.pi)).astype(int)
         
         elif type == 'QAM':
-            if (int(np.log2(M)) % 2 != 0): raise ValueError('The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {M}.')
-            dmin = math.sqrt(6/(M-1))
-            real_parts = np.round( np.real(symbols_hat)/dmin + (int(math.sqrt(M))-1)/2 ).astype(int)
-            imaginary_parts = np.round( np.imag(symbols_hat)/dmin + (int(math.sqrt(M))-1)/2 ).astype(int)
-            decimals = (real_parts * int(math.sqrt(M))) + np.where((real_parts % 2 == 0), (int(math.sqrt(M))-1) - imaginary_parts, imaginary_parts)
+            c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+            real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM[::-1])
+            constellation = (real_grid + 1j*imaginary_grid)
+            constellation[1::2] = constellation[1::2, ::-1]
+            constellation = constellation.flatten()
+
+            sort_idx = np.argsort(constellation)
+            pos = np.searchsorted(constellation[sort_idx], symbols_hat)
+            decimals = sort_idx[pos]
 
         else:
             raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
@@ -387,19 +392,19 @@ class Receiver:
 
         # 1. Construct the modulation constellation.
 
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+
         if self.type == 'PAM':
-            constellation = np.linspace(-(M-1), M-1, M) * (np.sqrt(12/(M**2-1)) / 2)
+            constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
 
         elif self.type == 'PSK':
             constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
 
         elif self.type == 'QAM':
-            if (math.log2(M) % 2 != 0): raise ValueError('The constellation size M is invalid.\nFor QAM Modulation, M must be a power of 4 (e.g., 4, 16, 64). Right now, M is {M}.')
-            real_parts = np.linspace(-(int(math.sqrt(M))-1), int(math.sqrt(M))-1) * (np.sqrt(6/(M-1)) / 2)
-            imaginary_parts = np.linspace(-(int(math.sqrt(M))-1), int(math.sqrt(M))-1) * (np.sqrt(6/(M-1)) / 2)
-            real_grid, imaginary_grid = np.meshgrid(real_parts, imaginary_parts)
+            c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+            real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
             constellation = (real_grid + 1j*imaginary_grid).flatten()
-            
+
         else :
             raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
         
@@ -480,7 +485,7 @@ class Receiver:
 
 
         # PLOTS
-        fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[np.linalg.matrix_rank(H)-1, 0], M=Mi[np.linalg.matrix_rank(H)-1])
+        fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[0, 0], M=Mi[0])
         plt.show()
 
         # RETURN
@@ -491,16 +496,16 @@ class Receiver:
 if __name__ == "__main__":
 
     # Initialize the receiver.
-    receiver = Receiver(Nr=4, constellation_type='PSK')
+    receiver = Receiver(Nr=4, constellation_type='QAM')
 
     # Initialize the transmitter and channel.
     import transmitter as tx
-    transmitter = tx.Transmitter(Nt=5, constellation_type='PSK')
+    transmitter = tx.Transmitter(Nt=5, constellation_type='QAM')
     import channel as ch
     channel = ch.Channel(Nt=5, Nr=4)
 
     s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
-    r = channel(s=s, SNR=15)
+    r = channel(s=s, SNR=10)
 
     # Receiver simulation example.
-    receiver.print_simulation_example(r=r, SNR=15, CSI=channel.get_CSI())
+    receiver.print_simulation_example(r=r, SNR=10, CSI=channel.get_CSI())
