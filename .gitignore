@@ -1,5 +1,8 @@
 # macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
+
 
 # Virtual environment
 .venv/
@@ -7,3 +10,32 @@
 # Python
 __pycache__/
 *.pyc
+
+# LaTeX auxiliary files
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.synctex.gz
+*.fdb_latexmk
+*.pdfsync
+*.nav
+*.snm
+*.vrb
+*.xdv
+
+# LaTeX intermediate directories
+_auto/
+_latexmk/
+tmp/
+build/
+
+# VSCode LaTeX extension cache
+.vscode/latex/
