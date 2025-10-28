@@ -68,14 +68,11 @@ class Transmitter:
 
     def __str__(self) -> str:
         """ Return a string representation of the transmitter object. """
+        return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
 
-        str_repr = f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
-        return str_repr
-
-    def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
+    def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(bits, SNR, CSI)
-    
+        return self.simulate(bits, SNR, CSI, M)
 
     # FUNCTIONALITY
 
@@ -99,10 +96,10 @@ class Transmitter:
 
         Returns
         -------
-        Pi, Ci, Mi : tuple
-            - Pi (1D numpy array): The optimal power allocation for each transmit antenna.
-            - Ci (1D numpy array): The capacity of each eigenchannel.
-            - Mi (1D numpy array): The constellation size for each transmit antenna.
+        Pi, Ci, Mi : tuple (3 times 1D numpy array of length used_eigenchannels)
+            - Pi: The optimal power allocation for each transmit antenna.
+            - Ci: The capacity of each eigenchannel.
+            - Mi: The constellation size for each transmit antenna.
 
         Notes
         -----
@@ -122,12 +119,11 @@ class Transmitter:
             waterlevel = (gamma / used_eigenchannels) + (1 / used_eigenchannels) * np.sum(1 / (S[:used_eigenchannels]**2))
 
         # Termination.
-        S = np.pad(S, (0, self.Nt-len(S)))
-        Pi =  np.concatenate(( np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*self.B*N0), 0), np.zeros(self.Nt - used_eigenchannels) ))
+        Pi = np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*self.B*N0), 0)
 
 
         # 2. Eigenchannel Capacities.
-        Ci = 2*self.B * np.log2( 1 + (Pi * (S**2)) / (2*self.B*N0) )
+        Ci = 2*self.B * np.log2( 1 + (Pi * (S[:used_eigenchannels]**2)) / (2*self.B*N0) )
 
 
         # 3. Constellation Sizes.
@@ -144,7 +140,7 @@ class Transmitter:
         Allocate the input bitstream across the transmit antennas based on the constellation size for each antenna. 
         
         Every antenna will have to send an equal amount of data symbols. If the number of bits in the bitstream does not perfectly align with an an equal amount of symbols per antenna, it is padded with zeros.
-        If an eigenchannel has zero capacity, no bits will be allocated to that eigenchannel.
+        If zero power is allocated to an eigenchannel (or thus the used capacity of that eigenchannel equals zero), no bits will be allocated to that eigenchannel.
 
         Parameters
         ----------
@@ -169,14 +165,14 @@ class Transmitter:
         assert self.Nt == Mi.size, f'The number of transmit antennas does not match the number of given constellation sizes.\nNumber of transmit antennas is {self.Nt}, while length of Mi is {Mi.size}.'
         for i, M in enumerate(Mi): assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
         
-        eigenchannel_capacities = np.log2(Mi).astype(int)
-        total_capacity = int(np.sum(eigenchannel_capacities))
-        N_symbols = int(np.ceil(len(bitstream) / total_capacity))
-        bitstream = np.concatenate([bitstream, np.zeros( N_symbols*total_capacity - len(bitstream), dtype=int)])
+        C_eigenchannels = np.log2(Mi).astype(int)
+        C_total = np.sum( C_eigenchannels ).astype(int) # What if C_total = 0 ??
+        N_symbols = np.ceil( len(bitstream) / C_total ).astype(int)
+        bitstream = np.pad( bitstream, pad_width=(0, N_symbols*C_total - len(bitstream)), mode='constant', constant_values=0 )
 
-        bits = [np.array([], dtype=int) for _ in range(self.Nt)]
+        bits = [np.array([], dtype=int)] * self.Nt
         while bitstream.size > 0:
-            for i, mc in enumerate(eigenchannel_capacities):
+            for i, mc in enumerate(C_eigenchannels):
                 bits[i] = np.concatenate((bits[i], bitstream[:mc]))
                 bitstream = bitstream[mc:]
 
@@ -341,13 +337,13 @@ class Transmitter:
         precoded_symbols = np.dot(Vh.conj().T, powered_symbols)
         return precoded_symbols
 
-    def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
+    def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
         """
         Description
         -----------
         Simulate the transmitter operations:\n
         (1) Get the channel state information.\n
-        (2) Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.\n
+        (2) Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.\n Note: If a fixed constellation size M is provided as input, the waterfilling algorithm is skipped and this constellation size is used for all antennas.\n
         (3) [bit_allocator] Divide the input bits across the transmit antennas.\n
         (4) [mapper] Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.\n
         (5) [power_allocator] Allocate power across the transmit antennas.\n
@@ -364,16 +360,28 @@ class Transmitter:
             The signal-to-noise ratio in dB.
         CSI : tuple
             The channel state information, consisting of the channel matrix H, left singular vectors U, singular values S, and right singular vectors Vh.
+        M : int, optional
+            The fixed constellation size for all transmit antennas. If provided, the waterfilling algorithm is skipped and this constellation size is used for all antennas.
 
         Returns
         -------
             s (numpy.ndarray): The output signal.
         """
-        
+
+        # Setup.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
 
-        Pi, Ci, Mi = self.waterfilling(H, S, N0)
+        if M is None:
+            Pi, Ci, Mi = self.waterfilling(H, S, N0)
+            Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
+            Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
+        else:
+            rank_H = np.linalg.matrix_rank(CSI[0])
+            Mi = np.array([M] * rank_H)
+            Pi = np.array([self.Pt / rank_H] * rank_H)
+
+        # Transmitter Operations.
         bits = self.bit_allocator(bits, Mi)
         symbols = self.mapper(bits, Mi)
         powered_symbols = self.power_allocator(symbols, Pi)
@@ -407,7 +415,7 @@ class Transmitter:
         ax.bar(x + 0.35/2, mc, width=0.35, color='tab:blue', label='Constellation size')
         ax.set_xlabel('Transmit antenna')
         ax.set_ylabel('Capacity [bits]')
-        ax.set_title(f'Antenna Bit Allocation\n\nTransmit antennas: {self.Nt}, SNR: {SNR} dB, Total transmit power: {round(self.Pt, 2)} W, Noise Power: {round(2*self.B*N0, 2)} W')
+        ax.set_title(f'Antenna Bit Allocation\n\n{self.Nt} transmit antennas and {CSI[0].shape[0]} receive antennas \nSNR: {SNR} dB')
         ax.set_xticks(x)
         ax.set_xticklabels(x + 1)
         ax.set_xlim(-0.5, len(Ci) - 0.5)
@@ -437,9 +445,10 @@ class Transmitter:
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         S = CSI[2]
         Pi = self.waterfilling(CSI[0], S, N0)[0]
+        Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
 
         inverse_channel_gains = (2*self.B*N0) / (S[S > 0] ** 2)
-        waterlevels = (Pi[Pi > 0] + inverse_channel_gains[Pi[:len(S)] > 0])
+        waterlevels = (Pi[Pi > 0] + inverse_channel_gains[Pi[:len(S[S > 0])] > 0])
 
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.bar(np.arange(1, len(waterlevels) + 1), waterlevels, color='tab:blue', label='Allocated power')
@@ -447,7 +456,7 @@ class Transmitter:
         ax.axhline(y=np.mean(waterlevels), color='tab:red', linestyle='--', linewidth=3, label='Water level')
         ax.set_xlabel('Transmit antenna')
         ax.set_ylabel('Power')
-        ax.set_title(f'Antenna Power Allocation\n\nTransmit antennas: {self.Nt}, SNR: {SNR} dB, Total transmit power: {round(self.Pt, 2)} W, Noise Power: {round(2*self.B*N0, 2)} W')
+        ax.set_title(f'Antenna Power Allocation\n\n{self.Nt} transmit antennas and {CSI[0].shape[0]} receive antennas \nSNR: {SNR} dB, Total transmit power: {round(self.Pt, 2)} W, Noise Power: {round(2*self.B*N0, 2)} W')
         ax.set_xticks(np.arange(1, len(inverse_channel_gains) + 1))
         ax.set_xlim(0.5, len(inverse_channel_gains) + 0.5)
         ax.legend(loc='upper left')
@@ -587,6 +596,8 @@ class Transmitter:
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.
         Pi, Ci, Mi = self.waterfilling(H, S, N0)
+        Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=0)
+        Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
         print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(Pi, 2)},\n Channel capacities Ci = {np.round(Ci, 2)},\n Constellation sizes Mi = {Mi}\n\n")
         
         # 3. Divide the input bits accross the transmit antennas.
@@ -634,4 +645,4 @@ if __name__ == "__main__":
     CSI = (H, U, S, Vh)
 
     # Transmitter simulation example.
-    transmitter.print_simulation_example(np.random.randint(0, 2, size=100), SNR=5, CSI=CSI, K=3)
+    transmitter.print_simulation_example(np.random.randint(0, 2, size=100), SNR=25, CSI=CSI, K=3)

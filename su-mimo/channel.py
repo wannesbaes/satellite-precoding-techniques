@@ -69,8 +69,7 @@ class Channel:
     
     def __str__(self) -> str:
         """ Return a string representation of the channel object. """
-        str_repr = f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
-        return str_repr
+        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
 
     def __call__(self, s: np.ndarray, SNR: float) -> np.ndarray:
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
@@ -97,11 +96,29 @@ class Channel:
         """ Get the current channel state information (CSI), in terms of the channel matrix H and its SVD (U, S, Vh)."""
         return self._H, self._U, self._S, self._Vh
 
+    def reset(self, H: np.ndarray = None):
+        """
+        Description
+        -----------
+        Reset the channel properties by re-initializing the MIMO channel matrix and its SVD.
+
+        Parameters
+        ----------
+        H : 2D numpy array (dtype: complex), optional
+            The MIMO channel matrix (shape: Nr x Nt). If not provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
+        """
+        
+        self._H = H
+        self._U = None
+        self._S = None
+        self._Vh = None
+        self.set_CSI()
+
     def generate_noise(self, s: np.ndarray, SNR: float) -> np.ndarray:
         """
         Description
         -----------
-        Generate complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors (n[k]) for every transmitted symbol vector, based on the specified SNR.
+        Generate complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors (w[k]) for every transmitted symbol vector, based on the specified SNR.
 
         Parameters
         ----------
@@ -112,7 +129,7 @@ class Channel:
         
         Returns
         -------
-        w : np.ndarray
+        noise : np.ndarray
             The generated noise vectors. Shape: (Nr, N_symbols)
         """
         
@@ -195,7 +212,7 @@ class Channel:
             ax.scatter(r_after_noise[rx_antenna, :K].real, r_after_noise[rx_antenna, :K].imag, color=colors[rx_antenna%len(colors)], alpha=1.0, s=100, label=f'Receive Antenna {rx_antenna+1}')
         ax.axhline(0, color='black', linewidth=0.5)
         ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_title(f'Received Symbols Before (Transparent) and After (Opaque) Noise (SNR = {SNR} dB)')
+        ax.set_title(f'Received Symbols Before (Transparent) and After (Opaque) Noise \nSNR = {SNR} dB')
         ax.set_xlabel('Real Part')
         ax.set_ylabel('Imaginary Part')
         ax.grid()
@@ -262,7 +279,7 @@ if __name__ == "__main__":
     # Initialize the transmitted signal s.
     import transmitter as tx
     transmitter = tx.Transmitter(Nt=5, constellation_type='PSK', Pt=1.0, B=0.5)
-    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
+    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=25, CSI=channel.get_CSI())
 
     # Channel simulation example.
-    channel.print_simulation_example(s=s, SNR=15, K=2)
+    channel.print_simulation_example(s=s, SNR=25, K=2)

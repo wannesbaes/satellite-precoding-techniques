@@ -61,9 +61,9 @@ class Receiver:
         """ Return a string representation of the receiver object. """
         return f"Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = {self.type}"
 
-    def __call__(self):
+    def __call__(self, r: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> None:
         """ Allow the receiver object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate()
+        return self.simulate(r, SNR, CSI, M)
 
 
     # FUNCTIONALITY
@@ -88,11 +88,11 @@ class Receiver:
 
         Returns
         -------
-        Pi, Ci, Mi : tuple
-            - Pi (numpy.ndarray): The optimal power allocation for each transmit antenna.
-            - Ci (numpy.ndarray): The capacity of each eigenchannel.
-            - Mi (numpy.ndarray): The constellation size for each transmit antenna.
-        
+        Pi, Ci, Mi : tuple (3 times a 1D numpy array of length used_eigenchannels)
+            - Pi: The optimal power allocation for each receive antenna.
+            - Ci: The capacity of each eigenchannel.
+            - Mi: The constellation size on each receive antenna.
+
         Notes
         -----
         In real-world scenarios, every antenna itself has a power constraint as well. However, in this implementation, we only consider a total power constraint across all antennas.
@@ -111,12 +111,11 @@ class Receiver:
             waterlevel = (gamma / used_eigenchannels) + (1 / used_eigenchannels) * np.sum(1 / (S[:used_eigenchannels]**2))
 
         # Termination.
-        S = np.pad(S, (0, max(0, self.Nr - len(S))))
-        Pi =  np.concatenate(( np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*self.B*N0), 0), np.zeros(self.Nr - used_eigenchannels) ))
+        Pi = np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*self.B*N0), 0)
 
 
         # 2. Eigenchannel Capacities.
-        Ci = 2*self.B * np.log2( 1 + (Pi * (S**2)) / (2*self.B*N0) )
+        Ci = 2*self.B * np.log2( 1 + (Pi * (S[:used_eigenchannels]**2)) / (2*self.B*N0) )
 
 
         # 3. Constellation Sizes.
@@ -134,10 +133,15 @@ class Receiver:
 
         Parameters
         ----------
-        r : np.ndarray
+        r : (Nr x num_symbols) numpy array
             The input signal of distorted data symbols received from the channel and to be processed by the receiver.
-        U : np.ndarray
+        U : (Nr x Nr) numpy array
             The left singular vectors of the channel matrix H.
+        
+        Returns
+        -------
+        postcoded_symbols: (Nr x num_symbols) numpy array
+            The postcoded symbols.
         """
 
         postcoded_symbols = U.conj().T @ r
@@ -151,22 +155,20 @@ class Receiver:
 
         Parameters
         ----------
-        postcoded_symbols : np.ndarray
+        postcoded_symbols : (Nr x num_symbols) numpy array
             The postcoded symbols to be equalized.
-        S : np.ndarray
+        S : (Nr,) numpy array
             The singular values of the channel matrix H.
-        Pi : np.ndarray
+        Pi : (Nr,) numpy array
             The allocated power on each antenna.
 
         Returns
         -------
-        postcoded_symbols : np.ndarray
+        equalized_symbols : (Nr x num_symbols) numpy array
             The equalized symbols.
         """
-        S = np.pad(S, (0, self.Nr-len(S)))
-        Pi = np.pad(Pi, (0, max(0, self.Nr - len(Pi))))[:self.Nr]
+        
         equalized_symbols = (postcoded_symbols / (S*Pi)[:, np.newaxis])
-
         return equalized_symbols
 
     def estimate(self, equalized_symbols: np.ndarray, M: int, type: str) -> np.ndarray:
@@ -331,13 +333,13 @@ class Receiver:
             bits_hat[rx_antenna] = self.demap(symbols_hat[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.array([], dtype=int)
         return bits_hat
 
-    def simulate(self, r: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
+    def simulate(self, r: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
         """
         Description
         -----------
         Simulate the receiver operations:\n
         (1) Get the channel state information.\n
-        (2) Execute the waterfilling algorithm to determine the constellation size and allocated power that will be received on each antenna.\n
+        (2) Execute the waterfilling algorithm to determine the constellation size and allocated power that will be received on each antenna.\n Note: If a fixed constellation size M is provided as input, the waterfilling algorithm is skipped and this constellation size is used for all antennas.\n
         (3) [postcoder] Postcode the received symbols using the left singular vectors of the channel matrix H.\n
         (4) [equalizer] Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.\n
         (5) [estimator] Convert the received (equalized postcoded) data symbols into the most probable data symbols.\n
@@ -352,6 +354,8 @@ class Receiver:
             The signal-to-noise ratio (SNR) in dB.
         CSI : tuple
             A tuple containing the channel state information of the MIMO channel: (H, U, S, Vh).
+        M : int, optional
+            The fixed constellation size for all receive antennas. If provided, the waterfilling algorithm is skipped and this constellation size is used for all antennas.
         
         Returns
         -------
@@ -359,10 +363,20 @@ class Receiver:
             The reconstructed bitstream.
         """
 
+        # Setup.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
-        Pi, Ci, Mi = self.waterfilling(H, S, N0)
 
+        if M is None:
+            Pi, Ci, Mi = self.waterfilling(H, S, N0)
+            Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+            Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
+        else:
+            rank_H = np.linalg.matrix_rank(CSI[0])
+            Mi = np.array([M] * rank_H)
+            Pi = np.array([self.Pt / rank_H] * rank_H)
+        
+        # Receiver Operations.
         postcoded_symbols = self.postcoder(r, U)
         equalized_symbols = self.equalizer(postcoded_symbols, S, Pi)
         symbols_hat = self.estimator(equalized_symbols, Mi)
@@ -374,7 +388,7 @@ class Receiver:
 
     # TESTS AND PLOTS
 
-    def plot_estimator(self, decision_variable: complex, M: int) -> None:
+    def plot_estimator(self, decision_variable: complex, M: int, SNR: float) -> None:
         """
         Description
         -----------
@@ -419,7 +433,7 @@ class Receiver:
         ax.scatter(np.real(constellation[constellation != decision_variable]), np.imag(constellation[constellation != decision_variable]), color='tab:blue', alpha=0.5, s=50, label='Constellation Points')
         ax.axhline(0, color='black', linewidth=0.5)
         ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_title(f'Estimator Visualization for {M}-{self.type}')
+        ax.set_title(f'Estimator Visualization for {M}-{self.type} \nSNR: {SNR} dB')
         ax.set_xlabel('Real Part')
         ax.set_ylabel('Imaginary Part')
         ax.legend()
@@ -461,6 +475,8 @@ class Receiver:
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation on each receive antenna.
         Pi, Ci, Mi = self.waterfilling(H, S, N0)
+        Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+        Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
         print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(Pi, 2)},\n Channel capacities Ci = {np.round(Ci, 2)},\n Constellation sizes Mi = {Mi}\n\n")
 
         # 3. Postcode the received symbols.
@@ -485,7 +501,7 @@ class Receiver:
 
 
         # PLOTS
-        fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[0, 0], M=Mi[0])
+        fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[1, 0], M=Mi[1], SNR=SNR)
         plt.show()
 
         # RETURN
@@ -504,7 +520,7 @@ if __name__ == "__main__":
     import channel as ch
     channel = ch.Channel(Nt=5, Nr=4)
 
-    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=15, CSI=channel.get_CSI())
+    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=10, CSI=channel.get_CSI())
     r = channel(s=s, SNR=10)
 
     # Receiver simulation example.
