@@ -11,6 +11,11 @@
 __pycache__/
 *.pyc
 
+# Drawio files
+*.drawio
+*.drawio.bkp
+*.png.bkp
+
 # LaTeX auxiliary files
 *.aux
 *.lof
@@ -30,6 +35,7 @@ __pycache__/
 *.snm
 *.vrb
 *.xdv
+*.bbl
 
 # LaTeX intermediate directories
 _auto/

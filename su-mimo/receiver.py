@@ -42,6 +42,8 @@ class Receiver:
         Search for the most probable transmitted data symbol vectors from the distorted (equalized & postcoded) data symbol vectors.
     demapper():
         Convert the estimated data symbol vectors into the corresponding bit sequence vectors according to the specified modulation constellation on each receive antenna.
+    bit_deallocator()
+        Combine the reconstructed bits on each antenna to create the output bitstream.
     simulate():
         Simulate the receiver operations and return the reconstructed bitstream.
     """
@@ -99,6 +101,14 @@ class Receiver:
         """
 
         # 1. Waterfilling Algorithm.
+
+        # Edge Case: The PSD of the noise is zero. The optimal strategy is to equally divide the power across all eigenchannels. The capacity of each eigenchannel becomes infinite. That's why we set the constelations sizes to a certain constant value (we can not choose an infinite constellation size).
+        if N0 == 0:
+            used_eigenchannels = np.linalg.matrix_rank(H)
+            Pi = np.array( [self.Pt / used_eigenchannels] * used_eigenchannels )
+            Ci = np.array([np.inf] * used_eigenchannels)
+            Mi = np.array([4] * used_eigenchannels)
+            return Pi, Ci, Mi
 
         # Initialization.
         gamma = self.Pt / (2*self.B*N0)
@@ -167,8 +177,10 @@ class Receiver:
         equalized_symbols : (Nr x num_symbols) numpy array
             The equalized symbols.
         """
-        
-        equalized_symbols = (postcoded_symbols / (S*Pi)[:, np.newaxis])
+
+        useful_eigenchannels = min(len(Pi[Pi>0]), len(S))
+        equalized_symbols = postcoded_symbols[:useful_eigenchannels] / (S*np.sqrt(Pi[:len(S)]))[:useful_eigenchannels][:, np.newaxis]
+
         return equalized_symbols
 
     def estimate(self, equalized_symbols: np.ndarray, M: int, type: str) -> np.ndarray:
@@ -237,10 +249,12 @@ class Receiver:
         symbols_hat : 2D numpy array (dtype: complex)
             The estimated transmitted data symbol vectors.
         """
-        Mi = np.pad(Mi, (0, max(0, self.Nr - len(Mi))))[:self.Nr]
-        symbols_hat = np.zeros_like(equalized_symbols, dtype=complex)
+        
+        num_symbols = len(equalized_symbols[0])
+        symbols_hat = np.zeros((self.Nr, num_symbols), dtype=complex)
+        
         for rx_antenna in range(self.Nr):
-            symbols_hat[rx_antenna, :] = self.estimate(equalized_symbols[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.zeros_like(equalized_symbols[rx_antenna, :], dtype=complex)
+            symbols_hat[rx_antenna, :] = self.estimate(equalized_symbols[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.zeros(num_symbols, dtype=complex)
         
         return symbols_hat
 
@@ -252,7 +266,7 @@ class Receiver:
 
         Parameters
         ----------
-        symbols_hat : 1D numpy array (dtype: complex)
+        symbols_hat : 1D numpy array (dtype: complex) (length: num_symbols)
             The estimated data symbol sequence.
         M : int
             The size of the modulation constellation.
@@ -261,7 +275,7 @@ class Receiver:
         
         Returns
         -------
-        bit_array : 1D numpy array (dtype: int)
+        bit_array : 1D numpy array (dtype: int) (length: num_symbols * log2(M))
             The corresponding bit sequence.
         """
 
@@ -292,14 +306,14 @@ class Receiver:
             raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
         
 
-        # 2. Convert the decimal values to the corresponding blocks of mc bits in gray code.
+        # 2. Convert the decimal values to the corresponding blocks of m bits in gray code.
 
-        mc = int(np.log2(M))
-        binarycodes = ((decimals[:, None].astype(int) & (1 << np.arange(mc))[::-1].astype(int)) > 0).astype(int)
+        m = int(np.log2(M))
+        binarycodes = ((decimals[:, None].astype(int) & (1 << np.arange(m))[::-1].astype(int)) > 0).astype(int)
 
         graycodes = np.zeros_like(binarycodes)
         graycodes[:, 0] = binarycodes[:, 0]
-        for i in range(1, mc):
+        for i in range(1, m):
             graycodes[:, i] = binarycodes[:, i] ^ binarycodes[:, i - 1]
 
 
@@ -316,22 +330,51 @@ class Receiver:
 
         Parameters
         ----------
-        symbols_hat : 2D numpy array (dtype: complex)
+        symbols_hat : 2D numpy array (dtype: complex) (shape: Nr x num_symbols)
             The estimated data symbol vectors.
-        Mi : 1D numpy array (dtype: int)
+        Mi : 1D numpy array (dtype: int) (length: used_eigenchannels)
             The size of the constellation for each transmit antenna.
         
         Returns
         -------
-        bits_hat : list
+        bits_hat : list of 1D numpy arrays (dtype: int) (shape: Nr x num_symbols * log2(Mi[rx_antenna]))
             The corresponding bit sequence vectors.
         """
 
-        Mi = np.pad(Mi, (0, max(0, self.Nr - len(Mi))))[:self.Nr]
+        Mi = np.pad(Mi, (0, max(0, self.Nr - len(Mi))), mode='constant', constant_values=1)
         bits_hat = [0] * self.Nr
         for rx_antenna in range(self.Nr):
             bits_hat[rx_antenna] = self.demap(symbols_hat[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.array([], dtype=int)
         return bits_hat
+
+    def bit_deallocator(self, bits_hat: np.ndarray, Mi: np.ndarray) -> np.ndarray:
+        """
+        Description
+        -----------
+        Combine the reconstructed bits on each antenna to create the output bitstream. It performs the inverse operation of the bit_allocator in the receiver.
+
+        Parameters
+        ----------
+        bits_hat : list of 1D numpy arrays (dtype: int) (shape: Nr x num_symbols * log2(Mi[rx_antenna]))
+            The reconstructed bits on each antenna.
+        Mi : 1D numpy array (dtype: int) (length: Nr)
+            The constellation size on each receive antenna.
+        
+        Return
+        ------
+        bitstream: 1D numpy array (dtype: int) (length: Nr * num_symbols * log2(Mi[rx_antenna]))
+            The reconstructed bitstream. This is the output of the receiver.
+        """
+
+        bitstream = np.array([], dtype=int)
+        m = np.log2(Mi).astype(int)
+        num_symbols = len(bits_hat[0]) // m[0]
+
+        for symbol_i in range(num_symbols):
+            for rx_antenna in range(len(Mi[Mi>=2])):
+                bitstream = np.concatenate((bitstream, bits_hat[rx_antenna][symbol_i*m[rx_antenna]: (symbol_i+1)*m[rx_antenna]]))
+
+        return bitstream
 
     def simulate(self, r: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
         """
@@ -344,7 +387,8 @@ class Receiver:
         (4) [equalizer] Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.\n
         (5) [estimator] Convert the received (equalized postcoded) data symbols into the most probable data symbols.\n
         (6) [demapper] Convert the data symbol sequences into the corresponding bit sequences according to the specified modulation constellation.\n
-        (7) Return the output bitstream.\n
+        (7) [bit deallocator] Combine the reconstructed bit sequences to create the output bitstream.\n
+        (8) Return the output bitstream.\n
 
         Parameters
         ----------
@@ -381,7 +425,7 @@ class Receiver:
         equalized_symbols = self.equalizer(postcoded_symbols, S, Pi)
         symbols_hat = self.estimator(equalized_symbols, Mi)
         bits_hat = self.demapper(symbols_hat, Mi)
-        bits_hat = np.concatenate(bits_hat)
+        bits_hat = self.bit_deallocator(bits_hat, Mi)
 
         return bits_hat
 
@@ -466,12 +510,12 @@ class Receiver:
         print("\n\n========== Receiver Simulation Example ==========\n")
 
         # 0. Print the input signal.
-        print(f"----- the input signal (distorted data symbols) -----\n{r}\n\n")
+        print(f"----- the input signal (distorted data symbols) -----\n{np.round(r, 2)}\n\n")
 
         # 1. Get the channel state information.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
-        print(f"----- the channel state information -----\n\n{np.round(H, 2)}\nS = {np.round(S, 2)}\n\n")
+        print(f"----- the channel state information -----\n\nH = \n{np.round(H, 2)}\n\nS = {np.round(S, 2)}\n\nU =\n {np.round(U, 2)}\n\nVh =\n {np.round(Vh, 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation on each receive antenna.
         Pi, Ci, Mi = self.waterfilling(H, S, N0)
@@ -497,15 +541,19 @@ class Receiver:
         for rx_antenna in range(self.Nr):
             print(f" Receive Antenna {rx_antenna+1}: bits_hat = {bits_hat[rx_antenna]}\n")
         
-        print("\n\n========== End of Simulation Example ==========\n")
+        # 7. Combine the bit sequences to create the output bitstream.
+        bits_hat = self.bit_deallocator(bits_hat, Mi)
+        print(f"\n----- the reconstructed bitstream -----\n bits_hat = {bits_hat}\n\n")
+        
+        print("\n\n========== End Receiver Simulation Example ==========\n")
 
 
         # PLOTS
-        fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[1, 0], M=Mi[1], SNR=SNR)
-        plt.show()
+        # fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[1, 0], M=Mi[1], SNR=SNR)
+        # plt.show()
 
         # RETURN
-        return
+        return bits_hat
 
 
 

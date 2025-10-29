@@ -69,7 +69,7 @@ class Channel:
     
     def __str__(self) -> str:
         """ Return a string representation of the channel object. """
-        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n  - SNR = {self.SNR} dB\n  - H = {'Provided' if self._H is not None else 'i.i.d. complex Gaussian (0 mean, 1 variance) variables.'}"
+        return f"Channel: \n  - Number of transmitting and receiving antennas is {self.Nt} and {self.Nr}\n\n   - H = \n{self._H}\n\n  - S = \n{self._S}\n\n"
 
     def __call__(self, s: np.ndarray, SNR: float) -> np.ndarray:
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
@@ -236,6 +236,11 @@ class Channel:
             The signal-to-noise ratio (SNR) in dB.
         K : int, optional
             The maximum number of symbol vectors to consider for illustration.
+        
+        Return
+        ------
+        r : 2D numpy array of shape (Nr, K)
+            The input signal for the receiver.
 
         Notes
         -----
@@ -246,7 +251,7 @@ class Channel:
         print("\n\n========== Channel Simulation Example ==========\n")
 
         # 0. Print the input symbol vector sequence.
-        print(f"----- the input symbol vector sequence -----\n{s}\n\n")
+        print(f"----- the input symbol vector sequence -----\n{np.round(s, 2)}\n\n")
 
         # 1. Transmit the precoded symbols through the MIMO channel.
         r = self._H @ s
@@ -258,16 +263,16 @@ class Channel:
         SNR_calculated = 10 * np.log10( np.mean( np.sum( np.abs(self._H @ s)**2, axis=0 ) ) / np.mean( np.sum( np.abs(w)**2, axis=0 ) ) )
         print(f"----- the received symbol vector sequence after adding noise -----\n{np.round(r, 2)}\nSNR [calculated]: {np.round(SNR_calculated, 2)} dB\n\n")
 
-        print("======== End of Simulation Example ========\n\n")
+        print("======== End Channel Simulation Example ========\n\n")
 
 
         # PLOTS
-        fig, ax = self.plot_before_after_noise(s=s, SNR=SNR, K=K)
-        plt.show()
+        #fig, ax = self.plot_before_after_noise(s=s, SNR=SNR, K=K)
+        #plt.show()
 
 
         # RETURN
-        return
+        return r
 
 
 

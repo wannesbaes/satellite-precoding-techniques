@@ -108,6 +108,14 @@ class Transmitter:
 
         # 1. Waterfilling Algorithm.
 
+        # Edge Case: The PSD of the noise is zero. The optimal strategy is to equally divide the power across all eigenchannels. The capacity of each eigenchannel becomes infinite. That's why we set the constelations sizes to a certain constant value (we can not choose an infinite constellation size).
+        if N0 == 0:
+            used_eigenchannels = np.linalg.matrix_rank(H)
+            Pi = np.array( [self.Pt / used_eigenchannels] * used_eigenchannels )
+            Ci = np.array([np.inf] * used_eigenchannels)
+            Mi = np.array([4] * used_eigenchannels)
+            return Pi, Ci, Mi
+
         # Initialization.
         gamma = self.Pt / (2*self.B*N0)
         used_eigenchannels = np.linalg.matrix_rank(H)
@@ -166,7 +174,8 @@ class Transmitter:
         for i, M in enumerate(Mi): assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
         
         C_eigenchannels = np.log2(Mi).astype(int)
-        C_total = np.sum( C_eigenchannels ).astype(int) # What if C_total = 0 ??
+        C_total = np.sum( C_eigenchannels ).astype(int)
+        
         N_symbols = np.ceil( len(bitstream) / C_total ).astype(int)
         bitstream = np.pad( bitstream, pad_width=(0, N_symbols*C_total - len(bitstream)), mode='constant', constant_values=0 )
 
@@ -209,16 +218,16 @@ class Transmitter:
         """
 
         
-        # 1. Divide the input bit sequences into blocks of mc bits, where M = 2^mc.
+        # 1. Divide the input bit sequences into blocks of m bits, where M = 2^m.
 
         assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
-        assert (bits.size % int(np.log2(M)) == 0), f'The length of the bit sequences is invalid.\nThey must be a multiple of log2(M). Right now, length is {bits.size} and log2(M) is {mc}.' 
+        assert (bits.size % int(np.log2(M)) == 0), f'The length of the bit sequences is invalid.\nThey must be a multiple of log2(M). Right now, length is {bits.size} and log2(M) is {m}.' 
 
-        mc = int(np.log2(M))
-        bits = bits.reshape((bits.size // mc, mc))
+        m = int(np.log2(M))
+        bits = bits.reshape((bits.size // m, m))
 
 
-        # 2. Convert the blocks of mc bits from gray code to the corresponding decimal value.
+        # 2. Convert the blocks of m bits from gray code to the corresponding decimal value.
         
         graycodes = bits
         binarycodes = np.zeros_like(graycodes)
@@ -227,7 +236,7 @@ class Transmitter:
         for i in range(1, graycodes.shape[1]):
             binarycodes[:, i] = binarycodes[:, i-1] ^ graycodes[:, i]
         
-        decimals = np.dot(binarycodes, (2**np.arange(mc))[::-1])  
+        decimals = np.dot(binarycodes, (2**np.arange(m))[::-1])  
 
 
         # 3. Convert the decimal values to the corresponding data symbols, according to the specified constellation type.
@@ -313,7 +322,7 @@ class Transmitter:
             Data symbol sequence with power allocated for each transmit antenna. Shape is (Nt, N_symbols).
         """
         
-        powered_symbols = np.dot(np.diag(np.sqrt(Pi)), symbols)
+        powered_symbols = np.diag(np.sqrt(Pi)) @ symbols
         return powered_symbols
 
     def precoder(self, powered_symbols: np.ndarray, Vh: np.ndarray) -> np.ndarray:
@@ -334,7 +343,7 @@ class Transmitter:
             Precoded data symbol sequence ready for transmission through the MIMO channel. Shape is (Nt, N_symbols).
         """
 
-        precoded_symbols = np.dot(Vh.conj().T, powered_symbols)
+        precoded_symbols = Vh.conj().T @ powered_symbols
         return precoded_symbols
 
     def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
@@ -381,13 +390,17 @@ class Transmitter:
             Mi = np.array([M] * rank_H)
             Pi = np.array([self.Pt / rank_H] * rank_H)
 
+        # Edge Case: Transmission fails if no bits can be transmitted due to zero useful channel capacity.
+        C_total = np.sum( np.log2(Mi).astype(int) )
+        if C_total == 0: return None, C_total
+
         # Transmitter Operations.
         bits = self.bit_allocator(bits, Mi)
         symbols = self.mapper(bits, Mi)
         powered_symbols = self.power_allocator(symbols, Pi)
         precoded_symbols = self.precoder(powered_symbols, Vh)
 
-        return precoded_symbols
+        return precoded_symbols, C_total
 
 
     # TESTS AND PLOTS
@@ -578,6 +591,11 @@ class Transmitter:
         K : int, optional
             The maximum number of data symbol vectors to consider in the example.
         
+        Return
+        ------
+        precoded_symbols : 2D numpy array of shape (Nt, K)
+            The first K transmitted precoded data symbol vectors.
+        
         Notes
         -----
         For demonstration purposes only.
@@ -592,7 +610,7 @@ class Transmitter:
         # 1. Get the channel state information.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
-        print(f"----- the channel state information -----\n\n{np.round(H, 2)}\nS = {np.round(S, 2)}\n\n")
+        print(f"----- the channel state information -----\n\nH = \n{np.round(H, 2)}\n\nS = {np.round(S, 2)}\n\nU =\n {np.round(U, 2)}\n\nVh =\n {np.round(Vh, 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.
         Pi, Ci, Mi = self.waterfilling(H, S, N0)
@@ -618,19 +636,18 @@ class Transmitter:
         precoded_symbols = self.precoder(powered_symbols, Vh)
         print(f"----- the precoded data symbols ready for transmission -----\n{np.round(precoded_symbols, 2)}\n\n")
 
-        print("======== End of Simulation Example ========")
+        print("======== End Transmitter Simulation Example ========")
 
 
         # PLOTS
-        fig1, ax1 = self.plot_bit_allocation(SNR, CSI)
-        fig2, ax2 = self.plot_power_allocation(SNR, CSI)
-        fig3, ax3 = self.plot_data_symbols(symbols, N=K)
-        plt.show()
+        # fig1, ax1 = self.plot_bit_allocation(SNR, CSI)
+        # fig2, ax2 = self.plot_power_allocation(SNR, CSI)
+        # fig3, ax3 = self.plot_data_symbols(symbols, N=K)
+        #plt.show()
 
 
         # RETURN
-        return
-
+        return precoded_symbols
 
 
 
