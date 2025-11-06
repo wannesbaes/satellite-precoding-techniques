@@ -3,7 +3,6 @@
 .AppleDouble
 .LSOverride
 
-
 # Virtual environment
 .venv/
 
@@ -36,6 +35,9 @@ __pycache__/
 *.vrb
 *.xdv
 *.bbl
+
+# Intermediate simulation results
+*.npz
 
 # LaTeX intermediate directories
 _auto/
