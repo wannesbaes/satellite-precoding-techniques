@@ -20,22 +20,25 @@ class SuMimoSVD:
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt: int, Nr: int, constellation_type: str, H: np.ndarray = None, M: int = None, Pt: float = 1.0, B: int = 0.5):
+    def __init__(self, Nt: int, Nr: int, c_type: str, c_size: int = None, data_rate: float = 1.0, H: np.ndarray = None, Pt: float = 1.0, B: int = 0.5):
 
         self.Nt = Nt
         self.Nr = Nr
-        self.type = constellation_type
-        self.M = M
+
+        self.type = c_type
+        self.M = c_size
+        self.data_rate = data_rate
+
         self.Pt = Pt
         self.B = B
 
-        self.transmitter = tx.Transmitter(Nt, constellation_type, Pt, B)
+        self.transmitter = tx.Transmitter(Nt, c_type, c_size, data_rate, Pt, B)
         self.channel = ch.Channel(Nt, Nr, H)
-        self.receiver = rx.Receiver(Nr, constellation_type, Pt, B)
+        self.receiver = rx.Receiver(Nr, c_type, c_size, data_rate, Pt, B)
 
     def __str__(self):
         """ String representation of the SU-MIMO DigCom system. """
-        return f"({self.Nt}x{self.Nr} {self.type}) SU-MIMO SVD DigCom System"
+        return f'{self.Nt}x{self.Nr} ' + (f'{self.M}-' if self.M is not None else '') + f'{self.type} SU-MIMO SVD DigCom System'
     
     def __call__(self):
         pass
@@ -65,16 +68,18 @@ class SuMimoSVD:
         """
 
         # 1. Transmitter
-        s, C_total = self.transmitter.simulate(bits, SNR, self.channel.get_CSI(), self.M)
-        if C_total == 0: return None, C_total
+        s, total_transmit_R = self.transmitter.simulate(bits, SNR, self.channel.get_CSI())
+        if total_transmit_R == 0: 
+            print('Transmission Failed! Not enough capacity available.')
+            return None, 0
 
         # 2. Channel
         r = self.channel.simulate(s, SNR)
 
         # 3. Receiver
-        bits_hat = self.receiver.simulate(r, SNR, self.channel.get_CSI(), self.M)
+        bits_hat = self.receiver.simulate(r, SNR, self.channel.get_CSI())
 
-        return bits_hat[:len(bits)], C_total
+        return bits_hat[:len(bits)], total_transmit_R
     
 
     def BER_simulation(self, bits: np.ndarray, SNR: float) -> float:
@@ -523,7 +528,7 @@ class SuMimoSVD:
         # Set default colors and markers if not provided.
         if colors is None: colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(Cs_list) - 10)
         if marker_colors is None: marker_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(Cs_list) - 10)
-        if markers is None: markers = ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(BERs_list) - 10)
+        if markers is None: markers = ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(Cs_list) - 10)
 
         # Create the plot.
         fig, ax = plt.subplots()
@@ -625,7 +630,7 @@ if __name__ == "__main__":
     # TEST 2: Performance analysis of multiple SU-MIMO SVD systems.
     if test == 'test 2':
 
-        def test_systems_performance(system_configs, curves, SNRs, num_errors_sim, num_channels):
+        def test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels):
 
             BERs_list = []
             Cs_list = []
@@ -689,16 +694,6 @@ if __name__ == "__main__":
             
             # Return
             return fig1, ax1, fig2, ax2, fig3, ax3
-
-        system_configs = [ (2, 2, 'PSK'), (2, 4, 'PSK'), (4, 4, 'PSK') ]
-        curves = ['upper bound', 'approximation', 'simulation']
-        SNRs = np.arange(-5, 26, 2.5)
-        
-        num_channels = {'upper bound': 100, 'approximation': 1000, 'simulation': 50}
-        num_errors_sim = 500
-
-        fig1, ax1, fig2, ax2, fig3, ax3 = test_systems_performance(system_configs, curves, SNRs, num_errors_sim, num_channels)
-        plt.show()
     
     # TEST 3: Performance analysis of different eigenchannels.
     if test == 'test 3':
@@ -713,7 +708,7 @@ if __name__ == "__main__":
             BERs_eigenchs = [x for x in BERs_eigenchs]
             Cs_eigenchs = [x for x in Cs_eigenchs]
             labels = [f'eigenchannel {i+1}' for i in range(min(Nt, Nr))]
-            title = f'Eigenchannel Performance (Simulation)\n{Nt}x{Nr}-{type} System.'
+            title = f'Eigenchannel Performance (Simulation)\n{Nt}x{Nr} {type} System.'
 
             fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
             fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
@@ -723,5 +718,67 @@ if __name__ == "__main__":
 
             return fig1, ax1, fig2, ax2, fig3, ax3
         
-        fig1, ax1, fig2, ax2 = test_performance_eigenchannels_simulation((4, 4, 'PSK'), np.arange(-5, 31, 2.5), 5000, 500)[:4]
-        plt.show()
+        def test_performance_eigenchannels_analytical(system, SNRs, num_channels, mode):
+            
+            Nt, Nr, type = system
+            su_mimo_svd = SuMimoSVD(Nt, Nr, type)
+
+            BERs_eigenchs, Cs_eigenchs = su_mimo_svd.BERs_analytical(SNRs, num_channels, mode, eigenchannels=True)[2:]
+
+            BERs_eigenchs = [x for x in BERs_eigenchs]
+            Cs_eigenchs = [x for x in Cs_eigenchs]
+            labels = [f'eigenchannel {i+1}' for i in range(min(Nt, Nr))]
+            title = f'Eigenchannel Performance (Analytical {mode})\n{Nt}x{Nr} {type} System.'
+
+            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
+            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
+            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_eigenchs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
+
+            np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_eigenchannel_performance_{mode.replace(" ", "_")}.npz', SNRs=SNRs, BERs=BERs_eigenchs, Cs=Cs_eigenchs, labels=labels)
+
+            return fig1, ax1, fig2, ax2, fig3, ax3
+        
+
+    # TEST 4: Performance analysis at different data rates.
+
+    if test == 'test 4':
+
+        def test_performance_data_rates_simulation(system, SNRs, c_sizes, SNRs_list, data_rates, num_errors, num_channels):
+        
+            Nt, Nr, c_type = system
+
+            BERs_list = []
+            Rs_list = []
+            labels = []
+
+            for c_size in c_sizes:
+
+                su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, c_size=c_size)
+                BERs, Rs = su_mimo_svd.BERs_simulation(SNRs, num_errors, num_channels)
+
+                BERs_list.append(BERs)
+                Rs_list.append(Rs)
+                labels.append(r'$R =$' + f' {np.log2(c_size).astype(int)} bits/antenna')
+
+            for data_rate, SNRs_i in zip(data_rates, SNRs_list):
+
+                su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, data_rate=data_rate)
+                BERs, Rs = su_mimo_svd.BERs_simulation(SNRs_i, num_errors, num_channels)
+
+                BERs = np.concatenate([np.full(len(SNRs) - len(SNRs_i), np.nan), BERs])
+                Rs = np.concatenate([np.full(len(SNRs) - len(SNRs_i), np.nan), Rs])
+
+                BERs_list.append(BERs)
+                Rs_list.append(Rs)
+                labels.append(r'$R \approx$' + f' {round(data_rate*100)}' + r'$\%$')
+
+
+            title = f'Performance at Different Data Rates (Simulation)\n{Nt}x{Nr} {c_type} System.'
+            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_list, labels, markers=['o']*len(BERs_list), title=title)
+            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Rs_list, labels, markers=['o']*len(Rs_list), title=title)
+            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_list, Rs_list, labels, markers=['o']*len(BERs_list), title=title)
+
+            return fig1, ax1, fig2, ax2, fig3, ax3
+
+
+

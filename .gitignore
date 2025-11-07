@@ -10,10 +10,8 @@
 __pycache__/
 *.pyc
 
-# Drawio files
-*.drawio
-*.drawio.bkp
-*.png.bkp
+# VSCode LaTeX extension cache
+.vscode/latex/
 
 # LaTeX auxiliary files
 *.aux
@@ -36,14 +34,20 @@ __pycache__/
 *.xdv
 *.bbl
 
-# Intermediate simulation results
-*.npz
-
 # LaTeX intermediate directories
 _auto/
 _latexmk/
 tmp/
 build/
 
-# VSCode LaTeX extension cache
-.vscode/latex/
+# Intermediate simulation results
+*.npz
+
+# Plots
+*.svg
+*.png
+
+# Drawio files
+*.drawio
+*.drawio.bkp
+*.png.bkp

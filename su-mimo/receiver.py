@@ -51,13 +51,17 @@ class Receiver:
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nr, constellation_type, Pt=1, B=1):
+    def __init__(self, Nr: int, c_type: str, c_size: int = None, data_rate: float = 1.0, Pt: float = 1.0, B: float = 0.5):
         """ Initialize the receiver. """
 
         self.Nr = Nr
+
+        self.type = c_type
+        self.M = c_size
+        self.data_rate = data_rate
+
         self.Pt = Pt
         self.B = B
-        self.type = constellation_type
 
     def __str__(self):
         """ Return a string representation of the receiver object. """
@@ -129,7 +133,7 @@ class Receiver:
 
 
         # 3. Constellation Sizes.
-        Mi = 2 ** np.floor( Ci ).astype(int) if self.type != 'QAM' else 4 ** np.floor( Ci / 2 ).astype(int)
+        Mi = 2 ** np.floor( Ci * self.data_rate ).astype(int) if self.type != 'QAM' else 4 ** np.floor( (Ci * self.data_rate) / 2 ).astype(int)
 
 
         # 4. Return.
@@ -376,7 +380,7 @@ class Receiver:
 
         return bitstream
 
-    def simulate(self, r: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
+    def simulate(self, r: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """
         Description
         -----------
@@ -411,14 +415,15 @@ class Receiver:
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
 
-        if M is None:
+        if self.M is None:
             Pi, Ci, Mi = self.waterfilling(H, S, N0)
-            Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
-            Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
         else:
             rank_H = np.linalg.matrix_rank(CSI[0])
-            Mi = np.array([M] * rank_H)
             Pi = np.array([self.Pt / rank_H] * rank_H)
+            Mi = np.array([self.M] * rank_H)
+        
+        Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+        Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
         
         # Receiver Operations.
         postcoded_symbols = self.postcoder(r, U)

@@ -58,13 +58,17 @@ class Transmitter:
 
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt: int, constellation_type: str, Pt: float = 1.0, B: float = 0.5) -> None:
+    def __init__(self, Nt: int, c_type: str, c_size: int = None, data_rate: float = 1.0, Pt: float = 1.0, B: float = 0.5) -> None:
         """ Initialize the transmitter. """
 
         self.Nt = Nt
+
+        self.type = c_type
+        self.M = c_size
+        self.data_rate = data_rate
+
         self.Pt = Pt
         self.B = B
-        self.type = constellation_type
 
     def __str__(self) -> str:
         """ Return a string representation of the transmitter object. """
@@ -135,7 +139,7 @@ class Transmitter:
 
 
         # 3. Constellation Sizes.
-        Mi = 2 ** np.floor( Ci ).astype(int) if self.type != 'QAM' else 4 ** np.floor( Ci / 2 ).astype(int)
+        Mi = 2 ** np.floor( Ci * self.data_rate ).astype(int) if self.type != 'QAM' else 4 ** np.floor( (Ci * self.data_rate) / 2 ).astype(int)
 
 
         # 4. Return.
@@ -154,8 +158,8 @@ class Transmitter:
         ----------
         bitstream : 1D numpy array
             Input bit sequence to be allocated across the transmit antennas.
-        Mi : 1D numpy array
-            Size of the constellation for each transmit antenna.
+        Ci : 1D numpy array
+            The capacity of each eigenchannel.
 
         Returns
         -------
@@ -170,18 +174,15 @@ class Transmitter:
             If the constellation size M of any antenna is invalid.
         """
 
-        assert self.Nt == Mi.size, f'The number of transmit antennas does not match the number of given constellation sizes.\nNumber of transmit antennas is {self.Nt}, while length of Mi is {Mi.size}.'
-        for i, M in enumerate(Mi): assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+        transmit_Rs = np.log2(Mi).astype(int)
+        total_transmit_R = np.sum(transmit_Rs)
         
-        C_eigenchannels = np.log2(Mi).astype(int)
-        C_total = np.sum( C_eigenchannels ).astype(int)
-        
-        N_symbols = np.ceil( len(bitstream) / C_total ).astype(int)
-        bitstream = np.pad( bitstream, pad_width=(0, N_symbols*C_total - len(bitstream)), mode='constant', constant_values=0 )
+        N_symbols = np.ceil( len(bitstream) / total_transmit_R ).astype(int)
+        bitstream = np.pad( bitstream, pad_width=(0, N_symbols*total_transmit_R - len(bitstream)), mode='constant', constant_values=0 )
 
         bits = [np.array([], dtype=int)] * self.Nt
         while bitstream.size > 0:
-            for i, mc in enumerate(C_eigenchannels):
+            for i, mc in enumerate(transmit_Rs):
                 bits[i] = np.concatenate((bits[i], bitstream[:mc]))
                 bitstream = bitstream[mc:]
 
@@ -346,7 +347,7 @@ class Transmitter:
         precoded_symbols = Vh.conj().T @ powered_symbols
         return precoded_symbols
 
-    def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
+    def simulate(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """
         Description
         -----------
@@ -381,18 +382,18 @@ class Transmitter:
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
 
-        if M is None:
+        if self.M is None:
             Pi, Ci, Mi = self.waterfilling(H, S, N0)
-            Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
-            Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
         else:
             rank_H = np.linalg.matrix_rank(CSI[0])
-            Mi = np.array([M] * rank_H)
             Pi = np.array([self.Pt / rank_H] * rank_H)
+            Mi = np.array([self.M] * rank_H)
+        
+        Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
+        Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
 
         # Edge Case: Transmission fails if no bits can be transmitted due to zero useful channel capacity.
-        C_total = np.sum( np.log2(Mi).astype(int) )
-        if C_total == 0: return None, C_total
+        if np.sum( np.log2(Mi) ) == 0: return None, 0
 
         # Transmitter Operations.
         bits = self.bit_allocator(bits, Mi)
@@ -400,7 +401,7 @@ class Transmitter:
         powered_symbols = self.power_allocator(symbols, Pi)
         precoded_symbols = self.precoder(powered_symbols, Vh)
 
-        return precoded_symbols, C_total
+        return precoded_symbols, np.sum(np.log2(Mi))
 
 
     # TESTS AND PLOTS
