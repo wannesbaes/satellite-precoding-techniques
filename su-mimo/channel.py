@@ -8,10 +8,10 @@ class Channel:
     """
     Description
     -----------
-    The channel of a single-user multiple-input multiple-output (SU-MIMO) communication system. 
+    The channel of a single-user multiple-input multiple-output (SU-MIMO) digital communication system.
 
     The channel is modeled as a distortion-free MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
-    In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR in dB).
+    In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR) (in dB).
 
     Attributes
     ----------
@@ -19,6 +19,8 @@ class Channel:
         The number of transmitting antennas.
     Nr : int
         The number of receiving antennas.
+    SNR : float
+        The signal-to-noise ratio (SNR) in dB.
     H : 2D numpy array (dtype: complex)
         The MIMO channel matrix (shape: Nr x Nt).
     U : 2D numpy array (dtype: complex)
@@ -40,16 +42,16 @@ class Channel:
     set_CSI()
         Initialize the MIMO channel matrix and compute its SVD.
     get_CSI()
-        Get the current channel state information (CSI), in terms of the channel matrix H and its SVD (U, S, Vh).
+        Get the current channel state information (CSI), in terms of the signal-to-noise ratio (SNR), the channel matrix (H) and its SVD (U, S, Vh).
+    reset()
+        Reset the channel properties.
     generate_noise()
-        Generate complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors for every transmitted symbol vector, based on the specified SNR.
+        Generate complex white Gaussian noise (AWGN) vectors for every transmitted symbol vector, based on the current SNR.
     simulate()
         Simulate the channel operations. Return the channel output signal r.
     
-    plot_scatter_diagram()
-        Plot a scatter diagram of the received symbol vectors for a given SNR and input signal.
     print_simulation_example()
-        Print a step-by-step example of the channel operations for a given SNR and input signal.
+        Print a step-by-step example of the channel operations for a given input signal s.
     """
 
 
@@ -95,8 +97,24 @@ class Channel:
         self._U, self._S, self._Vh = np.linalg.svd(self._H)
 
     def get_CSI(self):
-        """ Get the current channel state information (CSI), in terms of the SNR, the channel matrix H and its SVD (U, S, Vh)."""
-        return self._SNR, self._H, self._U, self._S, self._Vh
+        """
+        Description
+        -----------
+        Get the current channel state information (CSI), in terms of the SNR, the channel matrix H and its SVD (U, S, Vh).
+
+        Returns
+        -------
+        CSI : dict
+            The current channel state information (CSI).
+            - SNR : the signal-to-noise ratio (SNR) in dB. (float)
+            - H : the MIMO channel matrix. (2D numpy array, dtype: complex, shape: (Nr, Nt))
+            - U : the left singular vectors of the channel matrix H. (2D numpy array, dtype: complex, shape: (Nr, Nr))
+            - S : the singular values of the channel matrix H. (1D numpy array, dtype: float, shape: (Rank(H),))
+            - Vh : the right singular vectors of the channel matrix H. (2D numpy array, dtype: complex, shape: (Nt, Nt))
+        """
+        
+        CSI = {'SNR': self._SNR, 'H': self._H, 'U': self._U, 'S': self._S, 'Vh': self._Vh}
+        return CSI
 
     def reset(self, SNR=np.inf, H=None):
         """

@@ -8,20 +8,36 @@ class Receiver:
     """
     Description
     -----------
-    The receiver of a single-user multiple-input multiple-output (SU-MIMO) communication system, in which the channel state information is available at the receiver (and transmitter).
+    The receiver of a single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at the receiver (and transmitter).
 
-    When a receiver is called and given an received input signal r containing distorted data symbols, it executes the waterfilling algorithm to determine the constellation size and allocated power on each receive antenna, postcodes and equalizes the received symbols, searches the most probable transmitted data symbols, demaps them into bit sequences, and returns the reconstructed bitstream.
+    When the receiver is called and given an received input signal r, it ...
+        determines the power allocation and constellation size on each receive antenna
+        postcodes and equalizes the received symbol vectors
+        searches the most probable transmitted data symbol vectors
+        demaps them into bit vectors
+        and combines the reconstructed bits on each antenna to create the output bitstream.
 
     Attributes
     ----------
     Nr : int
         Number of receiving antennas.
+    c_type : str
+        Constellation type. (Choose between 'PAM', 'PSK', or 'QAM'.)
+    data_rate : float
+        The data rate at which data is transmitted. It is specified is the fraction of the channel capacity. Default is 1.0.
     Pt : float
-        Total available transmit power.
+        Total available transmit power. Default is 1.0.
     B : float
-        Bandwidth of the communication system.
-    type : str
-        Type of the modulation constellation ('PAM', 'PSK', or 'QAM').
+        Bandwidth of the communication system. Default is 0.5.
+    c_size : int, optional
+        Constellation size. Only used if a fixed constellation size is desired. Default is None.
+    
+    _Pi : 1D numpy array (dtype: float, length: Nr)
+        The power allocation for each receive antenna for the current CSI.
+    _Ci : 1D numpy array (dtype: float, length: Nr)
+        The capacity of each eigenchannel for the current CSI.
+    _Mi : 1D numpy array (dtype: int, length: Nr)
+        The constellation size for each receive antenna for the current CSI.
     
     Methods
     -------
@@ -34,47 +50,60 @@ class Receiver:
     
     waterfilling():
         Determine the optimal power allocation and constellation size on each receive antenna using the waterfilling algorithm.
+    detect():
+        Convert the decision variables into the most probable transmitted data symbols according to the specified modulation constellation.
+    demap():
+        Convert detected data symbols into the corresponding bits according to the specified modulation constellation.
+    
+    resource_allocation():
+        Determine and store the constellation size and power allocation for each receive antenna.
     postcode():
-        Postcode the received symbols using the left singular vectors of the channel matrix H.
+        Postcode the input signal using the left singular vectors of the channel matrix H.
     equalizer():
-        Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.
-    estimator():
-        Search for the most probable transmitted data symbol vectors from the distorted (equalized & postcoded) data symbol vectors.
+        Equalize the postcoded symbol vectors, based on S and Pi.
+    detector():
+        Convert the decision variable vectors into the most probable transmitted data symbol vectors.
     demapper():
-        Convert the estimated data symbol vectors into the corresponding bit sequence vectors according to the specified modulation constellation on each receive antenna.
-    bit_deallocator()
+        Convert the detected data symbol vectors into the corresponding bit vectors according to the specified modulation constellation.
+    bit_deallocator():
         Combine the reconstructed bits on each antenna to create the output bitstream.
     simulate():
-        Simulate the receiver operations and return the reconstructed bitstream.
+        Simulate the receiver operations. Return the reconstructed bitstream.
     """
 
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nr: int, c_type: str, c_size: int = None, data_rate: float = 1.0, Pt: float = 1.0, B: float = 0.5):
+    def __init__(self, Nr, c_type, data_rate=1.0, c_size=None, Pt=1.0, B=0.5):
         """ Initialize the receiver. """
 
+        # Receiver Settings.
         self.Nr = Nr
-
-        self.type = c_type
-        self.M = c_size
         self.data_rate = data_rate
+
+        self.M = c_size
+        self.c_type = c_type
 
         self.Pt = Pt
         self.B = B
 
+        # Resource Allocation.
+        self._Pi = None
+        self._Ci = None
+        self._Mi = None
+
     def __str__(self):
         """ Return a string representation of the receiver object. """
-        return f"Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = {self.type}"
+        return f'Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = ' + (f'{self.M}' if self.M != None else '') + f'{self.c_type}' + f'\n  - Data rate = {self.data_rate*100}% \n  - Total transmit power Pt = {self.Pt} W\n  - Bandwidth B = {self.B} Hz\n'
 
-    def __call__(self, r: np.ndarray, SNR: float, CSI: tuple) -> None:
+    def __call__(self, r, CSI):
         """ Allow the receiver object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(r, SNR, CSI)
+        return self.simulate(r, CSI)
 
 
     # FUNCTIONALITY
 
-    def waterfilling(self, H: np.ndarray, S: np.ndarray, N0: float) -> tuple:
+    def waterfilling(self, N0, H, S):
         """
         Description
         -----------
@@ -85,19 +114,19 @@ class Receiver:
 
         Parameters
         ----------
+        N0 : float
+            Noise power spectral density.
         H : numpy.ndarray
             Channel matrix.
         S : numpy.ndarray
             Singular values of the channel matrix H.
-        N0 : float
-            Noise power spectral density.
 
         Returns
         -------
-        Pi, Ci, Mi : tuple (3 times a 1D numpy array of length used_eigenchannels)
-            - Pi: The optimal power allocation for each receive antenna.
+        Pi, Ci, Mi : tuple (3x 1D numpy array of length used_eigenchannels)
+            - Pi: The optimal power allocation for each transmit antenna.
             - Ci: The capacity of each eigenchannel.
-            - Mi: The constellation size on each receive antenna.
+            - Mi: The constellation size for each transmit antenna.
 
         Notes
         -----
@@ -133,169 +162,97 @@ class Receiver:
 
 
         # 3. Constellation Sizes.
-        Mi = 2 ** np.floor( Ci * self.data_rate ).astype(int) if self.type != 'QAM' else 4 ** np.floor( (Ci * self.data_rate) / 2 ).astype(int)
+        Mi = 2 ** np.floor( Ci * self.data_rate ).astype(int) if self.c_type != 'QAM' else 4 ** np.floor( (Ci * self.data_rate) / 2 ).astype(int)
 
 
         # 4. Return.
         return Pi, Ci, Mi
 
-    def postcoder(self, r: np.ndarray, U: np.ndarray) -> np.ndarray:
+    def detect(self, decision_variables, M, c_type):
         """
         Description
         -----------
-        Postcode the received symbols using the left singular vectors of the channel matrix H.
+        Convert the decision variables into the most probable (minimum distance detection) transmitted data symbols according to the specified modulation constellation.
 
         Parameters
         ----------
-        r : (Nr x num_symbols) numpy array
-            The input signal of distorted data symbols received from the channel and to be processed by the receiver.
-        U : (Nr x Nr) numpy array
-            The left singular vectors of the channel matrix H.
-        
-        Returns
-        -------
-        postcoded_symbols: (Nr x num_symbols) numpy array
-            The postcoded symbols.
-        """
-
-        postcoded_symbols = U.conj().T @ r
-        return postcoded_symbols
-
-    def equalizer(self, postcoded_symbols: np.ndarray, S: np.ndarray, Pi: np.ndarray) -> np.ndarray:
-        """
-        Description
-        -----------
-        Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.
-
-        Parameters
-        ----------
-        postcoded_symbols : (Nr x num_symbols) numpy array
-            The postcoded symbols to be equalized.
-        S : (Nr,) numpy array
-            The singular values of the channel matrix H.
-        Pi : (Nr,) numpy array
-            The allocated power on each antenna.
-
-        Returns
-        -------
-        equalized_symbols : (Nr x num_symbols) numpy array
-            The equalized symbols.
-        """
-
-        useful_eigenchannels = min(len(Pi[Pi>0]), len(S))
-        equalized_symbols = postcoded_symbols[:useful_eigenchannels] / (S*np.sqrt(Pi[:len(S)]))[:useful_eigenchannels][:, np.newaxis]
-
-        return equalized_symbols
-
-    def estimate(self, equalized_symbols: np.ndarray, M: int, type: str) -> np.ndarray:
-        """
-        Description
-        -----------
-        Convert a  distorted (equalized & postcoded) data symbol sequence (the decision variables) into the most probable transmitted data symbol sequence according to the specified modulation constellation.
-
-        Parameters
-        ----------
-        equalized_symbols : 1D numpy array (dtype: complex)
-            The distorted (equalized & postcoded) data symbol sequence (the decision variables).
+        decision_variables : 1D numpy array (dtype: complex, length: num_symbols)
+            Input - decision variables.
         M : int
-            The size of the modulation constellation.
-        type : str
-            The type of modulation constellation (choose between 'PAM', 'PSK', 'QAM').
+            Constellation size.
+        c_type : str
+            Constellation type. (Choose between 'PAM', 'PSK', 'QAM'.)
         
         Returns
         -------
-        datasymbols_hat : 1D numpy array (dtype: complex)
-            The estimated transmitted data symbol sequence.
+        datasymbols_hat : 1D numpy array (dtype: complex, length: num_symbols)
+            Output - detected data symbols.
+        
+        Raises
+        ------
+        ValueError
+            If the constellation size or type is invalid.
         """
 
         # 1. Construct the modulation constellation.
 
-        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or c_type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {c_type}.'
 
-        if type == 'PAM':
+        if c_type == 'PAM':
             constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
 
-        elif type == 'PSK':
+        elif c_type == 'PSK':
             constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
 
-        elif type == 'QAM':
+        elif c_type == 'QAM':
             c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
             real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
             constellation = (real_grid + 1j*imaginary_grid).flatten()
 
         else :
-            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
         
 
         # 2. Map each decision variable to the nearest data symbol in the constellation.
 
-        distances = np.abs(constellation[:, np.newaxis] - equalized_symbols)
+        distances = np.abs(constellation[:, np.newaxis] - decision_variables)
         datasymbols_hat = constellation[np.argmin(distances, axis=0)]
 
         # 3. Return
         return datasymbols_hat
 
-    def estimator(self, equalized_symbols: np.ndarray, Mi: np.ndarray) -> np.ndarray:
+    def demap(self, symbols_hat, M, c_type):
         """
         Description
         -----------
-        Convert the distorted (equalized & postcoded) data symbol vectors (the decision variable vectors) into the most probable transmitted data symbol vectors according to the specified modulation constellation for each transmit antenna.
+        Convert detected data symbols into the corresponding bits according to the specified modulation constellation.
 
         Parameters
         ----------
-        equalized_symbols : 2D numpy array (dtype: complex)
-            The distorted (equalized & postcoded) data symbol vectors (the decision variable vectors).
-        Mi : 1D numpy array (dtype: int)
-            The size of the constellation for each transmit antenna.
-        
-        Returns
-        -------
-        symbols_hat : 2D numpy array (dtype: complex)
-            The estimated transmitted data symbol vectors.
-        """
-        
-        num_symbols = len(equalized_symbols[0])
-        symbols_hat = np.zeros((self.Nr, num_symbols), dtype=complex)
-        
-        for rx_antenna in range(self.Nr):
-            symbols_hat[rx_antenna, :] = self.estimate(equalized_symbols[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.zeros(num_symbols, dtype=complex)
-        
-        return symbols_hat
-
-    def demap(self, symbols_hat: np.ndarray, M: int, type: str) -> np.ndarray:
-        """
-        Description
-        -----------
-        Convert an estimated data symbol sequence into the corresponding bit sequence according to the specified modulation constellation.
-
-        Parameters
-        ----------
-        symbols_hat : 1D numpy array (dtype: complex) (length: num_symbols)
-            The estimated data symbol sequence.
+        symbols_hat : 1D numpy array (dtype: complex, length: num_symbols)
+            Input - detected data symbols.
         M : int
-            The size of the modulation constellation.
-        type : str
-            The type of modulation constellation (choose between 'PAM', 'PSK', 'QAM').
+            Constellation size.
+        c_type : str
+            Constellation type. (Choose between 'PAM', 'PSK', 'QAM'.)
         
         Returns
         -------
-        bit_array : 1D numpy array (dtype: int) (length: num_symbols * log2(M))
-            The corresponding bit sequence.
+        bits_hat : 1D numpy array (dtype: int, length: num_symbols * log2(M))
+            Output - reconstructed bits.
         """
 
         # 1. Convert the data symbols to the corresponding decimal values, according to the specified constellation type.
 
-        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
-        
-        if type == 'PAM':
+        if c_type == 'PAM':
             delta = np.sqrt(3/(M**2-1))
             decimals = np.round((1/2) * (symbols_hat / delta + (M-1))).astype(int)
         
-        elif type == 'PSK':
+        elif c_type == 'PSK':
             phases = np.angle(symbols_hat) % (2*np.pi)
             decimals = np.round((phases * M) / (2 * np.pi)).astype(int)
         
-        elif type == 'QAM':
+        elif c_type == 'QAM':
             c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
             real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM[::-1])
             constellation = (real_grid + 1j*imaginary_grid)
@@ -307,7 +264,7 @@ class Receiver:
             decimals = sort_idx[pos]
 
         else:
-            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
         
 
         # 2. Convert the decimal values to the corresponding blocks of m bits in gray code.
@@ -323,166 +280,276 @@ class Receiver:
 
         # 3. Convert the gray code blocks to a single bit sequence and return it.
 
-        bit_array = graycodes.flatten()
-        return bit_array
+        bits_hat = graycodes.flatten()
+        return bits_hat
 
-    def demapper(self, symbols_hat: np.ndarray, Mi: np.ndarray) -> list:
+
+    def resource_allocation(self, CSI, CCI):
         """
         Description
         -----------
-        Convert the estimated data symbol vectors into the corresponding bit sequence vectors according to the specified modulation constellation.
+        Determine and store the constellation size and power allocation for each transmit antenna.
+
+        If a control channel is available, set the resource allocation parameters from the control channel information.
+        
+        Otherwise, there are two cases:
+        - Case 1. No fixed constellation size M is provided as input. In this case, the waterfilling algorithm is executed to determine the optimal (!!) constellation size and power allocation for each transmit antenna.
+        - Case 2. A fixed constellation size M is provided as input. In this case, the waterfilling algorithm is skipped and this constant constellation size is used for all antennas. The power is equally divided across the used eigenchannels.
 
         Parameters
         ----------
-        symbols_hat : 2D numpy array (dtype: complex) (shape: Nr x num_symbols)
-            The estimated data symbol vectors.
-        Mi : 1D numpy array (dtype: int) (length: used_eigenchannels)
-            The size of the constellation for each transmit antenna.
+        CSI : dict
+            The channel state information (SNR, H, U, S, Vh).
+        CCI : dict, optional
+            The control channel information (Pi, Ci, Mi).
+        """
+
+        # If a control channel is available, set the resource allocation parameters from the control channel information.
+        if CCI is not None:
+            self._Pi = CCI['Pi']
+            self._Ci = CCI['Ci']
+            self._Mi = CCI['Mi']
+            return
+        
+        # Case 1: Determine the optimal power allocation and constellation size using the waterfilling algorithm.
+        if self.M is None:
+            N0 = self.Pt / ((10**(CSI['SNR']/10.0)) * 2*self.B)
+            Pi, Ci, Mi = self.waterfilling(N0, CSI['H'], CSI['S'])
+        
+        # Case 2: Use the fixed constellation size M and equally divide the power across the useful eigenchannels.
+        else:
+            rank_H = np.linalg.matrix_rank(CSI['H'])
+            Pi = np.array([self.Pt / rank_H] * rank_H)
+            Mi = np.array([self.M] * rank_H)
+        
+        # Pad Pi and Mi to match the number of transmit antennas Nt.
+        Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+        Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
+
+        # Store the results.
+        self._Pi = Pi
+        self._Ci = Ci
+        self._Mi = Mi
+        return
+
+    def postcoder(self, r, U):
+        """
+        Description
+        -----------
+        Postcode the input signal (distorted data symbol vectors) using the left singular vectors of the channel matrix H.
+
+        Parameters
+        ----------
+        r : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - received signal.
+        U : 2D numpy array (dtype: complex, shape: (Nr, Nr))
+            The left singular vectors of the channel matrix H.
         
         Returns
         -------
-        bits_hat : list of 1D numpy arrays (dtype: int) (shape: Nr x num_symbols * log2(Mi[rx_antenna]))
-            The corresponding bit sequence vectors.
+        r_prime : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Output - postcoded symbol vectors.
         """
 
-        Mi = np.pad(Mi, (0, max(0, self.Nr - len(Mi))), mode='constant', constant_values=1)
-        bits_hat = [0] * self.Nr
-        for rx_antenna in range(self.Nr):
-            bits_hat[rx_antenna] = self.demap(symbols_hat[rx_antenna, :], Mi[rx_antenna], self.type) if Mi[rx_antenna] >= 2 else np.array([], dtype=int)
-        return bits_hat
+        r_prime = U.conj().T @ r
+        return r_prime
 
-    def bit_deallocator(self, bits_hat: np.ndarray, Mi: np.ndarray) -> np.ndarray:
+    def equalizer(self, r_prime, S):
         """
         Description
         -----------
-        Combine the reconstructed bits on each antenna to create the output bitstream. It performs the inverse operation of the bit_allocator in the receiver.
+        Equalize the postcoded symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.
 
         Parameters
         ----------
-        bits_hat : list of 1D numpy arrays (dtype: int) (shape: Nr x num_symbols * log2(Mi[rx_antenna]))
-            The reconstructed bits on each antenna.
-        Mi : 1D numpy array (dtype: int) (length: Nr)
-            The constellation size on each receive antenna.
+        r_prime : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - postcoded symbol vectors.
+        S : 1D numpy array (dtype: float, length=rank_H)
+            The singular values of the channel matrix H.
+
+        Returns
+        -------
+        u : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Output - decision variable vectors.
+        """
+
+        useful_eigenchannels = min(len(self._Pi[self._Pi>0]), len(S))
+        u = r_prime[:useful_eigenchannels] / (S * np.sqrt(self._Pi[:len(S)]))[:useful_eigenchannels][:, np.newaxis]
+
+        return u
+
+    def detector(self, u):
+        """
+        Description
+        -----------
+        Convert the decision variable vectors (distorted (equalized & postcoded) data symbol vectors) into the most probable (minimum distance (MD) detection) transmitted data symbol vectors according to the specified modulation constellation for each transmit antenna.
+
+        Parameters
+        ----------
+        u : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - decision variable vectors.
+        
+        Returns
+        -------
+        a_hat : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Output - detected data symbol vectors.
+        """
+        
+        a_hat = np.array([ self.detect(u[rx_antenna, :], self._Mi[rx_antenna], self.c_type) for rx_antenna in range(len(self._Mi[self._Mi > 1])) ])
+        a_hat = np.concatenate( (a_hat, np.zeros((self.Nr - a_hat.shape[0], a_hat.shape[1]), dtype=complex)), axis=0 )
+        return a_hat
+
+    def demapper(self, a_hat):
+        """
+        Description
+        -----------
+        Convert the detected data symbol vectors into the corresponding bit vectors according to the specified modulation constellation. It performs the inverse operation of the mapper in the transmitter.
+
+        Parameters
+        ----------
+        a_hat : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - detected data symbol vectors.
+              
+        Returns
+        -------
+        b_hat : list of 1D numpy arrays (dtype: int, length: N_symbols * log2(Mi[rx_antenna]))
+            Output - reconstructed bit vectors.
+        """
+
+        b_hat = [ self.demap(a_hat[rx_antenna, :], self._Mi[rx_antenna], self.c_type) for rx_antenna in range(len(self._Mi[self._Mi > 1])) ] + [np.array([], dtype=int)]*(len(self._Mi[self._Mi <= 1]))
+        return b_hat
+    
+    def bit_deallocator(self, b_hat):
+        """
+        Description
+        -----------
+        Combine the reconstructed bit vectors to create the output bitstream. It performs the inverse operation of the bit_allocator in the transmitter.
+
+        Parameters
+        ----------
+        bits_hat : list of 1D numpy arrays (dtype: int, length: N_symbols * log2(Mi[rx_antenna]))
+            Input - reconstructed bit vectors.
         
         Return
         ------
-        bitstream: 1D numpy array (dtype: int) (length: Nr * num_symbols * log2(Mi[rx_antenna]))
-            The reconstructed bitstream. This is the output of the receiver.
+        bitstream_hat: 1D numpy array (dtype: int, length: Nr * num_symbols * log2(Mi[rx_antenna]))
+            Output - reconstructed bitstream.
         """
 
-        bitstream = np.array([], dtype=int)
-        m = np.log2(Mi).astype(int)
-        num_symbols = len(bits_hat[0]) // m[0]
+        bitstream_hat = np.array([], dtype=int)
+        m = np.log2(self._Mi).astype(int)
+        num_symbols = len(b_hat[0]) // m[0]
 
         for symbol_i in range(num_symbols):
-            for rx_antenna in range(len(Mi[Mi>=2])):
-                bitstream = np.concatenate((bitstream, bits_hat[rx_antenna][symbol_i*m[rx_antenna]: (symbol_i+1)*m[rx_antenna]]))
+            for rx_antenna in range(len(self._Mi[self._Mi > 1])):
+                bitstream_hat = np.concatenate((bitstream_hat, b_hat[rx_antenna][symbol_i*m[rx_antenna]: (symbol_i+1)*m[rx_antenna]]))
 
-        return bitstream
+        return bitstream_hat
 
-    def simulate(self, r: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
+    def simulate(self, r, CSI, CCI=None):
         """
         Description
         -----------
         Simulate the receiver operations:\n
         (1) Get the channel state information.\n
-        (2) Execute the waterfilling algorithm to determine the constellation size and allocated power that will be received on each antenna.\n Note: If a fixed constellation size M is provided as input, the waterfilling algorithm is skipped and this constellation size is used for all antennas.\n
-        (3) [postcoder] Postcode the received symbols using the left singular vectors of the channel matrix H.\n
-        (4) [equalizer] Equalize the postcoded symbols using the singular values of the channel matrix H and the allocated power on each antenna.\n
-        (5) [estimator] Convert the received (equalized postcoded) data symbols into the most probable data symbols.\n
-        (6) [demapper] Convert the data symbol sequences into the corresponding bit sequences according to the specified modulation constellation.\n
-        (7) [bit deallocator] Combine the reconstructed bit sequences to create the output bitstream.\n
+        (2) [resource_allocation] Set the resource allocation parameters, obtained from the control channel information.\n In case there is no control channel, execute the waterfilling algorithm to determine the constellation size and allocated power that will be received on each antenna.\n Note: If a fixed constellation size M is provided as input, the waterfilling algorithm is omitted. The available power is equally allocated across all antennas and this constant constellation size is used for all antennas.\n
+        (3) [postcoder] Postcode the received symbol vectors using the left singular vectors of the channel matrix H.\n
+        (4) [equalizer] Equalize the postcoded symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.\n
+        (5) [detector] Convert the decision variable vectors into the most probable data symbol vectors.\n
+        (6) [demapper] Convert the reconstructed data symbol vectors into the corresponding bit vectors according to the specified modulation constellation.\n
+        (7) [bit deallocator] Combine the reconstructed bit vectors to create the output bitstream.\n
         (8) Return the output bitstream.\n
 
         Parameters
         ----------
-        r : np.ndarray
-            The input signal of distorted data symbols received from the channel and to be processed by the receiver.
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
-        CSI : tuple
-            A tuple containing the channel state information of the MIMO channel: (H, U, S, Vh).
-        M : int, optional
-            The fixed constellation size for all receive antennas. If provided, the waterfilling algorithm is skipped and this constellation size is used for all antennas.
+        r : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - received signal.
+        CSI : dict
+            The channel state information.
+            - SNR: The signal-to-noise ratio in dB. (float)
+            - H : The channel matrix. (2D numpy array, dtype: complex, shape: (Nr, Nt)).
+            - U : The left singular vectors of H. (2D numpy array, dtype: complex, shape: (Nr, Nr)).
+            - S : The singular values of H. (1D numpy array, dtype: float, length: Rank(H)).
+            - Vh : The right singular vectors of H. (2D numpy array, dtype: complex, shape: (Nt, Nt)).
+        CCI : dict, optional
+            The control channel information.
+            - Pi : The power allocation for each transmit antenna. (1D numpy array, dtype: float)
+            - Ci : The capacity of each eigenchannel. (1D numpy array, dtype: float)
+            - Mi : The constellation size for each transmit antenna. (1D numpy array, dtype: int)
         
         Returns
         -------
-        bits_hat : np.ndarray
-            The reconstructed bitstream.
+        bitstream_hat : 1D numpy array (dtype: int, length: Nr * N_symbols * log2(Mi[rx_antenna]))
+            Output - reconstructed bitstream.
         """
 
-        # Setup.
-        N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-        H, U, S, Vh = CSI
-
-        if self.M is None:
-            Pi, Ci, Mi = self.waterfilling(H, S, N0)
-        else:
-            rank_H = np.linalg.matrix_rank(CSI[0])
-            Pi = np.array([self.Pt / rank_H] * rank_H)
-            Mi = np.array([self.M] * rank_H)
-        
-        Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
-        Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
+        # Receiver Setup.
+        self.resource_allocation(CCI)
         
         # Receiver Operations.
-        postcoded_symbols = self.postcoder(r, U)
-        equalized_symbols = self.equalizer(postcoded_symbols, S, Pi)
-        symbols_hat = self.estimator(equalized_symbols, Mi)
-        bits_hat = self.demapper(symbols_hat, Mi)
-        bits_hat = self.bit_deallocator(bits_hat, Mi)
+        r_prime = self.postcoder(r, CSI['U'])
+        u = self.equalizer(r_prime, CSI['S'])
+        a_hat = self.detector(u)
+        b_hat = self.demapper(a_hat)
+        bitstream_hat = self.bit_deallocator(b_hat)
 
-        return bits_hat
+        return bitstream_hat
 
 
     # TESTS AND PLOTS
 
-    def plot_estimator(self, decision_variable: complex, M: int, SNR: float) -> None:
+    def plot_detector(self, decision_variable, M, c_type, SNR):
         """
         Description
         -----------
-        Plot the decision variable, the complete constellation and the chosen constellation point to visualize the estimation process.
+        Plot the decision variable, the complete constellation and the chosen constellation point to visualize the detection process.
 
         Parameters
         ----------
         decision_variable : complex
-            The decision variable to be estimated.
+            The decision variable to be detected.
         M : int
-            The size of the modulation constellation.
-        type : str
-            The type of modulation constellation (choose between 'PAM', 'PSK', 'QAM').
+            Constellation size.
+        c_type : str
+            Constellation type. (Choose between 'PAM', 'PSK', 'QAM'.)
+        SNR : float
+            The signal-to-noise ratio (SNR) in dB.
+        
+        Returns
+        -------
+        fig, ax : tuple
+            The figure and axis objects of the plot.
         """
 
         # 1. Construct the modulation constellation.
 
-        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or c_type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {c_type}.'
 
-        if self.type == 'PAM':
+        if c_type == 'PAM':
             constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
 
-        elif self.type == 'PSK':
+        elif c_type == 'PSK':
             constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
 
-        elif self.type == 'QAM':
+        elif c_type == 'QAM':
             c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
             real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
             constellation = (real_grid + 1j*imaginary_grid).flatten()
 
         else :
-            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
+            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
         
-
-        # 2. Estimate the decision variable.
-        symbol_hat = self.estimate(np.array([decision_variable]), M, self.type)[0]
+        # 2. Detect the decision variable.
+        symbol_hat = self.detect(np.array([decision_variable]), M, c_type)[0]
 
         # 3. Plot.
         fig, ax = plt.subplots()
         ax.scatter(np.real(decision_variable), np.imag(decision_variable), color='tab:orange', s=60, label='Decision Variable')
-        ax.scatter(np.real(symbol_hat), np.imag(symbol_hat), color='tab:blue', alpha=1, s=60, label='Estimated Symbol')
+        ax.scatter(np.real(symbol_hat), np.imag(symbol_hat), color='tab:blue', alpha=1, s=60, label='Detected Symbol')
         ax.scatter(np.real(constellation[constellation != decision_variable]), np.imag(constellation[constellation != decision_variable]), color='tab:blue', alpha=0.5, s=50, label='Constellation Points')
         ax.axhline(0, color='black', linewidth=0.5)
         ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_title(f'Estimator Visualization for {M}-{self.type} \nSNR: {SNR} dB')
+        ax.set_title(f'Detector Visualization for {M}-{c_type} \nSNR: {SNR} dB')
         ax.set_xlabel('Real Part')
         ax.set_ylabel('Imaginary Part')
         ax.legend()
@@ -492,22 +559,26 @@ class Receiver:
 
         return fig, ax
 
-    def print_simulation_example(self, r: np.ndarray, SNR: float, CSI: tuple, K: int = 1) -> None:
+    def print_simulation_example(self, r, CSI, CCI, K=1):
         """
         Description
         -----------
-        Print a step-by-step example of the receiver operations (see simulate() method) for given input signal r, SNR, and channel state information (CSI). Only the first K data symbols vectors are considered.
+        Print a step-by-step example of the receiver operations (see simulate() method) for given input signal r, and channel state information (CSI). Only the first K data symbols vectors are considered.
 
         Parameters
         ----------
-        r : np.ndarray
-            The input signal of distorted data symbols received from the channel and to be processed by the receiver.
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
-        CSI : tuple
-            A tuple containing the channel state information of the MIMO channel: (H, U, S, Vh).
+        r : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - received signal.
+        CSI : dict
+            The channel state information (SNR, H, U, S, Vh).
+        CCI : dict
+            The control channel information (Pi, Ci, Mi).
         K : int, optional
-            The maximum number of symbol vectors to consider for illustration.
+            Number of data symbol vectors to consider in the illustration. Default is 1.
+        
+        Notes
+        -----
+        For demonstration purposes only.
         """
 
         # PRINTING EXAMPLE
@@ -518,63 +589,58 @@ class Receiver:
         print(f"----- the input signal (distorted data symbols) -----\n{np.round(r, 2)}\n\n")
 
         # 1. Get the channel state information.
-        N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-        H, U, S, Vh = CSI
-        print(f"----- the channel state information -----\n\nH = \n{np.round(H, 2)}\n\nS = {np.round(S, 2)}\n\nU =\n {np.round(U, 2)}\n\nVh =\n {np.round(Vh, 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
+        N0 = self.Pt / ((10**(CSI['SNR']/10.0)) * 2*self.B)
+        print(f"----- the channel state information -----\n\nH = \n{np.round(CSI['H'], 2)}\n\nS = {np.round(CSI['S'], 2)}\n\nU =\n {np.round(CSI['U'], 2)}\n\nVh =\n {np.round(CSI['Vh'], 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
 
-        # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation on each receive antenna.
-        Pi, Ci, Mi = self.waterfilling(H, S, N0)
-        Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
-        Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
-        print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(Pi, 2)},\n Channel capacities Ci = {np.round(Ci, 2)},\n Constellation sizes Mi = {Mi}\n\n")
+        # 2. Set the resource allocation parameters.
+        Pi, self._Ci, Mi = self.waterfilling(N0, CSI['H'], CSI['S']) if CCI is None else (CCI['Pi'], CCI['Ci'], CCI['Mi'])
+        self._Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+        self._Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
+        print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(self._Pi, 2)},\n Channel capacities Ci = {np.round(self._Ci, 2)},\n Constellation sizes Mi = {self._Mi}\n\n")
 
         # 3. Postcode the received symbols.
-        postcoded_symbols = self.postcoder(r[:, :K], U)
-        print(f"----- the postcoded symbols -----\n{np.round(postcoded_symbols, 2)}\n\n")
+        r_prime = self.postcoder(r[:, :K], CSI['U'])
+        print(f"----- the postcoded symbols -----\n{np.round(r_prime, 2)}\n\n")
 
         # 4. Equalize the postcoded symbols.
-        equalized_symbols = self.equalizer(postcoded_symbols, S, Pi)
-        print(f"----- the equalized symbols -----\n{np.round(equalized_symbols, 2)}\n\n")
+        u = self.equalizer(r_prime, CSI['S'])
+        print(f"----- the equalized symbols -----\n{np.round(u, 2)}\n\n")
 
-        # 5. Estimate the transmitted data symbols.
-        symbols_hat = self.estimator(equalized_symbols, Mi)
-        print(f"----- the estimated symbols -----\n{np.round(symbols_hat, 2)}\n\n")
+        # 5. Detect the transmitted data symbols.
+        a_hat = self.detector(u)
+        print(f"----- the estimated symbols -----\n{np.round(a_hat, 2)}\n\n")
 
         # 6. Demap the estimated data symbols into bit sequences.
-        bits_hat = self.demapper(symbols_hat, Mi)
+        b_hat = self.demapper(a_hat)
         print(f"----- the reconstructed bitstreams -----\n")
         for rx_antenna in range(self.Nr):
-            print(f" Receive Antenna {rx_antenna+1}: bits_hat = {bits_hat[rx_antenna]}\n")
+            print(f" Receive Antenna {rx_antenna+1}: bits_hat = {b_hat[rx_antenna]}\n")
         
         # 7. Combine the bit sequences to create the output bitstream.
-        bits_hat = self.bit_deallocator(bits_hat, Mi)
-        print(f"\n----- the reconstructed bitstream -----\n bits_hat = {bits_hat}\n\n")
+        bitstream_hat = self.bit_deallocator(b_hat)
+        print(f"\n----- the reconstructed bitstream -----\n bits_hat = {bitstream_hat}\n\n")
         
         print("\n\n========== End Receiver Simulation Example ==========\n")
 
 
-        # PLOTS
-        # fig1, ax1 = self.plot_estimator(decision_variable=equalized_symbols[1, 0], M=Mi[1], SNR=SNR)
-        # plt.show()
-
         # RETURN
-        return bits_hat
+        return bitstream_hat
 
 
 
 if __name__ == "__main__":
 
     # Initialize the receiver.
-    receiver = Receiver(Nr=4, constellation_type='QAM')
+    receiver = Receiver(Nr=4, c_type='QAM')
 
     # Initialize the transmitter and channel.
     import transmitter as tx
-    transmitter = tx.Transmitter(Nt=5, constellation_type='QAM')
+    transmitter = tx.Transmitter(Nt=5, c_type='QAM')
     import channel as ch
-    channel = ch.Channel(Nt=5, Nr=4)
+    channel = ch.Channel(Nt=5, Nr=4, SNR=15)
 
-    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=10, CSI=channel.get_CSI())
-    r = channel(s=s, SNR=10)
+    s = transmitter(bits=np.random.randint(0, 2, size=100), CSI=channel.get_CSI())
+    r = channel(s=s)
 
     # Receiver simulation example.
-    receiver.print_simulation_example(r=r, SNR=10, CSI=channel.get_CSI())
+    receiver.print_simulation_example(r=r, CSI=channel.get_CSI(), CCI=transmitter.get_CCI(), K=1)
