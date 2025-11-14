@@ -42,14 +42,14 @@ class Transmitter:
         Allow the transmitter object to be called as a function. When called, it executes the simulate() method.
     
     get_resource_allocation()
-        Return the power allocation, eigenchannel capacities, and constellation sizes of each transmit antenna, for the current CSI and SNR.
+        Return the power allocation, eigenchannel capacities, and constellation sizes of each transmit antenna, for the current CSI.
     waterfilling()
         Execute the waterfilling algorithm to determine the power allocation and constellation size for each transmit antenna.
     map()
         Convert a bit sequence into the corresponding data symbol sequence according to the specified modulation constellation.
     
     resource_allocation()
-        Determine and store the constellation size and power allocation for each transmit antenna, for the current channel state information (CSI) and signal-to-noise ratio (SNR).
+        Determine and store the constellation size and power allocation for each transmit antenna, for the current channel state information (CSI).
     bit_allocator()
         Allocate the input bitstream across the transmit antennas based on the calculated constellation size for each antenna.
     mapper()
@@ -66,7 +66,7 @@ class Transmitter:
     plot_power_allocation()
         Plot the power allocation across the transmit antennas as determined by the waterfilling algorithm.
     print_simulation_example()
-        Print a step-by-step example of the transmitter operations for given input bits, SNR, and channel state information (CSI).
+        Print a step-by-step example of the transmitter operations for given input bits and channel state information (CSI).
     """
 
 
@@ -94,14 +94,14 @@ class Transmitter:
         """ Return a string representation of the transmitter object. """
         return f'Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = ' + (f'{self.M}' if self.M != None else '') + f'{self.c_type}'
 
-    def __call__(self, bits, SNR, CSI):
+    def __call__(self, bits, CSI):
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(bits, SNR, CSI)
+        return self.simulate(bits, CSI)
 
     # FUNCTIONALITY
 
     def get_resource_allocation(self):
-        """ Return the power allocation, eigenchannel capacities, and constellation sizes of each transmit antenna, for the current CSI and SNR. """
+        """ Return the power allocation, eigenchannel capacities, and constellation sizes of each transmit antenna, for the current CSI. """
         return self._Pi, self._Ci, self._Mi
 
     def waterfilling(self, N0, H, S):
@@ -247,11 +247,11 @@ class Transmitter:
         return symbols
 
 
-    def resource_allocation(self, SNR, CSI):
+    def resource_allocation(self, CSI):
         """
         Description
         -----------
-        Determine and store the constellation size and power allocation for each transmit antenna, for the current channel state information (CSI) and signal-to-noise ratio (SNR).\n
+        Determine and store the constellation size and power allocation for each transmit antenna, for the current channel state information (CSI).\n
 
         There are two possible cases:
         - Case 1. No fixed constellation size M is provided as input. In this case, the waterfilling algorithm is executed to determine the optimal (!!) constellation size and power allocation for each transmit antenna.
@@ -259,21 +259,19 @@ class Transmitter:
 
         Parameters
         ----------
-        SNR : float
-            The signal-to-noise ratio in dB.
         CSI : tuple
-            The channel state information (H, U, S, Vh).
+            The channel state information (SNR, H, U, S, Vh).
         """
 
         # Case 1.
         if self.M is None:
+            SNR, H, U, S, Vh = CSI
             N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-            H, U, S, Vh = CSI
             Pi, Ci, Mi = self.waterfilling(N0, H, S)
         
         # Case 2.
         else:
-            rank_H = np.linalg.matrix_rank(CSI[0])
+            rank_H = np.linalg.matrix_rank(CSI[1])
             Pi = np.array([self.Pt / rank_H] * rank_H)
             Mi = np.array([self.M] * rank_H)
         
@@ -384,7 +382,7 @@ class Transmitter:
         s = Vh.conj().T @ s_prime
         return s
 
-    def simulate(self, bitstream, SNR, CSI):
+    def simulate(self, bitstream, CSI):
         """
         Description
         -----------
@@ -403,10 +401,13 @@ class Transmitter:
         ----------
         bitstream : 1D numpy array (dtype=int, length=N_bits)
             The input bitstream.
-        SNR : float
-            The signal-to-noise ratio in dB.
         CSI : tuple
-            The channel state information. It consists of the channel matrix H, left singular vectors U, singular values S, and right singular vectors Vh.
+            The channel state information.
+            - SNR: The signal-to-noise ratio in dB. (float)
+            - H : The channel matrix. (2D numpy array, dtype=complex, shape=(Nr, Nt)).
+            - U : The left singular vectors of H. (2D numpy array, dtype=complex, shape=(Nr, Nr)).
+            - S : The singular values of H. (1D numpy array, dtype=float, length=Rank(H)).
+            - Vh : The right singular vectors of H. (2D numpy array, dtype=complex, shape=(Nt, Nt)).
 
         Returns
         -------
@@ -415,7 +416,7 @@ class Transmitter:
         """
 
         # Transmitter Setup.
-        self.resource_allocation(SNR, CSI)
+        self.resource_allocation(CSI)
 
         # Edge Case: Transmission fails due to zero useful channel capacity.
         if np.sum( np.log2(self._Mi) ) == 0: return None
@@ -424,14 +425,14 @@ class Transmitter:
         b = self.bit_allocator(bitstream)
         a = self.mapper(b)
         s_prime = self.power_allocator(a)
-        s = self.precoder(s_prime, CSI[3])
+        s = self.precoder(s_prime, CSI[4])
 
         return s
 
 
     # TESTS AND PLOTS
 
-    def plot_bit_allocation(self, SNR, CSI) -> None:
+    def plot_bit_allocation(self, CSI) -> None:
         """
         Description
         -----------
@@ -440,14 +441,13 @@ class Transmitter:
 
         Parameters
         ----------
-        SNR : float
-            The signal-to-noise ratio in dB.
         CSI : tuple
-            The channel state information (H, U, S, Vh).
+            The channel state information (SNR, H, U, S, Vh).
         """
 
+        SNR, H, _, S, _ = CSI
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-        Pi, Ci, Mi = self.waterfilling(N0, CSI[0], CSI[2])
+        Pi, Ci, Mi = self.waterfilling(N0, H, S)
         mc = np.log2(Mi).astype(int)
 
         x = np.arange(len(Ci))
@@ -456,7 +456,7 @@ class Transmitter:
         ax.bar(x + 0.35/2, mc, width=0.35, color='tab:blue', label='Constellation size')
         ax.set_xlabel('Transmit antenna')
         ax.set_ylabel('Capacity [bits]')
-        ax.set_title(f'Antenna Bit Allocation\n\n{self.Nt} transmit antennas and {CSI[0].shape[0]} receive antennas \nSNR: {SNR} dB')
+        ax.set_title(f'Antenna Bit Allocation\n\n{self.Nt} transmit antennas and {H.shape[0]} receive antennas \nSNR: {SNR} dB')
         ax.set_xticks(x)
         ax.set_xticklabels(x + 1)
         ax.set_xlim(-0.5, len(Ci) - 0.5)
@@ -465,7 +465,7 @@ class Transmitter:
 
         return fig, ax
 
-    def plot_power_allocation(self, SNR, CSI) -> None:
+    def plot_power_allocation(self, CSI) -> None:
         """
         Description
         -----------
@@ -474,10 +474,8 @@ class Transmitter:
 
         Parameters
         ----------
-        SNR : float
-            The signal-to-noise ratio in dB.
         CSI : tuple
-            The channel state information (H, U, S, Vh).
+            The channel state information (SNR, H, U, S, Vh).
         
         Returns
         -------
@@ -485,9 +483,9 @@ class Transmitter:
             The figure and axis objects of the plot.
         """
 
+        SNR, H, _, S, _ = CSI
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-        S = CSI[2]
-        Pi = self.waterfilling(N0, CSI[0], S)[0]
+        Pi = self.waterfilling(N0, H, S)[0]
         Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
 
         inverse_channel_gains = (2*self.B*N0) / (S[S > 0] ** 2)
@@ -499,7 +497,7 @@ class Transmitter:
         ax.axhline(y=np.mean(waterlevels), color='tab:red', linestyle='--', linewidth=3, label='Water level')
         ax.set_xlabel('Transmit antenna')
         ax.set_ylabel('Power')
-        ax.set_title(f'Antenna Power Allocation\n\n{self.Nt} transmit antennas and {CSI[0].shape[0]} receive antennas \nSNR: {SNR} dB, Total Transmit Power: {round(self.Pt, 2)} W, Noise Power: {round(2*self.B*N0, 2)} W')
+        ax.set_title(f'Antenna Power Allocation\n\n{self.Nt} transmit antennas and {H.shape[0]} receive antennas \nSNR: {SNR} dB, Total Transmit Power: {round(self.Pt, 2)} W, Noise Power: {round(2*self.B*N0, 2)} W')
         ax.set_xticks(np.arange(1, len(inverse_channel_gains) + 1))
         ax.set_xlim(0.5, len(inverse_channel_gains) + 0.5)
         ax.legend(loc='upper left')
@@ -507,20 +505,18 @@ class Transmitter:
         
         return fig, ax
 
-    def print_simulation_example(self, bitstream, SNR, CSI, K=1) -> None:
+    def print_simulation_example(self, bitstream, CSI, K=1) -> None:
         """
         Description
         -----------
-        Print a step-by-step example of the transmitter operations (see simulate() method) for given input bits, SNR, and CSI. Only the first K data symbols vectors are considered.
+        Print a step-by-step example of the transmitter operations (see simulate() method) for given input bits and CSI. Only the first K data symbols vectors are considered.
 
         Parameters
         ----------
         bitstream : 1D numpy array (dtype=int, length=N_bits)
             The input bitstream.
-        SNR : float
-            The signal-to-noise ratio in dB.
         CSI : tuple
-            The channel state information (H, U, S, Vh).
+            The channel state information (SNR, H, U, S, Vh).
         K : int, optional
             The maximum number of data symbol vectors to consider in the example.
         
@@ -541,8 +537,8 @@ class Transmitter:
         print(f"----- the input bit sequence -----\n{bitstream}\n\n")
         
         # 1. Get the channel state information.
+        SNR, H, U, S, Vh = CSI
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-        H, U, S, Vh = CSI
         print(f"----- the channel state information -----\n\nH = \n{np.round(H, 2)}\n\nS = {np.round(S, 2)}\n\nU =\n {np.round(U, 2)}\n\nVh =\n {np.round(Vh, 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
 
         # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.
@@ -573,8 +569,8 @@ class Transmitter:
 
 
         # PLOTS
-        fig1, ax1 = self.plot_bit_allocation(SNR, CSI)
-        fig2, ax2 = self.plot_power_allocation(SNR, CSI)
+        fig1, ax1 = self.plot_bit_allocation(CSI)
+        fig2, ax2 = self.plot_power_allocation(CSI)
         plt.show()
 
 
