@@ -67,9 +67,9 @@ class Receiver:
         """ Return a string representation of the receiver object. """
         return f"Receiver: \n  - Number of antennas = {self.Nr}\n  - Constellation = {self.type}"
 
-    def __call__(self, r: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> None:
+    def __call__(self, r: np.ndarray, SNR: float, CSI: tuple) -> None:
         """ Allow the receiver object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(r, SNR, CSI, M)
+        return self.simulate(r, SNR, CSI)
 
 
     # FUNCTIONALITY

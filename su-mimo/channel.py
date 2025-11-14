@@ -10,7 +10,7 @@ class Channel:
     -----------
     The channel of a single-user multiple-input multiple-output (SU-MIMO) communication system. 
 
-    The channel is modeled as a flat-fading MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
+    The channel is modeled as a distortion-free MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
     In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR in dB).
 
     Attributes
@@ -46,8 +46,8 @@ class Channel:
     simulate()
         Simulate the channel operations. Return the channel output signal r.
     
-    plot_before_after_noise()
-        Plot the received symbol vectors before and after adding noise for a given SNR and input signal.
+    plot_scatter_diagram()
+        Plot a scatter diagram of the received symbol vectors for a given SNR and input signal.
     print_simulation_example()
         Print a step-by-step example of the channel operations for a given SNR and input signal.
     """
@@ -176,51 +176,125 @@ class Channel:
 
     # TESTS AND PLOTS
 
-    def plot_before_after_noise(self, s: np.ndarray, SNR: float, K: int = 1) -> tuple:
+    def plot_scatter_diagram(self, s: np.ndarray, Pi: np.ndarray, c_sizes: np.ndarray, c_type: str, SNR: float, K: int = 50):
         """
         Description
         -----------
-        Plot the first K received symbol vectors before and after adding noise for a given SNR and input signal s. 
-        
-        The symbols before adding noise are half-transparent, while the symbols after adding noise are fully opaque.
-        Every color represents a different receive antenna.
+        Plot a scatter diagram of the received symbol vectors.
+        Every transmitted symbol is represented by a different color. Every used eigenchannel (antenna) has its own subplot. The number of symbol vectors to be considered is specified by K.
 
         Parameters
         ----------
         s : np.ndarray
             The input signal. This signal consists of the precoded symbols that the transmitter sends through the channel. Shape: (Nt, N_symbols)
+        Pi : np.ndarray
+            The power allocation vector. Shape: (Nr,)
+        c_sizes : np.ndarray
+            The constellation sizes for every eigenchannel. Shape: (Nr,)
+        c_type : str
+            The constellation type.
         SNR : float
             The signal-to-noise ratio (SNR) in dB.
         K : int, optional
             The maximum number of symbol vectors to consider for illustration.
-
+        
         Returns
         -------
-        r_before_noise : np.ndarray
-            The received symbol vectors before adding noise. Shape: (Nr, N_symbols)
-        r_after_noise : np.ndarray
-            The received symbol vectors after adding noise. Shape: (Nr, N_symbols)
+        fig, ax : matplotlib.figure.Figure, matplotlib.axes.Axes
+            The created figure and axes objects.
         """
         
-        r_before_noise = self._H @ s
-        r_after_noise = r_before_noise + self.generate_noise(s, SNR)
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        def generate_constellation(c_size: int, c_type: str) -> np.ndarray:
+            """ Generate the constellation points for a given constellation size M and type. """
 
-        fig, ax = plt.subplots(figsize=(6, 6))
-        for rx_antenna in range(self.Nr):
-            ax.scatter(r_before_noise[rx_antenna, :K].real, r_before_noise[rx_antenna, :K].imag, color=colors[rx_antenna%len(colors)], alpha=0.5, s=100)
-            ax.scatter(r_after_noise[rx_antenna, :K].real, r_after_noise[rx_antenna, :K].imag, color=colors[rx_antenna%len(colors)], alpha=1.0, s=100, label=f'Receive Antenna {rx_antenna+1}')
-        ax.axhline(0, color='black', linewidth=0.5)
-        ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_title(f'Received Symbols Before (Transparent) and After (Opaque) Noise \nSNR = {SNR} dB')
-        ax.set_xlabel('Real Part')
-        ax.set_ylabel('Imaginary Part')
-        ax.grid()
-        ax.axis('equal')
-        ax.legend()
+            if c_type == 'PAM':
+                constellation = np.arange(-(c_size-1), (c_size-1) + 1, 2) * np.sqrt(3/(c_size**2-1))
+            
+            elif c_type == 'PSK':
+                constellation = np.exp(1j * 2*np.pi * np.arange(c_size) / c_size)
+
+            elif c_type == 'QAM':
+                c_sqrtM_PAM = np.arange(-(np.sqrt(c_size)-1), (np.sqrt(c_size)-1) + 1, 2) * np.sqrt(3 / (2*(c_size-1)))
+                real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
+                constellation = (real_grid + 1j*imaginary_grid)
+                constellation[1::2] = constellation[1::2, ::-1]
+                constellation = constellation.flatten()
+
+            else :
+                raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+
+            return constellation
+
+        def generate_color_map(c_sizes: np.ndarray) -> list[dict]:
+            """ Generate a color map that allocates a unique color to each different transmitted symbol based on its value, for every eigenchannel. """
+            
+            color_map = []
+            
+            for c_size in c_sizes:
+                colors = plt.get_cmap('hsv', c_size+1)
+                constellation = generate_constellation(c_size, c_type)
+                eigenchannel_color_map = {constellation[i]: colors(i) for i in range(c_size)}
+                color_map.append(eigenchannel_color_map)
+
+            return color_map
+        
+
+        def reconstrct_tx_symbols(s: np.ndarray, Pi: np.ndarray, c_sizes: np.ndarray) -> np.ndarray:
+            """ Reconstruct the transmitted symbols from the precoded symbols s. """
+
+            s_prime = self._Vh @ s
+            s_prime = s_prime[:np.sum(c_sizes > 1), :K]
+            symbols = s_prime / np.sqrt(Pi[c_sizes > 1].reshape(-1, 1))
+
+            for eigenchannel, c_size in enumerate(c_sizes[c_sizes > 1]):
+                constellation = generate_constellation(c_size, c_type)
+                distances = np.abs(constellation.reshape(-1, 1) - symbols[eigenchannel])
+                symbols[eigenchannel] = constellation[np.argmin(distances, axis=0)]
+            
+            return symbols
+
+        def construct_rx_symbols(s: np.ndarray, SNR: float) -> np.ndarray:
+            """ Construct the received symbols from the precoded symbols s, according to the current channel and SNR. """
+            
+            r = self.simulate(s, SNR)
+            r_prime = self._U.conj().T @ r
+            r_prime = r_prime[:np.sum(c_sizes > 1), :K]
+            
+            return r_prime
+
+        symbols = reconstrct_tx_symbols(s, Pi, c_sizes)
+        r_prime = construct_rx_symbols(s, SNR)
+        
+        color_map = generate_color_map(c_sizes)
+        fig, axes = plt.subplots(1, symbols.shape[0], figsize=(6*symbols.shape[0], 6))
+
+        for eigenchannel in range(symbols.shape[0]):
+            
+            ax = axes[eigenchannel] if symbols.shape[0] > 1 else axes
+            
+            # Plot the received symbols for the current eigenchannel with colors based on the transmitted symbols.
+            colors = [color_map[eigenchannel][symbol] for symbol in symbols[eigenchannel]]
+            ax.scatter(r_prime[eigenchannel].real, r_prime[eigenchannel].imag, color=colors, marker='.', alpha= 0.75, s=50)
+
+
+            # Plot the constellation points for reference.
+            constellation_points = generate_constellation(c_sizes[eigenchannel], c_type)
+            colors = [color_map[eigenchannel][point] for point in constellation_points]
+            constellation_points = constellation_points * (self._S[eigenchannel] * np.sqrt(Pi[eigenchannel]))
+            ax.scatter(constellation_points.real, constellation_points.imag, color=colors, edgecolor='black', marker='o', alpha= 1.0, s=50)
+
+            ax.axhline(0, color='black', linewidth=0.5)
+            ax.axvline(0, color='black', linewidth=0.5)
+            ax.set_title(f'Eigenchannel {eigenchannel+1}: {c_sizes[eigenchannel]}-{c_type}')
+            ax.set_xlabel('Real Part')
+            ax.set_ylabel('Imaginary Part')
+            ax.grid(True, which='both', linestyle='--', alpha=0.7)
+            ax.axis('equal')
+            
+        fig.suptitle(f'Scatter Diagram after SVD Processing \nSNR = {SNR} dB & R = {SNR}%')
         fig.tight_layout()
-                
-        return fig, ax
+    
+        return fig, axes
 
     def print_simulation_example(self, s: np.ndarray, SNR: float, K: int = 1) -> tuple:
         """
@@ -265,15 +339,8 @@ class Channel:
 
         print("======== End Channel Simulation Example ========\n\n")
 
-
-        # PLOTS
-        #fig, ax = self.plot_before_after_noise(s=s, SNR=SNR, K=K)
-        #plt.show()
-
-
         # RETURN
         return r
-
 
 
 if __name__ == "__main__":
@@ -283,8 +350,12 @@ if __name__ == "__main__":
     
     # Initialize the transmitted signal s.
     import transmitter as tx
-    transmitter = tx.Transmitter(Nt=5, constellation_type='PSK', Pt=1.0, B=0.5)
-    s = transmitter(bits=np.random.randint(0, 2, size=100), SNR=25, CSI=channel.get_CSI())
+    transmitter = tx.Transmitter(Nt=5, c_type='QAM')
+    s, Pi, Mi = transmitter.simulate(bits=np.random.randint(0, 2, size=2400), SNR=7, CSI=channel.get_CSI())
 
     # Channel simulation example.
-    channel.print_simulation_example(s=s, SNR=25, K=2)
+    # channel.print_simulation_example(s=s, SNR=25, K=2)
+
+    # Scatter diagram.
+    fig, ax = channel.plot_scatter_diagram(s=s, Pi=Pi, c_sizes=Mi, c_type=transmitter.type, SNR=7, K=100)
+    plt.show()

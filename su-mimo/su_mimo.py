@@ -63,15 +63,13 @@ class SuMimoSVD:
         -------
         bits_hat : 1D numpy array (dtype: int)
             The reconstructed bit stream at the receiver after transmission through the SU-MIMO SVD system.
-        C_total : int
-            The total used capacity of the SU-MIMO SVD system during the transmission.
+        transmit_R : int
+            The transmit rate (the total used capacity) of the SU-MIMO SVD system during the transmission.
         """
 
         # 1. Transmitter
-        s, total_transmit_R = self.transmitter.simulate(bits, SNR, self.channel.get_CSI())
-        if total_transmit_R == 0: 
-            print('Transmission Failed! Not enough capacity available.')
-            return None, 0
+        s, Pi, Mi = self.transmitter.simulate(bits, SNR, self.channel.get_CSI())
+        if np.sum(np.log2(Mi)) == 0: return None, 0
 
         # 2. Channel
         r = self.channel.simulate(s, SNR)
@@ -79,7 +77,7 @@ class SuMimoSVD:
         # 3. Receiver
         bits_hat = self.receiver.simulate(r, SNR, self.channel.get_CSI())
 
-        return bits_hat[:len(bits)], total_transmit_R
+        return bits_hat[:len(bits)], np.sum(np.log2(Mi))
     
 
     def BER_simulation(self, bits: np.ndarray, SNR: float) -> float:
@@ -162,7 +160,6 @@ class SuMimoSVD:
             Cs.append(np.mean(np.array(Cs_SNR)))
 
         return BERs, Cs
-
 
     def BER_eigenchs_simulation(self, bits: np.ndarray, SNR: float, Mi: np.ndarray) -> float:
         """
@@ -613,7 +610,7 @@ class SuMimoSVD:
 
 if __name__ == "__main__":
 
-    test = 'test 3'
+    test = 'test 2'
 
     # TEST 1: Example simulation of SU-MIMO SVD system.
     if test == 'test 1':
@@ -645,7 +642,7 @@ if __name__ == "__main__":
 
                 # Initialize SU-MIMO SVD system.
                 su_mimo_svd = SuMimoSVD(Nt, Nr, type)
-                label = f'{type} ({Nt}x{Nr})'
+                label = f'{Nt}x{Nr} {type}'
 
                 # Calculate analytical BERs upper bound and the used capacities, and store the results.
                 if 'upper bound' in curves:
@@ -695,6 +692,15 @@ if __name__ == "__main__":
             # Return
             return fig1, ax1, fig2, ax2, fig3, ax3
     
+        system_configs = [ (4, 4, 'PSK') ]
+        curves = ['simulation']
+        SNRs = np.arange(-5, 31, 5)
+        num_errors_sim = 5000
+        num_channels = {'simulation': 500}
+        fig1, ax1, fig2, ax2, fig3, ax3 = test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels)
+        plt.show()
+
+
     # TEST 3: Performance analysis of different eigenchannels.
     if test == 'test 3':
 

@@ -74,9 +74,9 @@ class Transmitter:
         """ Return a string representation of the transmitter object. """
         return f"Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = {self.type}"
 
-    def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple, M: int = None) -> np.ndarray:
+    def __call__(self, bits: np.ndarray, SNR: float, CSI: tuple) -> np.ndarray:
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(bits, SNR, CSI, M)
+        return self.simulate(bits, SNR, CSI)
 
     # FUNCTIONALITY
 
@@ -221,7 +221,7 @@ class Transmitter:
         
         # 1. Divide the input bit sequences into blocks of m bits, where M = 2^m.
 
-        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or self.type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
+        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or type != 'QAM'), f'The constellation size M of antenna {i} is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {self.type}.'
         assert (bits.size % int(np.log2(M)) == 0), f'The length of the bit sequences is invalid.\nThey must be a multiple of log2(M). Right now, length is {bits.size} and log2(M) is {m}.' 
 
         m = int(np.log2(M))
@@ -375,10 +375,15 @@ class Transmitter:
 
         Returns
         -------
-            s (numpy.ndarray): The output signal.
+        s : numpy.ndarray (dtype=complex), shape=(Nt, N_symbols)
+            The output signal.
+        Pi : numpy.ndarray (dtype=float), shape=(Nt,)
+            The power allocation for each transmit antenna.
+        Mi : numpy.ndarray (dtype=int), shape=(Nt,)
+            The constellation size for each transmit antenna.
         """
 
-        # Setup.
+        # Transmitter Initialization.
         N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
         H, U, S, Vh = CSI
 
@@ -393,7 +398,7 @@ class Transmitter:
         Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
 
         # Edge Case: Transmission fails if no bits can be transmitted due to zero useful channel capacity.
-        if np.sum( np.log2(Mi) ) == 0: return None, 0
+        if np.sum( np.log2(Mi) ) == 0: return None, Pi, Mi
 
         # Transmitter Operations.
         bits = self.bit_allocator(bits, Mi)
@@ -401,7 +406,7 @@ class Transmitter:
         powered_symbols = self.power_allocator(symbols, Pi)
         precoded_symbols = self.precoder(powered_symbols, Vh)
 
-        return precoded_symbols, np.sum(np.log2(Mi))
+        return precoded_symbols, Pi, Mi
 
 
     # TESTS AND PLOTS
