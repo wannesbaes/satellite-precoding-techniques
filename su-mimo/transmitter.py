@@ -84,11 +84,11 @@ class Transmitter:
 
         # Transmitter Settings.
         self.Nt = Nt
-        self.data_rate = data_rate
 
         self.M = c_size
         self.c_type = c_type
 
+        self.data_rate = data_rate
         self.Pt = Pt
         self.B = B
 
@@ -123,7 +123,7 @@ class Transmitter:
             - Mi: The constellation size for each used eigenchannel.
         """
         
-        CCI = {'Pi': self._Pi[self._Pi > 0], 'Ci': self._Ci, 'Mi': self._Mi[self._Mi > 1]}
+        CCI = {'Pi': self._Pi[self._Pi > 0], 'Ci': self._Ci[self._Ci > 0], 'Mi': self._Mi[self._Mi > 1]}
         return CCI
 
     def waterfilling(self, N0, H, S):
@@ -292,10 +292,12 @@ class Transmitter:
         else:
             rank_H = np.linalg.matrix_rank(CSI['H'])
             Pi = np.array([self.Pt / rank_H] * rank_H)
+            Ci = 2*self.B * np.log2( 1 + (10**(CSI['SNR']/10.0) * Pi*(CSI['S'][:rank_H]**2)) / (self.Pt) )
             Mi = np.array([self.M] * rank_H)
         
         # Pad Pi and Mi to match the number of transmit antennas Nt.
         Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Pi)), mode='constant', constant_values=0)
+        Ci = np.pad(Ci, pad_width=(0, self.Nt - len(Ci)), mode='constant', constant_values=0)
         Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
 
         # Store the results.

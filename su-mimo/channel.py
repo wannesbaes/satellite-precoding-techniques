@@ -120,7 +120,7 @@ class Channel:
         """
         Description
         -----------
-        Reset the channel properties by re-initializing the signal-to-noise ratio (SNR), the MIMO channel matrix and its SVD.
+        Reset the channel properties by re-initializing the signal-to-noise ratio (SNR), the MIMO channel matrix (H) and its SVD (U, S, Vh).
 
         Parameters
         ----------

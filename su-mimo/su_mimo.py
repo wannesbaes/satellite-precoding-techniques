@@ -3,11 +3,13 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-import os
+from matplotlib.colors import to_rgba, to_hex
+from matplotlib.collections import LineCollection
 
 import transmitter as tx
 import channel as ch
 import receiver as rx
+
 
 class SuMimoSVD:
     """
@@ -15,262 +17,263 @@ class SuMimoSVD:
     -----------
     A single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at both the transmitter and receiver.
     
-    The communication system consists of a transmitter, a flat-fading MIMO channel, and a receiver. The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and postcoding at the receiver.
+    The communication system consists of a transmitter, a distortion-free MIMO channel, and a receiver. 
+    The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and postcoding at the receiver.
     """
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt: int, Nr: int, c_type: str, c_size: int = None, data_rate: float = 1.0, H: np.ndarray = None, Pt: float = 1.0, B: int = 0.5):
+    def __init__(self, Nt, Nr, c_type, Pt=1.0, B=0.5, data_rate=1.0, SNR=np.inf, H=None, c_size=None):
 
         self.Nt = Nt
         self.Nr = Nr
 
-        self.type = c_type
+        self.c_type = c_type
         self.M = c_size
-        self.data_rate = data_rate
 
         self.Pt = Pt
         self.B = B
+        self.data_rate = data_rate
 
-        self.transmitter = tx.Transmitter(Nt, c_type, c_size, data_rate, Pt, B)
-        self.channel = ch.Channel(Nt, Nr, H)
-        self.receiver = rx.Receiver(Nr, c_type, c_size, data_rate, Pt, B)
+        self.transmitter = tx.Transmitter(Nt, c_type, data_rate, Pt, B, c_size)
+        self.channel = ch.Channel(Nt, Nr, SNR, H)
+        self.receiver = rx.Receiver(Nr, c_type, data_rate, Pt, B, c_size)
 
     def __str__(self):
         """ String representation of the SU-MIMO DigCom system. """
-        return f'{self.Nt}x{self.Nr} ' + (f'{self.M}-' if self.M is not None else '') + f'{self.type} SU-MIMO SVD DigCom System'
-    
-    def __call__(self):
-        pass
+        return f'{self.Nt}x{self.Nr} ' + (f'{self.M}-' if self.M is not None else '') + f'{self.c_type} SU-MIMO SVD DigCom System'
 
 
     # FUNCTIONALITY
 
-    def simulate(self, bits: np.ndarray, SNR: float) -> np.ndarray:
+    def simulate(self, bitstream):
         """
         Description
         -----------
-        Simulate the SU-MIMO SVD communication system for a given input bit stream and SNR value. Return the reconstructed bit stream at the receiver.
+        Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the reconstructed bitstream at the receiver.\n
+        If no capacity is available on the channel, the transmission fails and None is returned.
 
         Parameters
         ----------
-        bits : 1D numpy array (dtype: int)
-            The input bit stream to be transmitted.
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
+        bitstream : 1D numpy array (dtype: int, length: N_bits)
+            Input - The bit stream.
         
         Returns
         -------
-        bits_hat : 1D numpy array (dtype: int)
-            The reconstructed bit stream at the receiver after transmission through the SU-MIMO SVD system.
-        transmit_R : int
-            The transmit rate (the total used capacity) of the SU-MIMO SVD system during the transmission.
+        bitstream_hat : 1D numpy array (dtype: int, length: N_bits)
+            Output - The reconstructed bit stream.
         """
 
         # 1. Transmitter
-        s, Pi, Mi = self.transmitter.simulate(bits, SNR, self.channel.get_CSI())
-        if np.sum(np.log2(Mi)) == 0: return None, 0
+        s = self.transmitter.simulate(bitstream, self.channel.get_CSI())
+        if s is None: return None
 
         # 2. Channel
-        r = self.channel.simulate(s, SNR)
+        r = self.channel.simulate(s)
 
         # 3. Receiver
-        bits_hat = self.receiver.simulate(r, SNR, self.channel.get_CSI())
+        bitstream_hat = self.receiver.simulate(r, self.channel.get_CSI(), self.transmitter.get_CCI())
 
-        return bits_hat[:len(bits)], np.sum(np.log2(Mi))
+        return bitstream_hat[:len(bitstream)]
     
-
-    def BER_simulation(self, bits: np.ndarray, SNR: float) -> float:
+    def BERs_simulation(self, SNRs, num_errors=200, num_channels=50):
         """
         Description
         -----------
-        Simulate the SU-MIMO SVD communication system for a given input bit stream and SNR value. Return the Bit Error Rate (BER).
-
+        Simulate the SU-MIMO SVD digital communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations.\n
+        Return the simulated BERs for each SNR value.
+        
         Parameters
         ----------
-        bits : 1D numpy array (dtype: int)
-            The input bit stream to be transmitted.
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
-        
-        Returns
-        -------
-        ber : float
-            The Bit Error Rate (BER) at the receiver after transmission through the SU-MIMO SVD system.
-            If the transmission fails (due to a zero capacity channel), the BER is set to NaN.
-        C_total : int
-            The total used capacity of the SU-MIMO SVD system during the transmission.
-        """
-        
-        bits_hat, C_total = self.simulate(bits, SNR)
-        BER = np.sum(bits_hat != bits) / bits.size if C_total > 0 else np.nan
-
-        return BER, C_total
-
-    def BERs_simulation(self, SNRs: np.ndarray, num_errors: int = 200, num_channels: int = 20):
-        """
-        Description
-        -----------
-        Simulate the SU-MIMO SVD communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations. Return the simulated BERs for each SNR value.
-
-        Parameters
-        ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB to simulate over.
+        SNRs : 1D numpy array (dtype: float, length: N_SNRs)
+            Input - The range of signal-to-noise ratio (SNR) values in dB to simulate over.
         num_errors : int
-            The minimum number of bit errors to reach for each SNR value before stopping the simulation.
+            The minimum number of bit errors that must be reached for each SNR value before stopping the simulation.
         num_channels : int
             The minimum number of different channel realizations to average over for each SNR value.
         
         Returns
         -------
-        BERs : 1D numpy array (dtype: float)
-            The simulated Bit Error Rates (BERs) corresponding to each SNR value.
-        Cs : 1D numpy array (dtype: int)
-            The total used capacity corresponding to each SNR value. This is the number of bits per data symbol vector.
+        BERs : 1D numpy array (dtype: float, length: N_SNRs)
+            Output - The simulated Bit Error Rates (BERs) corresponding to each SNR value.
+        data_Rs : 1D numpy array (dtype: int, length: N_SNRs)
+            Output - The total data transmit rate (bits per symbol vector) corresponding to each SNR value.
+        activation_Rs : 1D numpy array (dtype: float, length: N_SNRs)
+            Output - The activation rate of the channel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
         """
-        print(f"\nStarting BER Simulation for \n{str(self)} ...")
+        
+        def BER_simulation(bitstream):
+            """
+            Description
+            -----------
+            Simulate the SU-MIMO SVD communication system for a given input bitstream. Return the Bit Error Rate (BER).\n
+            If no capacity is available on the channel, NaN is returned.
 
-
-        BERs = []
-        Cs = []
-
-        for SNR in SNRs:
-
-            counted_errors = 0
-            counted_channels = 0
-            Cs_SNR = []
-
-            # num_bits = (1 / self.BER_approximation([SNR])[0][0]) * (num_errors / num_channels)
-            num_bits = 2400
-            bits = np.random.randint(0, 2, size=round(num_bits))
+            Parameters
+            ----------
+            bitstream : 1D numpy array (dtype: int, length: N_bits)
+                Input - The bit stream.
             
-            while counted_errors < num_errors or counted_channels < num_channels:
-
-                self.channel.reset()
-                BER, C_SNR = self.BER_simulation(bits, SNR)
-
-                Cs_SNR.append(C_SNR)
-                if C_SNR == 0: continue
-
-                counted_errors += round(num_bits*BER)
-                counted_channels += 1
+            Returns
+            -------
+            BER : float
+                Output - The Bit Error Rate (BER).
+            """
             
-            BERs.append(counted_errors / (num_bits*counted_channels))
-            Cs.append(np.mean(np.array(Cs_SNR)))
+            bitstream_hat = self.simulate(bitstream)
+            BER = np.sum(bitstream_hat != bitstream) / bitstream.size if bitstream_hat is not None else np.nan
 
-        return BERs, Cs
-
-    def BER_eigenchs_simulation(self, bits: np.ndarray, SNR: float, Mi: np.ndarray) -> float:
-        """
-        Description
-        -----------
-        Simulate the SU-MIMO SVD communication system for a given input bit stream and SNR value. Return the Bit Error Rate (BER) of each eigenchannel.
-
-        Parameters
-        ----------
-        bits : 1D numpy array (dtype: int)
-            The input bit stream to be transmitted.
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
+            return BER
         
-        Returns
-        -------
-        BERi : 1D numpy array (length: number of used eigenchannels)
-            The Bit Error Rate (BER) of each eigenchannel at the receiver after transmission through the SU-MIMO SVD system.
-            If the transmission fails (due to a zero capacity channel), the BER is set to NaN.
-        Ci : 1D numpy array (length: number of used eigenchannels)
-            The total used capacity of each eigenchannel of the SU-MIMO SVD system during the transmission.
-        """
-        
-        # Simulate the system.
-        bits_hat, C_total = self.simulate(bits, SNR)
-        if C_total == 0: return np.nan
-
-        # Allocate bits to the eigenchannels.
-        bits_eigenchs = self.transmitter.bit_allocator(bits, np.concatenate([Mi, np.ones(self.Nt - len(Mi), dtype=int)]))
-        bits_eigenchs_hat = self.transmitter.bit_allocator(bits_hat, np.concatenate([Mi, np.ones(self.Nt - len(Mi), dtype=int)]))
-
-        # Calculate the BER of each eigenchannel.
-        BER_eigenchs = np.array([ (np.sum(bits_eigenchs_hat[i] != bits_eigenchs[i]) / bits_eigenchs[i].size) for i in range(len(Mi)) ])
-
-        return BER_eigenchs
-
-    def BERs_eigenchs_simulation(self, SNRs: np.ndarray, num_errors: int = 200, num_channels: int = 20):
-        """
-        Description
-        -----------
-        Simulate the SU-MIMO SVD communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations. Return the simulated BERs of each eigenchannel (!) for every SNR value.
-
-        Parameters
-        ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB to simulate over.
-        num_errors : int
-            The minimum number of bit errors to reach for each SNR value before stopping the simulation.
-        num_channels : int
-            The minimum number of different channel realizations to average over for each SNR value.
-        
-        Returns
-        -------
-        BERs : 2D numpy array (dtype: float), shape: (min(Nt, Nr), len(SNRs))
-            The simulated Bit Error Rates (BERs) of each eigenchannel for every SNR value.
-        Cs : 2D numpy array (dtype: int), shape: (min(Nt, Nr), len(SNRs))
-            The total used capacity of each eigenchannel for every SNR value. This is the number of bits per data symbol vector.
-        """
         print(f"\nStarting BER Simulation for \n{str(self)} ...")
 
         # Initialization.
-        BER_eigenchs = np.empty((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
-        C_eigenchs = np.empty((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
+        counted_bits = np.zeros(len(SNRs), dtype=int)
+        counted_errors = np.zeros(len(SNRs), dtype=float)
+        used_channels = np.zeros(len(SNRs), dtype=int)
+        realized_channels = np.zeros(len(SNRs), dtype=int)
+        data_Rs = [[] for _ in range(len(SNRs))]
 
-        for i, SNR in enumerate(SNRs):
+        # Run the simulation until the required number of errors and channels is reached for every SNR value.
+        while np.any(counted_errors < num_errors) or np.any(used_channels < num_channels):
+
+            # Reset the channel properties (new channel matrix).
+            self.channel.reset()
             
-            # Initialization.
-            N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-            
-            counted_errors = 0
-            counted_channels = 0
+            # Iterate over every SNR value for which the required number of errors or usable channel realization has not yet been reached.
+            for i in np.where( (counted_errors < num_errors) | (used_channels < num_channels) )[0]:
 
-            BER_eigenchs_SNR = []
-            C_eigenchs_SNR = []
-
-            while counted_errors < num_errors or counted_channels < num_channels:
-
-                # Generate random bits to transmit.
+                # Initialize the bitstream.
                 num_bits = 2400
-                bits = np.random.randint(0, 2, size=round(num_bits))
+                bitstream = np.random.randint(0, 2, size=num_bits)
 
-                # Calculate the used constellation sizes of the eigenchannels.
-                self.channel.reset()
-                H, U, S, Vh = self.channel.get_CSI()
-                Mi = self.transmitter.waterfilling(H, S, N0)[2]
-                Mi = (Mi[Mi > 1]).astype(int)
+                # Run the simulation for the current channel and SNR value.
+                self.channel.reset(SNR=SNRs[i], H=self.channel.get_CSI()['H'])
+                BER = BER_simulation(bitstream)
+                R = np.sum(np.log2(self.transmitter.get_CCI()['Mi']))
 
-                # Store the total bits per symbol of each eigenchannel for the current SNR value and the current channel realization.
-                Ci = np.concatenate( [ np.log2(Mi).astype(int), np.array([0]*(min(self.Nt, self.Nr) - len(Mi))) ] )
-                C_eigenchs_SNR.append(Ci)
-                if np.sum(Ci) == 0: continue
-                
-                # Simulate the communication and calculate the BER of each eigenchannel for the current SNR value and the current channel realization. Store the result.
-                BER_eigenchs_SNR_channel = self.BER_eigenchs_simulation(bits, SNR, Mi)
-                BER_eigenchs_SNR_channel = np.concatenate( [ BER_eigenchs_SNR_channel, np.array([np.nan]*(min(self.Nt, self.Nr) - len(Mi))) ] )
-                BER_eigenchs_SNR.append(BER_eigenchs_SNR_channel)
+                # Store the channel activation rate.
+                realized_channels[i] += 1
 
-                # Update the counted errors and channels.
-                counted_errors += round( num_bits * ((1/np.sum(Mi)) * np.sum(Mi * BER_eigenchs_SNR_channel[:len(Mi)])) )
-                counted_channels += 1
+                # Store the data transmit rate.
+                data_Rs[i].append(R)
+
+                # Store the bit error rate. (Only if actual data was transmitted)
+                if R == 0: continue
+                counted_bits[i] += num_bits
+                counted_errors[i] += num_bits*BER
+                used_channels[i] += 1
+        
+        # Calculate the average BER and data transmit rate for each SNR value.
+        BERs = counted_errors / counted_bits
+        data_Rs = np.array([np.mean(np.array(data_Rs[i], dtype=float)) for i in range(len(SNRs))])
+        activation_Rs = used_channels / realized_channels
+        
+        return BERs, data_Rs, activation_Rs
+
+    def BERs_eigenchs_simulation(self, SNRs, num_errors=200, num_channels=50):
+        """
+        Description
+        -----------
+        Simulate the SU-MIMO SVD digital communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations.\n
+        Return the simulated BERs of each eigenchannel (!) for every SNR value.
+
+        Parameters
+        ----------
+        SNRs : 1D numpy array (dtype: float, length: N_SNRs)
+            Input - The range of signal-to-noise ratio (SNR) values in dB to simulate over.
+        num_errors : int
+            The minimum number of bit errors that must be reached in at least one eigenchannel for each SNR value before stopping the simulation.
+        num_channels : int
+            The minimum number of different channel realizations in at least one eigenchannel for each SNR value to average over.
+        
+        Returns
+        -------
+        BERs : 2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The simulated Bit Error Rates (BERs) of each eigenchannel, corresponding to each SNR value.
+        data_Rs : 2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The total data transmit rate (bits per symbol) of each eigenchannel, corresponding to each SNR value.
+        activation_Rs : 1D numpy array (dtype: float, length: N_SNRs)
+            Output - The activation rate of every eigenchannel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data throught that eigenchannel.)
+        """
+        
+        def BER_eigenchs_simulation(bitstream):
+            """
+            Description
+            -----------
+            Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the Bit Error Rate (BER) of each eigenchannel.
+            If no capacity is available on the eigenchannel, np.NaN is returned for that eigenchannel.
+
+            Parameters
+            ----------
+            bitstream : 1D numpy array (dtype: int, length: N_bits)
+                Input - The bit stream.
             
-            # Store the average BER of each eigenchannel over the different channel realizations for the current SNR value.
-            BER_eigenchs_SNR = np.nanmean(np.array(BER_eigenchs_SNR), axis=0)
-            BER_eigenchs[:, i] = BER_eigenchs_SNR
+            Returns
+            -------
+            BER_eigenchs : 1D numpy array (dtype: float, length: min(Nt, Nr))
+                Output - The Bit Error Rates (BERs) of each eigenchannel.
+            """
+            
+            # Simulate the system.
+            bitstream_hat = self.simulate(bitstream)
+            if bitstream_hat is None: return np.array([np.nan]*min(self.Nt, self.Nr))
 
-            # Store the average bits per symbol (C) of each eigenchannel over the different channel realizations for the current SNR value.
-            C_eigenchs_SNR = np.mean(np.array(C_eigenchs_SNR), axis=0)
-            C_eigenchs[:, i] = C_eigenchs_SNR
+            # Allocate bits to the eigenchannels.
+            bitstream_eigenchs = self.transmitter.bit_allocator(bitstream)
+            bitstream_hat_eigenchs = self.transmitter.bit_allocator(bitstream_hat)
 
-        return BER_eigenchs, C_eigenchs
+            # Calculate the BER of each eigenchannel.
+            BER_eigenchs = np.array([ ( (np.sum(bitstream_hat_eigenchs[i] != bitstream_eigenchs[i]) / bitstream_eigenchs[i].size) if bitstream_eigenchs[i].size > 0 else np.nan ) for i in range(min(self.Nt, self.Nr)) ])
 
+            return BER_eigenchs
+        
+        print(f"\nStarting BER Eigenchannel Simulation for \n{str(self)} ...")
+
+        # Initialization.
+        counted_bits = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
+        counted_errors = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
+        used_channels = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=int)
+        realized_channels = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=int)
+        data_Rs = [ [[] for _ in range(len(SNRs))] for _ in range(min(self.Nt, self.Nr)) ]
+
+        # Run the simulation until the required number of errors (on every eigenchannel) and usable channel realization is reached for every SNR value.
+        while np.any(counted_errors[0, :] < num_errors) or np.any(used_channels[0, :] < num_channels):
+
+            # Reset the channel properties (new channel matrix).
+            self.channel.reset()
+            
+            # Iterate over every SNR value for which the required number of errors or usable channel realizations has not yet been reached.
+            for SNR_idx in np.where( (counted_errors[0, :] < num_errors) | (used_channels[0, :] < num_channels) )[0]:
+
+                # Initialize the bitstream.
+                num_bits = 2400
+                bitstream = np.random.randint(0, 2, size=num_bits)
+
+                # Run the simulation for the current channel and SNR value.
+                self.channel.reset(SNR=SNRs[SNR_idx], H=self.channel.get_CSI()['H'])
+                BERi = BER_eigenchs_simulation(bitstream)
+                data_Ri = np.pad( np.log2(self.transmitter.get_CCI()['Mi']), pad_width=(0, min(self.Nt, self.Nr) - len(self.transmitter.get_CCI()['Mi'])), mode='constant', constant_values=0 )
+                
+                # Store the eigenchannel activation rate.
+                realized_channels[:, SNR_idx] += 1
+                
+                # Store the data transmit rate.
+                for eigench_idx in range(min(self.Nt, self.Nr)): data_Rs[eigench_idx][SNR_idx].append(data_Ri[eigench_idx])
+
+                # Store the bit error rate. (Only if capacity is available on the eigenchannel.)
+                if np.sum(data_Ri) == 0: continue
+                num_bits_i = np.ceil(num_bits * (data_Ri[data_Ri > 0] / np.sum(data_Ri)))
+                counted_bits[(data_Ri > 0), SNR_idx] += num_bits_i
+                counted_errors[(data_Ri > 0), SNR_idx] += num_bits_i*BERi[data_Ri > 0]
+                used_channels[(data_Ri > 0), SNR_idx] += (data_Ri > 0)[data_Ri > 0]
+        
+        # Calculate the average BER, data transmit rate and activation rate for each SNR value.
+        BERs = np.divide(counted_errors, counted_bits, out=np.full((min(self.Nt, self.Nr), len(SNRs)), np.nan, dtype=float), where=(counted_bits != 0))
+        data_Rs = np.array([ [np.mean(np.array(data_Rs[eigench_idx][SNR_idx], dtype=float)) for SNR_idx in range(len(SNRs))] for eigench_idx in range(min(self.Nt, self.Nr)) ])
+        activation_Rs = used_channels / realized_channels
+        
+        return BERs, data_Rs, activation_Rs
 
     def BERs_analytical(self, SNRs: np.ndarray, num_channels: int, mode: str, eigenchannels: bool = False) -> float:
         """ 
@@ -452,166 +455,320 @@ class SuMimoSVD:
 
     # TESTS AND PLOTS
 
-    def plot_BERs(self, SNRs: np.ndarray, BERs_list: list[np.ndarray], labels: list[str], colors: list[str] = None, marker_colors: list[str] = None, markers: list[str] = None, title: str = None) -> None:
+    def plot_performance(self, SNRs, BERs, data_Rs, settings):
         """
         Description
         -----------
-        Plot the simulated Bit Error Rates (BERs) over a range of SNR values on a semi-logarithmic scale.
-        It is possible to plot multiple BER curves on the same figure by providing a list of BER arrays and corresponding labels.
+        Create the performance evaluation plots for the requested evaluation metrics.
 
         Parameters
         ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB.
-        BERs : list of 1D numpy arrays (dtype: float), each with length len(SNRs)
+        SNRs : 1D numpy array (dtype: float, length: N_SNRs)
+            The range of signal-to-noise ratio (SNR) values in dB, for which the performance data is provided.
+        BERs : 2D numpy array (dtype: float, shape: (N_curves, N_SNRs))
             The simulated Bit Error Rates (BERs) corresponding to each SNR value.
-        labels : list of strings with length len(BERs)
-            The labels for each BER curve to be displayed in the legend.
-        colors : list of strings with length len(BERs), optional
-            The colors for each BER curve. Default uses default matplotlib tableau palette colors.
-        marker_colors : list of strings with length len(BERs), optional
-            The colors for each marker in the BER curves. Default uses default matplotlib tableau palette colors.
-        markers : list of strings with length len(BERs), optional
-            The markers for each BER curve. Default is a predefined set of 10 different markers.
-        title : str, optional
-            The title of the plot. Default is no title.
+        data_Rs : 2D numpy array (dtype: float, shape: (N_curves, N_SNRs))
+            The total data transmit rate (bits per symbol vector) corresponding to each SNR value.
+        settings : dict
+            A dictionary containing the plot settings for each evaluation metric.
+            - labels : the label, for each curve to be displayed in the legend. (list of str, length: N_curves)
+            - colors : the color, for each curve. Optional. (list of str, length: N_curves)
+            - markers : the type of the markers, for each curve. Optional. (list of str, length: N_curves)
+            - marker_colors : the color of the markers, for each curve. Optional. (list of str, length: N_curves)
+            - opacity : the opacity of the markers and curve parts, for each curve. Optional. (2D numpy array, dtype: float, shape: (N_curves, N_SNRs))
+            - titles : the title of each performance evaluation plot. \n
+            This also defines which different metrics are plotted! 
+            Possible options are:
+                * 'BER' : Bit Error Rate plot.
+                * 'data_Rs' : Data Transmit Rate plot.
+                * 'Ebs' : The energy per bit to the noise power spectral density (BNR) plot.
+        
+        Returns
+        -------
+        plots : dict
+            A dictionary containing the created plots (values) for each requested evaluation metric (keys).
         """
 
-        # Set default colors and markers if not provided.
-        if colors is None: colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(BERs_list) - 10)
-        if marker_colors is None: marker_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(BERs_list) - 10)
-        if markers is None: markers = ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(BERs_list) - 10)
+        # Initialize a dictionary to hold the result plots.
+        plots = {metric: None for metric in settings['titles'].keys()}
 
-        # Create the plot.
-        fig, ax = plt.subplots()
-        for i in range(len(BERs_list)):
-            ax.semilogy(SNRs, BERs_list[i], label=labels[i], color=colors[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], marker=markers[i], linestyle='-')
-        if title is not None: ax.set_title(title)
-        ax.set_xlabel('SNR [dB]')
-        ax.set_ylabel('Bit Error Rate (BER)')
-        ax.grid(True, which='both', linestyle='--', alpha=0.6)
-        ax.set_ylim(1e-8, 1)
-        ax.set_xlim(SNRs[0]-(SNRs[1]-SNRs[0]), SNRs[-1]+(SNRs[1]-SNRs[0]))
-        ax.legend()
-        fig.tight_layout()
+        # Initialize the plot settings.
+        labels = settings['labels']
+        colors = settings.get('colors', [to_hex(c) for c in plt.get_cmap('tab10').colors] + ['black']*(len(labels) - 10))
+        markers = settings.get('markers', ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(labels) - 10))
+        marker_colors = settings.get('marker_colors', colors)
+        opacity = settings.get('opacity', None)
+        titles = settings['titles']
+
+        # Create the requested plots.
+        for metric in settings['titles'].keys():
+
+            # Get the data and data specific plot settings.
+            if metric == 'BER': 
+                data = BERs
+                title = titles[metric]
+                y_label = 'Bit Error Rate (BER)'
+                y_scale = 'log'
+                y_lim_bottom, y_lim_top = 1e-7, 1
+            elif metric == 'data_Rs': 
+                data = data_Rs
+                title = titles[metric]
+                y_label = 'Data Transmit Rate (bits per symbol vector)'
+                y_scale = 'linear'
+                y_lim_bottom, y_lim_top = None, None
+            elif metric == 'Ebs':
+                data = np.divide(np.tile(SNRs, (len(labels), 1)), data_Rs, out=np.full((len(labels), len(SNRs)), np.nan), where=(data_Rs != 0))
+                title = titles[metric]
+                y_label = r'$\frac{\mathrm{E}_b}{\mathrm{N}_0}$ [dB]'
+                y_scale = 'linear'
+                y_lim_bottom, y_lim_top = None, None
+            else: 
+                raise ValueError(f'The performance metric "{metric}" is not recognized.')
+
+            # Initialize the plot.
+            fig, ax = plt.subplots()
+
+            # Create each curve.
+            for i in range(len(labels)):
+                
+                if opacity is not None:
+                    
+                    points = np.array([SNRs, data[i]]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    segment_colors = np.tile(to_rgba(colors[i]), (len(segments), 1))
+                    segment_colors[:, 3] = (opacity[i][:-1] + opacity[i][1:]) / 2
+                    
+                    lc = LineCollection(segments, colors=segment_colors, linewidth=1.5)
+                    ax.add_collection(lc)
+
+                    for j in range(len(SNRs)):
+                        ax.scatter(SNRs[j], data[i][j], marker=markers[i], color=marker_colors[i], edgecolors=marker_colors[i], alpha=opacity[i][j], s=36, zorder=3)
+
+                    ax.plot([], [], label=labels[i], color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
+                
+                else:
+                    ax.plot(SNRs, data[i], label=labels[i], color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
+            
+            # Set the plot settings.
+            ax.set_title(title)
+            ax.set_yscale(y_scale)
+            ax.set_xlabel('SNR [dB]')
+            ax.set_ylabel(y_label)
+            ax.set_xlim(SNRs[0]-(SNRs[1]-SNRs[0]), SNRs[-1]+(SNRs[1]-SNRs[0]))
+            ax.set_ylim(y_lim_bottom, y_lim_top)
+            ax.grid(True, which='both', linestyle='--', alpha=0.6)
+            ax.legend()
+            fig.tight_layout()
+            
+            # Store the plot.
+            plots[metric] = (fig, ax)
         
-        return fig, ax
+        return plots
 
-    def plot_Cs(self, SNRs: np.ndarray, Cs_list: list[np.ndarray],  labels: list[str], colors: list[str] = None, marker_colors: list[str] = None, markers: list[str] = None, title: str = None) -> None:
+    def plot_scatter_diagram(self, K=100):
         """
         Description
         -----------
-        Plot the total used capacity, i.e. the total amount of bits that are transmitted per data symbol vector (or thus per time unit), over a range of SNR values on a semi-logarithmic scale.
-        It is possible to plot multiple capacity curves on the same figure by providing a list of capacity arrays and corresponding labels.
+        Plot a scatter diagram of the received symbol vectors.
+        Every distinct transmitted symbol is represented by a different color. Every used eigenchannel (antenna) has its own subplot. The amount of symbol vectors to consider is specified by K.
 
         Parameters
         ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB.
-        Cs : list of 1D numpy arrays (dtype: float), each with length len(SNRs)
-            The total used capacities corresponding to each SNR value.
-        labels : list of strings with length len(Cs)
-            The labels for each capacity curve to be displayed in the legend.
-        colors : list of strings with length len(Cs), optional
-            The colors for each capacity curve. Default uses default matplotlib tableau palette colors.
-        marker_colors : list of strings with length len(Cs), optional
-            The colors for each marker in the capacity curves. Default uses default matplotlib tableau palette colors.
-        markers : list of strings with length len(Cs), optional
-            The markers for each capacity curve. Default is a predefined set of 10 different markers.
-        title : str, optional
-            The title of the plot. Default is None.
-        """
-
-        # Set default colors and markers if not provided.
-        if colors is None: colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(Cs_list) - 10)
-        if marker_colors is None: marker_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(Cs_list) - 10)
-        if markers is None: markers = ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(Cs_list) - 10)
-
-        # Create the plot.
-        fig, ax = plt.subplots()
-        for i in range(len(Cs_list)):
-            ax.plot(SNRs, Cs_list[i], label=labels[i], color=colors[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], marker=markers[i], linestyle='-')
-        if title is not None: ax.set_title(title)
-        ax.set_xlabel('SNR [dB]')
-        ax.set_ylabel('Total Used Capacity [bits/symbol vector]')
-        ax.grid(True, which='both', linestyle='--', alpha=0.6)
-        ax.set_xlim(SNRs[0]-(SNRs[1]-SNRs[0]), SNRs[-1]+(SNRs[1]-SNRs[0]))
-        ax.set_ylim(0, None)
-        ax.legend()
-        fig.tight_layout()
+        K : int
+            The amount of symbol vectors to consider for the scatter diagram.
         
-        return fig, ax
+        Returns
+        -------
+        plot : matplotlib figure
+            The created scatter diagram plot.
+        """
+        
+        def generate_constellation(M, c_type):
+            """
+            Description
+            -----------
+            Generate the constellation points for a given constellation size (M) and type (c_type). 
+
+            Parameters
+            ----------
+            M : int
+                Input - Constellation size.
+            c_type : str
+                Input - Constellation type. (Choose between 'PAM', 'PSK', or 'QAM'.)
+            
+            Returns
+            -------
+            constellation : 1D numpy array (dtype: complex, length: M)
+                Output - Constellation points.
+            """
+
+            if c_type == 'PAM':
+                constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
+            
+            elif c_type == 'PSK':
+                constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
+
+            elif c_type == 'QAM':
+                c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+                real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
+                constellation = (real_grid + 1j*imaginary_grid)
+                constellation[1::2] = constellation[1::2, ::-1]
+                constellation = constellation.flatten()
+
+            else :
+                raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+
+            return constellation
+
+        def generate_colormaps(Mi, c_type):
+            """
+            Description
+            -----------
+            Generate a color map for each used eigenchannel that allocates a unique color to every constellation point.
+
+            Parameters
+            ----------
+            Mi : 1D numpy array (dtype: int, length: min(Nt, Nr))
+                Input - Constellation sizes used on each eigenchannel.
+            c_type : str
+                Input - Constellation type. (Choose between 'PAM', 'PSK', or 'QAM'.)
+            
+            Returns
+            -------
+            colormaps : 1D numpy array (dtype: dict, length: min(Nt, Nr))
+                Output - Colormaps, one for each eigenchannel. Each colormap is a dictionary that maps every constellation point index (key) to a unique color (value).
+            """
+            
+            colormaps = []
+            
+            for M in Mi:
+                colors = plt.get_cmap('turbo', M).colors
+                constellation = generate_constellation(M, c_type)
+                eigenchannel_colormaps = {constellation[i]: colors[i] for i in range(M)}
+                colormaps.append(eigenchannel_colormaps)
+
+            return np.array(colormaps)
+        
+        def scatter_simulate(K):
+            """
+            Description
+            -----------
+            Simulate the SU-MIMO SVD digital communication system for K symbol vectors with a random input bitstream, with the purpose of obtaining the transmitted and received symbols for the scatter diagram. 
+
+            Parameters
+            ----------
+            K : int, optional
+                Input - The number of symbol vectors to consider for illustration (equal to the number of points in each scatter diagram).
+            
+            Returns
+            -------
+            a : 2D numpy array (dtype: complex, shape: (min(Nt, Nr), K))
+                Output - The data symbols (before power allocation and precoding, so this are constellation points).
+            r_prime : 2D numpy array (dtype: complex, shape: (min(Nt, Nr), K))
+                Output - The received data symbols (after postcoding).
+            """
+            
+            # Transmitter Setup.
+            self.transmitter.resource_allocation(self.channel.get_CSI())
+            total_bits = K * np.sum( np.log2(self.transmitter.get_CCI()['Mi']) )
+            bitstream = np.random.randint(0, 2, size=int(total_bits))
+            if total_bits == 0: return None, None
+
+            # 1. Simulate the transmitter operations.
+            b = self.transmitter.bit_allocator(bitstream)
+            a = self.transmitter.mapper(b)
+            s_prime = self.transmitter.power_allocator(a)
+            s = self.transmitter.precoder(s_prime, self.channel.get_CSI()['Vh'])
+
+            # 2. Simulate the channel operations.
+            r = self.channel.simulate(s)
+
+            # 3. Simulate the receiver operations untill the postcoder.
+            r_prime = self.receiver.postcoder(r, self.channel.get_CSI()['U'])
+
+            # Return
+            return a, r_prime
+
+        # Similate part of the system to obtain the transmitted data symbols (before power allocation and precoding) and the received data symbols (after postcoding).
+        a, r_prime = scatter_simulate(K)
+
+        # Retrieve the CSI and CCI.
+        SNR = self.channel.get_CSI()['SNR']
+        S = self.channel.get_CSI()['S']
+        Mi = self.transmitter.get_CCI()['Mi']
+        Pi = self.transmitter.get_CCI()['Pi']
+
+        # Initialize the plot. Build the colormaps.
+        fig, axes = plt.subplots(1, len(Mi), figsize=(6*len(Mi), 6))
+        colormaps = generate_colormaps(Mi, self.c_type)
+
+        # Create a scatter diagram for every eigenchannel.
+        for eigenchannel in range(len(Mi)):
+            
+            ax = axes[eigenchannel] if len(Mi) > 1 else axes
+            
+            # Plot the received symbols for the current eigenchannel with colors based on the transmitted symbols.
+            colors = [colormaps[eigenchannel][symbol] for symbol in a[eigenchannel]]
+            ax.scatter(r_prime[eigenchannel].real, r_prime[eigenchannel].imag, color=colors, marker='.', alpha= 0.75, s=50)
+
+
+            # Plot the constellation points for reference.
+            constellation_points = generate_constellation(Mi[eigenchannel], self.c_type)
+            colors = [colormaps[eigenchannel][point] for point in constellation_points]
+            constellation_points = constellation_points * (S[eigenchannel] * np.sqrt(Pi[eigenchannel]))
+            ax.scatter(constellation_points.real, constellation_points.imag, color=colors, edgecolor='black', marker='o', alpha= 1.0, s=50)
+
+            # Plot settings.
+            ax.axhline(0, color='black', linewidth=0.5)
+            ax.axvline(0, color='black', linewidth=0.5)
+            ax.set_title(f'Eigenchannel {eigenchannel+1}: {Mi[eigenchannel]}-{self.c_type}')
+            ax.set_xlabel('Real Part')
+            ax.set_ylabel('Imaginary Part')
+            ax.grid(True, which='both', linestyle='--', alpha=0.7)
+            ax.axis('equal')
+        
+        # Overall plot settings.
+        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing \nSNR = {SNR} dB & R = {round(self.data_rate*100)}%')
+        fig.tight_layout()
     
-    def plot_BERs_Cs(self, SNRs: np.ndarray, BERs_list: list[np.ndarray], Cs_list: list[np.ndarray], labels: list[str], colors: list[str] = None, marker_colors: list[str] = None, markers: list[str] = None, title: str = None) -> None:
-        """
-        Description
-        -----------
-        Plot the simulated Bit Error Rates (BERs) in function of the ratio between the energy per bit and the noise PSD (E_b/N_0) on a semi-logarithmic scale.
-        It is possible to plot multiple BER curves on the same figure by providing a list of BER arrays and corresponding labels.
+        # Return the plot.
+        return fig, axes
 
-        Parameters
-        ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB.
-        Cs : list of 1D numpy arrays (dtype: float), each with length len(SNRs)
-            The total used capacities corresponding to each SNR value.
-        labels : list of strings with length len(Cs)
-            The labels for each capacity curve to be displayed in the legend.
-        colors : list of strings with length len(Cs), optional
-            The colors for each capacity curve. Default uses default matplotlib tableau palette colors.
-        marker_colors : list of strings with length len(Cs), optional
-            The colors for each marker in the capacity curves. Default uses default matplotlib tableau palette colors.
-        markers : list of strings with length len(Cs), optional
-            The markers for each capacity curve. Default is a predefined set of 10 different markers.
-        title : str, optional
-            The title of the plot. Default is None.
-        """
-
-        # Set default colors and markers if not provided.
-        if colors is None: colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(BERs_list) - 10)
-        if marker_colors is None: marker_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] + ['black']*(len(BERs_list) - 10)
-        if markers is None: markers = ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(BERs_list) - 10)
-
-        # Create the plot.
-        fig, ax = plt.subplots()
-        for i in range(len(BERs_list)):
-            ax.semilogy(SNRs / Cs_list[i], BERs_list[i], label=labels[i], color=colors[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], marker=markers[i], linestyle='-')
-        if title is not None: ax.set_title(title)
-        ax.set_xlabel(r'$\frac{\mathrm{E}_b}{\mathrm{N}_0}$ [dB]')
-        ax.set_ylabel('Bit Error Rate (BER)')
-        ax.grid(True, which='both', linestyle='--', alpha=0.6)
-        ax.set_ylim(1e-8, 1)
-        ax.legend()
-        fig.tight_layout()
-        
-        return fig, ax
-
-    def print_simulation_example(self, bits: np.ndarray, SNR: float, K: int = 1) -> None:
+    def print_simulation_example(self, bitstream, K=1):
         """ 
         Description
         -----------
-        Print a step-by-step example of the transmitter, channel and receiver operations (see simulate() methods) for given input bits, SNR, and optionally a channel state information (CSI). Only the first K data symbols vectors are considered.
+        Print a step-by-step example of the transmitter, channel and receiver operations (see simulate() methods) for a given input bitstream. Only the first K data symbols vectors are considered for illustration.
+
+        Parameters
+        ----------
+        bitstream : 1D numpy array (dtype: int, length: N_bits)
+            Input - The bit stream.
+        K : int, optional
+            The maximum number of symbol vectors to consider for illustration.
+        
+        Notes
+        -----
+        For demonstration purposes only.
         """
-        print(self)
+        
+        print(f"\nStarting Simulation Example for \n{str(self)} ...\n\n")
 
-        s = self.transmitter.print_simulation_example(bits, SNR, self.channel.get_CSI(), K)
-        r = self.channel.print_simulation_example(s, SNR, K)
-        bits_hat = self.receiver.print_simulation_example(r, SNR, self.channel.get_CSI(), K)
+        s = self.transmitter.print_simulation_example(bitstream, self.channel.get_CSI(), K)
+        r = self.channel.print_simulation_example(s, K)
+        bits_hat = self.receiver.print_simulation_example(r, self.channel.get_CSI(), self.transmitter.get_CCI(), K)
 
-
-        min_len = min(len(bits), len(bits_hat))
-        BER = np.sum(bits[:min_len] != bits_hat[:min_len]) / bits.size
+        min_len = min(len(bitstream), len(bits_hat))
+        BER = np.sum(bitstream[:min_len] != bits_hat[:min_len]) / bitstream.size
         print(f"\n\n========== Final Result ==========\n Bit Error Rate (BER): {BER}\n\n\n")
 
         return
 
 
-
-
 if __name__ == "__main__":
 
-    test = 'test 2'
-
+    test = 'test 0'
+    
     # TEST 1: Example simulation of SU-MIMO SVD system.
     if test == 'test 1':
 
@@ -624,7 +781,7 @@ if __name__ == "__main__":
         ber = su_mimo_svd.print_simulation_example(bits=np.random.randint(0, 2, size=16000), SNR=np.inf, K=3)
 
 
-    # TEST 2: Performance analysis of multiple SU-MIMO SVD systems.
+    # TEST 2: Performance evaluation of multiple SU-MIMO SVD systems.
     if test == 'test 2':
 
         def test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels):
@@ -695,13 +852,13 @@ if __name__ == "__main__":
         system_configs = [ (4, 4, 'PSK') ]
         curves = ['simulation']
         SNRs = np.arange(-5, 31, 5)
-        num_errors_sim = 5000
-        num_channels = {'simulation': 500}
+        num_errors_sim = 200
+        num_channels = {'simulation': 50}
         fig1, ax1, fig2, ax2, fig3, ax3 = test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels)
         plt.show()
 
 
-    # TEST 3: Performance analysis of different eigenchannels.
+    # TEST 3: Performance evaluation of the different eigenchannels.
     if test == 'test 3':
 
         def test_performance_eigenchannels_simulation(system, SNRs, num_errors, num_channels):
@@ -745,8 +902,7 @@ if __name__ == "__main__":
             return fig1, ax1, fig2, ax2, fig3, ax3
         
 
-    # TEST 4: Performance analysis at different data rates.
-
+    # TEST 4: Performance evaluation at different data rates.
     if test == 'test 4':
 
         def test_performance_data_rates_simulation(system, SNRs, c_sizes, SNRs_list, data_rates, num_errors, num_channels):

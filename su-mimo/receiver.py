@@ -74,16 +74,16 @@ class Receiver:
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nr, c_type, data_rate=1.0, c_size=None, Pt=1.0, B=0.5):
+    def __init__(self, Nr, c_type, data_rate=1.0, Pt=1.0, B=0.5, c_size=None):
         """ Initialize the receiver. """
 
         # Receiver Settings.
         self.Nr = Nr
-        self.data_rate = data_rate
 
         self.M = c_size
         self.c_type = c_type
 
+        self.data_rate = data_rate
         self.Pt = Pt
         self.B = B
 
@@ -306,9 +306,9 @@ class Receiver:
 
         # If a control channel is available, set the resource allocation parameters from the control channel information.
         if CCI is not None:
-            self._Pi = CCI['Pi']
-            self._Ci = CCI['Ci']
-            self._Mi = CCI['Mi']
+            self._Pi = np.pad(CCI['Pi'], pad_width=(0, self.Nr - len(CCI['Pi'])), mode='constant', constant_values=0)
+            self._Ci = np.pad(CCI['Ci'], pad_width=(0, self.Nr - len(CCI['Ci'])), mode='constant', constant_values=0)
+            self._Mi = np.pad(CCI['Mi'], pad_width=(0, self.Nr - len(CCI['Mi'])), mode='constant', constant_values=1)
             return
         
         # Case 1: Determine the optimal power allocation and constellation size using the waterfilling algorithm.
@@ -320,10 +320,12 @@ class Receiver:
         else:
             rank_H = np.linalg.matrix_rank(CSI['H'])
             Pi = np.array([self.Pt / rank_H] * rank_H)
+            Ci = 2*self.B * np.log2( 1 + (10**(CSI['SNR']/10.0) * Pi*(CSI['S'][:rank_H]**2)) / (self.Pt) )
             Mi = np.array([self.M] * rank_H)
         
         # Pad Pi and Mi to match the number of transmit antennas Nt.
         Pi = np.pad(Pi, pad_width=(0, self.Nr - len(Pi)), mode='constant', constant_values=0)
+        Ci = np.pad(Ci, pad_width=(0, self.Nr - len(Ci)), mode='constant', constant_values=0)
         Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
 
         # Store the results.
@@ -484,7 +486,7 @@ class Receiver:
         """
 
         # Receiver Setup.
-        self.resource_allocation(CCI)
+        self.resource_allocation(CSI, CCI)
         
         # Receiver Operations.
         r_prime = self.postcoder(r, CSI['U'])
