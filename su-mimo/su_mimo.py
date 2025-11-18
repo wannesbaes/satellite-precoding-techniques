@@ -81,7 +81,7 @@ class SuMimoSVD:
         Description
         -----------
         Simulate the SU-MIMO SVD digital communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations.\n
-        Return the simulated BERs for each SNR value.
+        Return the simulated BERs for each SNR value, along with the average information bit rate and activation rate.
         
         Parameters
         ----------
@@ -97,7 +97,7 @@ class SuMimoSVD:
         BERs : 1D numpy array (dtype: float, length: N_SNRs)
             Output - The simulated Bit Error Rates (BERs) corresponding to each SNR value.
         data_Rs : 1D numpy array (dtype: int, length: N_SNRs)
-            Output - The total data transmit rate (bits per symbol vector) corresponding to each SNR value.
+            Output - The information bit rates (bits per symbol vector) corresponding to each SNR value.
         activation_Rs : 1D numpy array (dtype: float, length: N_SNRs)
             Output - The activation rate of the channel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
         """
@@ -125,7 +125,7 @@ class SuMimoSVD:
 
             return BER
         
-        print(f"\nStarting BER Simulation for \n{str(self)} ...")
+        print(f"\nStarting BER simulation for \n{str(self)} ...")
 
         # Initialization.
         counted_bits = np.zeros(len(SNRs), dtype=int)
@@ -141,28 +141,28 @@ class SuMimoSVD:
             self.channel.reset()
             
             # Iterate over every SNR value for which the required number of errors or usable channel realization has not yet been reached.
-            for i in np.where( (counted_errors < num_errors) | (used_channels < num_channels) )[0]:
+            for SNR_idx in np.where( (counted_errors < num_errors) | (used_channels < num_channels) )[0]:
 
                 # Initialize the bitstream.
                 num_bits = 2400
                 bitstream = np.random.randint(0, 2, size=num_bits)
 
                 # Run the simulation for the current channel and SNR value.
-                self.channel.reset(SNR=SNRs[i], H=self.channel.get_CSI()['H'])
+                self.channel.reset(SNR=SNRs[SNR_idx], H=self.channel.get_CSI()['H'])
                 BER = BER_simulation(bitstream)
                 R = np.sum(np.log2(self.transmitter.get_CCI()['Mi']))
 
                 # Store the channel activation rate.
-                realized_channels[i] += 1
+                realized_channels[SNR_idx] += 1
 
                 # Store the data transmit rate.
-                data_Rs[i].append(R)
+                data_Rs[SNR_idx].append(R)
 
                 # Store the bit error rate. (Only if actual data was transmitted)
                 if R == 0: continue
-                counted_bits[i] += num_bits
-                counted_errors[i] += num_bits*BER
-                used_channels[i] += 1
+                counted_bits[SNR_idx] += num_bits
+                counted_errors[SNR_idx] += num_bits*BER
+                used_channels[SNR_idx] += 1
         
         # Calculate the average BER and data transmit rate for each SNR value.
         BERs = counted_errors / counted_bits
@@ -228,7 +228,7 @@ class SuMimoSVD:
 
             return BER_eigenchs
         
-        print(f"\nStarting BER Eigenchannel Simulation for \n{str(self)} ...")
+        print(f"\nStarting eigenchannel BER simulation for \n{str(self)} ...")
 
         # Initialization.
         counted_bits = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
@@ -275,182 +275,179 @@ class SuMimoSVD:
         
         return BERs, data_Rs, activation_Rs
 
-    def BERs_analytical(self, SNRs: np.ndarray, num_channels: int, mode: str, eigenchannels: bool = False) -> float:
-        """ 
+
+    def BERs_eigenchs_analytical(self, SNRs, num_channels=50, settings={}):
+        """
         Description
         -----------
-        Calculate a theoretical upper boound of the BERs for eigenchannel i, over a range of SNR values.
+        Calculate an analytical approximation or upper bound of the Bit Error Rate (BER) over a range of SNR values, for every eigenchannel. Average the result over a specified number of channel realizations.\n
 
-        If a number of channels is provided, the BERs are averaged over that number of different channel realizations. By default, the BERs are calculated for the current channel only. The state of the system (and thus channel) is not changed after executing this function.
+        Return the analytical BERs for each SNR value, along with the information bit rates and activation rates.
+        Depending on the settings, either the BERs of every eigenchannel are returned separately, or the weighted average BER over all eigenchannels is returned. 
 
-        In addition to the BERs, the total used capacity is returned. This indicates the total number of bits that are transmitted per data symbol vector (or thus per time unit) over the SU-MIMO SVD system at each SNR value.
-        
         Parameters
         ----------
-        SNRs : 1D numpy array (dtype: float)
-            The range of signal-to-noise ratio (SNR) values in dB to calculate the theoretical BER approximation over.
+        SNRs : 1D numpy array (dtype: float, length: N_SNRs)
+            The range of signal-to-noise ratio (SNR) values in dB to calculate the analytical BER over.
         num_channels : int
             The number of different channel realizations to average over.
-        mode: str
-            Choose between 'upper bound' and 'approximation'.
-        eigenchannels : bool, optional
-            If True, the BERs and used capacity of each eigenchannel separately are returned as well. 
-
+        settings : dict
+            The calculation settings.
+            - mode: (str)
+                'upper bound' or 'approximation'. For more information on the calculation method, see the documentation under the section 'Bit Error Rate Calculation'.
+            - eigenchannels: (bool)
+                If True, return the BERs for every eigenchannel separately. If False, return the weighted average BER over all eigenchannels.
+        
         Returns
         -------
-        BERs : 1D numpy array (dtype: float)
-            The theoretical Bit Error Rates (BERs) corresponding to each SNR value.
-        Cs_total : 1D numpy array (dtype: float)
-            The total used capacity (bits per symbol vector) of the SU-MIMO SVD system corresponding to each SNR value.
-        BERs_eigench: 2D numpy array (dtype: float), shape: (min(Nt, Nr), len(SNRs))
-            The theoretical Bit Error Rates (BERs) of each eigenchannel, for every SNR value. (Only if eigenchannels is True.)
-        Cs_eigench: 2D numpy array (dtype: float), shape: (min(Nt, Nr), len(SNRs))
-            The total used capacity (bits per symbol) of each eigenchannel, for every SNR value. (Only if eigenchannels is True.)
+        BERs : 1D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The analytical Bit Error Rates (BERs) corresponding to each SNR value, for every eigenchannel.
+        data_Rs : 1D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The information bit rates (bits per symbol vector) corresponding to each SNR value, for every eigenchannel.
+        activation_Rs : 1D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The activation rates of the channel corresponding to each SNR value, for every eigenchannel. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
         """
-        print(f"\nStarting BER {mode} calculation for \n{str(self)} ...")
+    
+        def analytical_BER(mode):
+            """
+            Description
+            -----------
+            Calculate an analytical approximation or upper bound of the Bit Error Rate (BER) of each eigenchannel for the current channel realization and the current SNR. 
+            Return the analytical BERs, along with the information bit rates of each eigenchannel.
 
-        def construct_constellation(M: int, type: str) -> np.ndarray:
+            Parameters
+            ----------
+            mode: str
+                'upper bound' or 'approximation'. For more information on the calculation method, see the documentation under the section 'Bit Error Rate Calculation'.
+            
+            Returns
+            -------
+            BERi : 1D numpy array (dtype: float, length: min(Nt, Nr))
+                Output - The analytical Bit Error Rates (BERs) of each eigenchannel.
+            data_Ri : 1D numpy array (dtype: float, length: min(Nt, Nr))
+                Output - The information bit rates (bits per symbol) of each eigenchannel.
+            """
 
-            if type == 'PAM':
-                constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
+            def construct_constellation(M, c_type):
 
-            elif type == 'PSK':
-                constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
+                if c_type == 'PAM':
+                    constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
 
-            elif type == 'QAM':
-                c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
-                real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
-                constellation = (real_grid + 1j*imaginary_grid).ravel()
+                elif c_type == 'PSK':
+                    constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
 
-            else :
-                raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
-        
-            return constellation
+                elif c_type == 'QAM':
+                    c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+                    real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
+                    constellation = (real_grid + 1j*imaginary_grid).ravel()
 
-        def Q(x: np.ndarray) -> np.ndarray:
-            """ Implementation of the Q-function. The tail probability of standard normal distribution: Q(x) = P[X > x] with X ~ N(0,1). """
-            return sp.stats.norm.sf(x)
+                else :
+                    raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+            
+                return constellation
 
-        def N(c: np.ndarray, Mi: int, type: str) -> np.ndarray:
-            """ Return the Hamming distance between any two constellation points. Cartesian product of c is created in the same way as in d(). """
-            b = (self.receiver.demap(c, Mi, type)).reshape(len(c), -1)
-            i, j = np.meshgrid(np.arange(len(c)), np.arange(len(c)))
-            N = (np.sum(np.abs(b[i] - b[j]), axis=2)).ravel()
-            return N
+            def Q(x):
+                """ Implementation of the Q-function. The tail probability of standard normal distribution: Q(x) = P[X > x] with X ~ N(0,1). """
+                return sp.stats.norm.sf(x)
 
-        def d(c: np.ndarray) -> np.ndarray:
-            """ Return the Euclidean distance between any two constellation points. Cartesian product of c is created in the same way as in N(). """
-            c1, c2 = np.meshgrid(c, c)
-            d = np.abs((c1 - c2).ravel())
-            return d
+            def N(c, M, c_type):
+                """ Return the Hamming distance between any two constellation points. Cartesian product of the constellation c is created in the same way as in d(). """
+                b = (self.receiver.demap(c, M, c_type)).reshape(len(c), -1)
+                i, j = np.meshgrid(np.arange(len(c)), np.arange(len(c)))
+                N = (np.sum(np.abs(b[i] - b[j]), axis=2)).ravel()
+                return N
 
-        def K(Mi: np.ndarray, type: str) -> float:
-            """ Calculate the average number of nearest neighbors K of a given constellation. """
-            if type == 'PAM': return 2*(Mi-1) / Mi
-            elif type == 'PSK': return np.where(Mi == 2, 1, 2)
-            elif type == 'QAM': return 4*(np.sqrt(Mi)-1) / np.sqrt(Mi)
-            else: raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
-        
-        def d_min(Mi: np.ndarray, type: str) -> float:
-            """ Calculate the distance between the nearest neighbors of a given constellation. """
-            if type == 'PAM': return np.sqrt(12 / (Mi**2 - 1))
-            elif type == 'PSK': return 2 * np.abs( np.sin(np.pi / Mi) )
-            elif type == 'QAM': return np.sqrt(6 / (Mi - 1))
-            else: raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {type}.')
-        
-        # Store the current channel.
-        channel = self.channel
+            def d(c):
+                """ Return the Euclidean distance between any two constellation points. Cartesian product of the constellation c is created in the same way as in N(). """
+                c1, c2 = np.meshgrid(c, c)
+                d = np.abs((c1 - c2).ravel())
+                return d
+
+            def K(Mi, c_type):
+                """ Calculate the average number of nearest neighbors K of a given constellation. """
+                if c_type == 'PAM': return 2*(Mi-1) / Mi
+                elif c_type == 'PSK': return np.where(Mi == 2, 1, 2)
+                elif c_type == 'QAM': return 4*(np.sqrt(Mi)-1) / np.sqrt(Mi)
+                else: raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+            
+            def d_min(Mi, c_type):
+                """ Calculate the distance between the nearest neighbors of a given constellation. """
+                if c_type == 'PAM': return np.sqrt(12 / (Mi**2 - 1))
+                elif c_type == 'PSK': return 2 * np.abs( np.sin(np.pi / Mi) )
+                elif c_type == 'QAM': return np.sqrt(6 / (Mi - 1))
+                else: raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+            
+            # Retrieve the CSI of the current channel realization.
+            CSI = self.channel.get_CSI()
+            S = CSI['S']
+            N0 = self.Pt / ((10**(CSI['SNR']/10.0)) * 2*self.B)
+
+            # Retrieve the corresponding CCI.
+            self.transmitter.resource_allocation(CSI)
+            Mi = self.transmitter.get_CCI()['Mi']
+            Pi = self.transmitter.get_CCI()['Pi']
+
+            # Edge case: No data is could be transmitted due to lack of capacity.
+            if len(Mi) == 0: return np.full(min(self.Nt, self.Nr), np.nan), np.zeros(min(self.Nt, self.Nr), dtype=int)
+            
+
+            # Mode 1: Approximation.
+            if mode == 'approximation':
+                Ki = K(Mi, self.c_type)
+                dmin = d_min(Mi, self.c_type)
+                BERi = (Ki / np.log2(Mi)) * Q( ((Pi * S[:len(Pi)]**2) / N0) * dmin )
+
+            # Mode 2: Upper Bound.
+            elif mode == 'upper bound':
+                BERi = np.empty(len(Pi))
+                for i in range(len(Pi)):
+                    c = construct_constellation(Mi[i], self.c_type)
+                    N_value = N(c, Mi[i], self.c_type)
+                    Q_value = Q( ((Pi[i] * S[i]**2) / N0) * d(c) )
+                    BERi[i] = (1 / (Mi[i]*np.log2(Mi[i]))) * np.sum( N_value * Q_value )
+
+            # Invalid Mode.
+            else: 
+                raise ValueError(f'The mode is invalid.\nChoose between "upper bound" or "approximation". Right now, mode is {mode}.')
+            
+
+            # Termination.
+            BERi = np.pad(BERi, pad_width=(0, min(self.Nt, self.Nr) - len(BERi)), mode='constant', constant_values=np.nan)
+            data_Ri = np.pad(np.log2(Mi).astype(int), pad_width=(0, min(self.Nt, self.Nr) - len(Mi)), mode='constant', constant_values=0)
+            return BERi, data_Ri
+
+        print(f"\nStarting eigenchannel BER {settings.get('mode', '')} calculation for \n{str(self)} ...")
+
 
         # Initialization.
-        BERs_channels = np.zeros((num_channels, len(SNRs)), dtype=float)
-        Cs_channels = np.zeros((num_channels, len(SNRs)), dtype=float)
-
-        if eigenchannels:
-            BERs_eigenchs_channels = np.zeros((num_channels, min(self.Nt, self.Nr), len(SNRs)), dtype=float)
-            Cs_eigenchs_channels = np.zeros((num_channels, min(self.Nt, self.Nr), len(SNRs)), dtype=float)
+        BERs = np.empty((min(self.Nt, self.Nr), len(SNRs), num_channels), dtype=float)
+        data_Rs = np.empty((min(self.Nt, self.Nr), len(SNRs), num_channels), dtype=float)
 
 
-        for channel_i in range(num_channels):
+        # Iteration.
+        for channel_idx in range(num_channels):
 
-            # Reset the channel and retrieve the CSI.
-            if num_channels > 1: self.channel.reset()
-            H, U, S, Vh = self.channel.get_CSI()
+            for SNR_idx, SNR in enumerate(SNRs):
 
-            # Initialization of outer-loop variables.
-            BERs_channel_SNRs = []
-            Cs_channel_SNRs = []
+                H = self.channel.get_CSI()['H'] if SNR_idx != 0 else None
+                self.channel.reset(SNR=SNR, H=H)
 
-            if eigenchannels:
-                BERs_eigench_channel_SNRs = np.zeros((min(self.Nt, self.Nr), len(SNRs)))
-                Cs_eigench_channel_SNRs = np.zeros((min(self.Nt, self.Nr), len(SNRs)))
-
-            for i, SNR in enumerate(SNRs):
-
-                # Calculate the used capacity and allocated power on each eigenchannel.
-                N0 = self.Pt / ((10**(SNR/10.0)) * 2*self.B)
-                Pi, Ci, Mi = self.transmitter.waterfilling(H, S, N0)
-                Pi = Pi[Mi > 1]
-                Mi = Mi[Mi > 1]
-
-                # Calculate the total used capacity of the system, and store it.
-                C_total = np.sum( np.log2(Mi) )
-                Cs_channel_SNRs.append( C_total )
-
-
-                # Calculate the bit error rate of the eigenchannels of the system!
-
-                if mode == 'upper bound':
-                    BERi = np.empty(len(Pi))
-                    for i in range(len(Pi)):
-                        c = construct_constellation(Mi[i], self.type)
-                        BERi[i] = (1 / (Mi[i]*np.log2(Mi[i]))) * np.sum( N(c, Mi[i], self.type) * Q( ((Pi[i] * S[i]**2) / N0) * d(c) ) )
-                
-                elif mode == 'approximation':
-                    Ki = K(Mi, self.type)
-                    dmin = d_min(Mi, self.type)
-                    BERi = (Ki / np.log2(Mi)) * Q( ((Pi * S[:len(Pi)]**2) / N0) * dmin )
-
-                else: 
-                    raise ValueError(f'The mode is invalid.\nChoose between "upper bound" or "approximation". Right now, mode is {mode}.')
-
-
-                # Optionally, store the bit error rates and used capacity of each eigenchannel, for the current SNR value and channel realization.
-                if eigenchannels:
-                    BERs_eigench_channel_SNRs[:, i] = np.concatenate([BERi, np.array( [np.nan] * (min(self.Nt, self.Nr) - len(BERi)) )])
-                    Cs_eigench_channel_SNRs[:, i] = np.concatenate([Mi, np.array( [0] * (min(self.Nt, self.Nr) - len(Mi)) )])
-
-
-                # Calculate the bit error rate of the complete system as a weighted average, and store it.
-                BERs_channel_SNR = (1 / C_total) * np.sum( np.log2(Mi) * BERi ) if C_total > 0 else np.nan
-                BERs_channel_SNRs.append( BERs_channel_SNR )
-
-
-            # Store the results for the current channel realization.
-            BERs_channels[channel_i] = BERs_channel_SNRs
-            Cs_channels[channel_i] = Cs_channel_SNRs
-
-            if eigenchannels:
-                BERs_eigenchs_channels[channel_i] = BERs_eigench_channel_SNRs
-                Cs_eigenchs_channels[channel_i] = Cs_eigench_channel_SNRs
-
-
-        # Average the results over the different channel realizations.
-        BERs = np.nanmean(BERs_channels, axis=0)
-        Cs = np.mean(Cs_channels, axis=0)
-
-        if eigenchannels:
-            BERs_eigench = np.nanmean(BERs_eigenchs_channels, axis=0)
-            Cs_eigench = np.mean(Cs_eigenchs_channels, axis=0)
-
-        # Restore the current channel.
-        self.channel = channel
-
-        # Return the result.
-        result = [BERs, Cs]
-        if eigenchannels: result += [BERs_eigench, Cs_eigench]
+                BERi, data_Ri = self.analytical_BER(settings.get('mode', ''))
+                BERs[:, SNR_idx, channel_idx] = BERi
+                data_Rs[:, SNR_idx, channel_idx] = data_Ri
         
-        return result
 
+        # Termination.
+        activation_Rs = np.sum( data_Rs > 0, axis=2 ) / num_channels
+        BERs = np.nanmean(BERs, axis=2)
+        data_Rs = np.mean(data_Rs, axis=2)
+        
+        if not settings['eigenchannels']:
+            BERs = np.sum( (data_Rs / np.where(data_Rs[0]==0, np.nan, np.sum(data_Rs, axis=0))) * BERs, axis=0 )
+            data_Rs = np.sum(data_Rs, axis=0)
+            activation_Rs = activation_Rs[0]
+
+        return BERs, data_Rs, activation_Rs
 
 
     # TESTS AND PLOTS
@@ -513,7 +510,7 @@ class SuMimoSVD:
             elif metric == 'data_Rs': 
                 data = data_Rs
                 title = titles[metric]
-                y_label = 'Data Transmit Rate (bits per symbol vector)'
+                y_label = r'Information Bit Rate $R_b$ [bits per symbol vector]'
                 y_scale = 'linear'
                 y_lim_bottom, y_lim_top = None, None
             elif metric == 'Ebs':
@@ -716,7 +713,7 @@ class SuMimoSVD:
             constellation_points = generate_constellation(Mi[eigenchannel], self.c_type)
             colors = [colormaps[eigenchannel][point] for point in constellation_points]
             constellation_points = constellation_points * (S[eigenchannel] * np.sqrt(Pi[eigenchannel]))
-            ax.scatter(constellation_points.real, constellation_points.imag, color=colors, edgecolor='black', marker='o', alpha= 1.0, s=50)
+            ax.scatter(constellation_points.real, constellation_points.imag, color=colors, edgecolor='black', marker='X', alpha= 1.0, s=50)
 
             # Plot settings.
             ax.axhline(0, color='black', linewidth=0.5)
@@ -769,178 +766,23 @@ if __name__ == "__main__":
 
     test = 'test 0'
     
-    # TEST 1: Example simulation of SU-MIMO SVD system.
-    if test == 'test 1':
+    # TEST 0: Example simulation of SU-MIMO SVD system.
+    if test == 'example':
 
-        Nt = 3
-        Nr = 2
-        type = 'PSK'
-        H = np.array([[3, 2, 2], [2, 3, -2]])
+        su_mimo_svd = SuMimoSVD(Nt=3, Nr=2, c_type='PSK', H=np.array([[3, 2, 2], [2, 3, -2]]))
+        ber = su_mimo_svd.print_simulation_example(bits=np.random.randint(0, 2, size=16000), K=3)
 
-        su_mimo_svd = SuMimoSVD(Nt=Nt, Nr=Nr, constellation_type=type, H=H)
-        ber = su_mimo_svd.print_simulation_example(bits=np.random.randint(0, 2, size=16000), SNR=np.inf, K=3)
+    # TEST 1: Performance analysis through bit error rate curves.
+    if test == 'BER':
 
+        # 1. Analyse the performance for different SU-MIMO SVD DigCom Systems.
+        # 2. Analyse the performance of the different eigenchannels.
+        # 3. Analyse the performance at different data rates.
+        pass
 
-    # TEST 2: Performance evaluation of multiple SU-MIMO SVD systems.
-    if test == 'test 2':
-
-        def test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels):
-
-            BERs_list = []
-            Cs_list = []
-            
-            labels = []
-            colors = []
-
-            markers = [marker for marker in ['o', 's', 'D', 'v', '*', 'p', '8', '^', '<', '>'][:len(system_configs)] for _ in range(len(curves))]
-
-
-            for Nt, Nr, type in system_configs:
-
-                # Initialize SU-MIMO SVD system.
-                su_mimo_svd = SuMimoSVD(Nt, Nr, type)
-                label = f'{Nt}x{Nr} {type}'
-
-                # Calculate analytical BERs upper bound and the used capacities, and store the results.
-                if 'upper bound' in curves:
-
-                    BERs_upper_bound, Cs_upper_bound, BERis_upper_bound = su_mimo_svd.BERs_analytical(SNRs, num_channels['upper bound'], mode='upper bound')
-
-                    BERs_list.append(BERs_upper_bound)
-                    Cs_list.append(Cs_upper_bound)
-                    
-                    labels.append(label + ' upper bound')
-                    colors.append('tab:red')
-
-                    np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_performance_upper_bound.npz', SNRs=SNRs, BERs=BERs_upper_bound, Cs=Cs_upper_bound, BERis=BERis_upper_bound)
-                
-                # Calculate analytical BERs approximation and the used capacities, and store the results.
-                if 'approximation' in curves:
-
-                    BERs_approx, Cs_approx, BERis_approx = su_mimo_svd.BERs_analytical(SNRs, num_channels['approximation'], mode='approximation')
-
-                    BERs_list.append(BERs_approx)
-                    Cs_list.append(Cs_approx)
-
-                    labels.append(label + ' approximation')
-                    colors.append('tab:orange')
-
-                    np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_performance_approximation.npz', SNRs=SNRs, BERs=BERs_approx, Cs=Cs_approx, BERis=BERis_approx)
-
-                # Calculate simulated BERs and the used capacities, and store the results.
-                if 'simulation' in curves:
-
-                    BERs_sim, Cs_sim = su_mimo_svd.BERs_simulation(SNRs, num_errors_sim, num_channels['simulation'])
-
-                    BERs_list.append(BERs_sim)
-                    Cs_list.append(Cs_sim)
-                    
-                    labels.append(label + ' simulation')
-                    colors.append('tab:blue')
-
-                    np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_performance_simulation.npz', SNRs=SNRs, BERs=BERs_sim, Cs=Cs_sim)
-
-
-            # Plot results.
-            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_list, labels, colors=colors, marker_colors=colors, markers=markers,title=f'SU-MIMO SVD DigCom System')
-            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Cs_list, labels, colors=colors, marker_colors=colors, markers=markers, title=f'SU-MIMO SVD DigCom System')
-            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_list, Cs_list, labels, colors=colors, marker_colors=colors, markers=markers, title=f'SU-MIMO SVD DigCom System')
-            
-            # Return
-            return fig1, ax1, fig2, ax2, fig3, ax3
-    
-        system_configs = [ (4, 4, 'PSK') ]
-        curves = ['simulation']
-        SNRs = np.arange(-5, 31, 5)
-        num_errors_sim = 200
-        num_channels = {'simulation': 50}
-        fig1, ax1, fig2, ax2, fig3, ax3 = test_performance_systems(system_configs, curves, SNRs, num_errors_sim, num_channels)
-        plt.show()
-
-
-    # TEST 3: Performance evaluation of the different eigenchannels.
-    if test == 'test 3':
-
-        def test_performance_eigenchannels_simulation(system, SNRs, num_errors, num_channels):
-            
-            Nt, Nr, type = system
-            su_mimo_svd = SuMimoSVD(Nt, Nr, type)
-
-            BERs_eigenchs, Cs_eigenchs = su_mimo_svd.BERs_eigenchs_simulation(SNRs, num_errors, num_channels)
-            
-            BERs_eigenchs = [x for x in BERs_eigenchs]
-            Cs_eigenchs = [x for x in Cs_eigenchs]
-            labels = [f'eigenchannel {i+1}' for i in range(min(Nt, Nr))]
-            title = f'Eigenchannel Performance (Simulation)\n{Nt}x{Nr} {type} System.'
-
-            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_eigenchs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-
-            np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_eigenchannel_performance_simulation.npz', SNRs=SNRs, BERs=BERs_eigenchs, Cs=Cs_eigenchs, labels=labels)
-
-            return fig1, ax1, fig2, ax2, fig3, ax3
+    # TEST 2: Performance analysis through scatter diagrams.
+    if test == 'scatter':
         
-        def test_performance_eigenchannels_analytical(system, SNRs, num_channels, mode):
-            
-            Nt, Nr, type = system
-            su_mimo_svd = SuMimoSVD(Nt, Nr, type)
-
-            BERs_eigenchs, Cs_eigenchs = su_mimo_svd.BERs_analytical(SNRs, num_channels, mode, eigenchannels=True)[2:]
-
-            BERs_eigenchs = [x for x in BERs_eigenchs]
-            Cs_eigenchs = [x for x in Cs_eigenchs]
-            labels = [f'eigenchannel {i+1}' for i in range(min(Nt, Nr))]
-            title = f'Eigenchannel Performance (Analytical {mode})\n{Nt}x{Nr} {type} System.'
-
-            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_eigenchs, Cs_eigenchs, labels, markers=(['o']*min(Nt, Nr)), title=title)
-
-            np.savez(f'su-mimo/inter_sim_results/{Nt}x{Nr}_{type}_eigenchannel_performance_{mode.replace(" ", "_")}.npz', SNRs=SNRs, BERs=BERs_eigenchs, Cs=Cs_eigenchs, labels=labels)
-
-            return fig1, ax1, fig2, ax2, fig3, ax3
-        
-
-    # TEST 4: Performance evaluation at different data rates.
-    if test == 'test 4':
-
-        def test_performance_data_rates_simulation(system, SNRs, c_sizes, SNRs_list, data_rates, num_errors, num_channels):
-        
-            Nt, Nr, c_type = system
-
-            BERs_list = []
-            Rs_list = []
-            labels = []
-
-            for c_size in c_sizes:
-
-                su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, c_size=c_size)
-                BERs, Rs = su_mimo_svd.BERs_simulation(SNRs, num_errors, num_channels)
-
-                BERs_list.append(BERs)
-                Rs_list.append(Rs)
-                labels.append(r'$R =$' + f' {np.log2(c_size).astype(int)} bits/antenna')
-
-            for data_rate, SNRs_i in zip(data_rates, SNRs_list):
-
-                su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, data_rate=data_rate)
-                BERs, Rs = su_mimo_svd.BERs_simulation(SNRs_i, num_errors, num_channels)
-
-                BERs = np.concatenate([np.full(len(SNRs) - len(SNRs_i), np.nan), BERs])
-                Rs = np.concatenate([np.full(len(SNRs) - len(SNRs_i), np.nan), Rs])
-
-                BERs_list.append(BERs)
-                Rs_list.append(Rs)
-                labels.append(r'$R \approx$' + f' {round(data_rate*100)}' + r'$\%$')
-
-
-            title = f'Performance at Different Data Rates (Simulation)\n{Nt}x{Nr} {c_type} System.'
-            fig1, ax1 = su_mimo_svd.plot_BERs(SNRs, BERs_list, labels, markers=['o']*len(BERs_list), title=title)
-            fig2, ax2 = su_mimo_svd.plot_Cs(SNRs, Rs_list, labels, markers=['o']*len(Rs_list), title=title)
-            fig3, ax3 = su_mimo_svd.plot_BERs_Cs(SNRs, BERs_list, Rs_list, labels, markers=['o']*len(BERs_list), title=title)
-
-            return fig1, ax1, fig2, ax2, fig3, ax3
-
-
-
+        # 1. Analyse the scatter diagram at different SNR values (for the same SU-MIMO SVD DigCom System).
+        # 2. Analyse the scatter diagram at different data rates (for the same SU-MIMO SVD DigCom System).
+        pass
