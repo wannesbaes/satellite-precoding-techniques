@@ -487,6 +487,7 @@ class Transmitter:
         ax.set_xlim(-0.5, len(Ci) - 0.5)
         ax.legend(loc='upper right')
         fig.tight_layout()
+        fig.savefig(f"../plots/resource_allocation/bit_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
 
         return fig, ax
 
@@ -526,6 +527,7 @@ class Transmitter:
         ax.set_xlim(0.5, len(inverse_channel_gains) + 0.5)
         ax.legend(loc='upper left')
         fig.tight_layout()
+        fig.savefig(f"../plots/resource_allocation/power_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
         
         return fig, ax
 
@@ -599,17 +601,3 @@ class Transmitter:
 
         # RETURN
         return s
-
-
-
-if __name__ == "__main__":
-
-    # Initialize the transmitter.
-    transmitter = Transmitter(Nt=5, c_type='QAM')
-    
-    # Initialize the channel.
-    H = (1/np.sqrt(2)) * (np.random.randn(transmitter.Nt-1, transmitter.Nt) + 1j * np.random.randn(transmitter.Nt-1, transmitter.Nt))
-    CSI = {'SNR': 15, 'H': H} | {key : value for key, value in zip(['U', 'S', 'Vh'], np.linalg.svd(H))}
-
-    # Transmitter simulation example.
-    transmitter.print_simulation_example(np.random.randint(0, 2, size=100), CSI=CSI, K=3)

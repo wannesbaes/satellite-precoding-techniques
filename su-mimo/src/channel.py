@@ -241,17 +241,3 @@ class Channel:
 
         # RETURN
         return r
-
-
-if __name__ == "__main__":
-
-    # Initialize the channel.
-    channel = Channel(Nt=5, Nr=4, SNR=15)
-    
-    # Initialize the transmitted signal s.
-    import transmitter as tx
-    transmitter = tx.Transmitter(Nt=5, c_type='QAM')
-    s = transmitter.simulate(bits=np.random.randint(0, 2, size=2400), CSI=channel.get_CSI())
-
-    # Channel simulation example.
-    channel.print_simulation_example(s=s, K=2)

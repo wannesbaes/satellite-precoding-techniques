@@ -500,67 +500,6 @@ class Receiver:
 
     # TESTS AND PLOTS
 
-    def plot_detector(self, decision_variable, M, c_type, SNR):
-        """
-        Description
-        -----------
-        Plot the decision variable, the complete constellation and the chosen constellation point to visualize the detection process.
-
-        Parameters
-        ----------
-        decision_variable : complex
-            The decision variable to be detected.
-        M : int
-            Constellation size.
-        c_type : str
-            Constellation type. (Choose between 'PAM', 'PSK', 'QAM'.)
-        SNR : float
-            The signal-to-noise ratio (SNR) in dB.
-        
-        Returns
-        -------
-        fig, ax : tuple
-            The figure and axis objects of the plot.
-        """
-
-        # 1. Construct the modulation constellation.
-
-        assert (M & (M - 1) == 0) and ((M & 0xAAAAAAAA) == 0 or c_type != 'QAM'), f'The constellation size M is invalid.\nFor PAM and PSK modulation, it must be a power of 2. For QAM Modulation, M must be a power of 4. Right now, M equals {M} and the type is {c_type}.'
-
-        if c_type == 'PAM':
-            constellation = np.arange(-(M-1), (M-1) + 1, 2) * np.sqrt(3/(M**2-1))
-
-        elif c_type == 'PSK':
-            constellation = np.exp(1j * 2*np.pi * np.arange(M) / M)
-
-        elif c_type == 'QAM':
-            c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
-            real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM)
-            constellation = (real_grid + 1j*imaginary_grid).flatten()
-
-        else :
-            raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
-        
-        # 2. Detect the decision variable.
-        symbol_hat = self.detect(np.array([decision_variable]), M, c_type)[0]
-
-        # 3. Plot.
-        fig, ax = plt.subplots()
-        ax.scatter(np.real(decision_variable), np.imag(decision_variable), color='tab:orange', s=60, label='Decision Variable')
-        ax.scatter(np.real(symbol_hat), np.imag(symbol_hat), color='tab:blue', alpha=1, s=60, label='Detected Symbol')
-        ax.scatter(np.real(constellation[constellation != decision_variable]), np.imag(constellation[constellation != decision_variable]), color='tab:blue', alpha=0.5, s=50, label='Constellation Points')
-        ax.axhline(0, color='black', linewidth=0.5)
-        ax.axvline(0, color='black', linewidth=0.5)
-        ax.set_title(f'Detector Visualization for {M}-{c_type} \nSNR: {SNR} dB')
-        ax.set_xlabel('Real Part')
-        ax.set_ylabel('Imaginary Part')
-        ax.legend()
-        ax.grid()
-        ax.axis('equal')
-        fig.tight_layout()
-
-        return fig, ax
-
     def print_simulation_example(self, r, CSI, CCI, K=1):
         """
         Description
@@ -627,22 +566,3 @@ class Receiver:
 
         # RETURN
         return bitstream_hat
-
-
-
-if __name__ == "__main__":
-
-    # Initialize the receiver.
-    receiver = Receiver(Nr=4, c_type='QAM')
-
-    # Initialize the transmitter and channel.
-    import transmitter as tx
-    transmitter = tx.Transmitter(Nt=5, c_type='QAM')
-    import channel as ch
-    channel = ch.Channel(Nt=5, Nr=4, SNR=15)
-
-    s = transmitter(bits=np.random.randint(0, 2, size=100), CSI=channel.get_CSI())
-    r = channel(s=s)
-
-    # Receiver simulation example.
-    receiver.print_simulation_example(r=r, CSI=channel.get_CSI(), CCI=transmitter.get_CCI(), K=1)

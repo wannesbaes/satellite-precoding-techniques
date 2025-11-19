@@ -8,46 +8,12 @@
 
 # Python
 __pycache__/
+.pytest_cache__/
 *.pyc
 
-# VSCode LaTeX extension cache
-.vscode/latex/
+# Draft files
+draft_files/
 
-# LaTeX auxiliary files
-*.aux
-*.lof
-*.log
-*.lot
-*.fls
-*.out
-*.toc
-*.fmt
-*.fot
-*.cb
-*.cb2
-*.synctex.gz
-*.fdb_latexmk
-*.pdfsync
-*.nav
-*.snm
-*.vrb
-*.xdv
-*.bbl
-
-# LaTeX intermediate directories
-_auto/
-_latexmk/
-tmp/
-build/
-
-# Intermediate simulation results
-*.npz
-
-# Plots
-*.svg
-*.png
-
-# Drawio files
-*.drawio
-*.drawio.bkp
-*.png.bkp
+# LaTeX report files.
+su-mimo/reports/latex/
+su-mimo/reports/figures/
