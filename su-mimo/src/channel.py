@@ -10,7 +10,7 @@ class Channel:
     -----------
     The channel of a single-user multiple-input multiple-output (SU-MIMO) digital communication system.
 
-    The channel is modeled as a distortion-free MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
+    The channel is modeled as a flat-fading MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
     In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR) (in dB).
 
     Attributes

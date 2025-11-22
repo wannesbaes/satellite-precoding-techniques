@@ -374,14 +374,14 @@ class Transmitter:
         
         Returns
         -------
-        s_prime : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        s_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Output - powered data symbol vectors.
         """
         
-        s_prime = np.diag(np.sqrt(self._Pi)) @ a
-        return s_prime
+        s_tilda = np.diag(np.sqrt(self._Pi)) @ a
+        return s_tilda
 
-    def precoder(self, s_prime, Vh):
+    def precoder(self, s_tilda, Vh):
         """ 
         Description
         -----------
@@ -389,7 +389,7 @@ class Transmitter:
 
         Parameters
         ----------
-        s_prime : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        s_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Input - powered data symbol vectors.
         Vh : 2D numpy array (dtype: complex, shape: (Nt, Nt))
             Right singular vectors of the channel matrix H.
@@ -400,7 +400,7 @@ class Transmitter:
             Output - precoded data symbol vectors.
         """
 
-        s = Vh.conj().T @ s_prime
+        s = Vh.conj().T @ s_tilda
         return s
 
     def simulate(self, bitstream, CSI):
@@ -445,8 +445,8 @@ class Transmitter:
         # Transmitter Operations.
         b = self.bit_allocator(bitstream)
         a = self.mapper(b)
-        s_prime = self.power_allocator(a)
-        s = self.precoder(s_prime, CSI['Vh'])
+        s_tilda = self.power_allocator(a)
+        s = self.precoder(s_tilda, CSI['Vh'])
 
         return s
 
@@ -487,7 +487,7 @@ class Transmitter:
         ax.set_xlim(-0.5, len(Ci) - 0.5)
         ax.legend(loc='upper right')
         fig.tight_layout()
-        fig.savefig(f"../plots/resource_allocation/bit_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(f"su-mimo/plots/resource_allocation/bit_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
 
         return fig, ax
 
@@ -527,7 +527,7 @@ class Transmitter:
         ax.set_xlim(0.5, len(inverse_channel_gains) + 0.5)
         ax.legend(loc='upper left')
         fig.tight_layout()
-        fig.savefig(f"../plots/resource_allocation/power_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(f"su-mimo/plots/resource_allocation/power_allocation/{(str(self) + '__SNR_' + str(CSI['SNR']) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
         
         return fig, ax
 
@@ -583,11 +583,11 @@ class Transmitter:
         print(f"\n\n----- the data symbols for each transmit antenna -----\n{np.round(a, 2)}\n\n")
 
         # 5. Allocate power across the transmit antennas.
-        s_prime = self.power_allocator(a)
-        print(f"----- the data symbols with power allocated for each transmit antenna -----\n{np.round(s_prime, 2)}\n\n")
+        s_tilda = self.power_allocator(a)
+        print(f"----- the data symbols with power allocated for each transmit antenna -----\n{np.round(s_tilda, 2)}\n\n")
 
         # 6. Precode the data symbols.
-        s = self.precoder(s_prime, CSI['Vh'])
+        s = self.precoder(s_tilda, CSI['Vh'])
         print(f"----- the precoded data symbols ready for transmission -----\n{np.round(s, 2)}\n\n")
 
         print("======== End Transmitter Simulation Example ========")

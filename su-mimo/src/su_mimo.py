@@ -17,8 +17,8 @@ class SuMimoSVD:
     -----------
     A single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at both the transmitter and receiver.
     
-    The communication system consists of a transmitter, a distortion-free MIMO channel, and a receiver. 
-    The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and postcoding at the receiver.
+    The communication system consists of a transmitter, a flat-fading MIMO channel, and a receiver. 
+    The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and combining at the receiver.
 
     Attributes
     ----------
@@ -514,8 +514,8 @@ class SuMimoSVD:
             This also defines which different metrics are plotted! 
             Possible options are:
                 * 'BER' : Bit Error Rate plot.
-                * 'data_Rs' : Data Transmit Rate plot.
-                * 'Ebs' : The energy per bit to the noise power spectral density (BNR) plot.
+                * 'data_R' : Data Transmit Rate plot.
+                * 'Eb' : The energy per bit to the noise power spectral density (BNR) plot.
         
         Returns
         -------
@@ -543,15 +543,15 @@ class SuMimoSVD:
                 title = titles[metric]
                 y_label = 'Bit Error Rate (BER)'
                 y_scale = 'log'
-                y_lim_bottom, y_lim_top = 1e-7, 1
-            elif metric == 'data_Rs': 
+                y_lim_bottom, y_lim_top = 1e-6, 1
+            elif metric == 'data_R': 
                 data = data_Rs
                 title = titles[metric]
                 y_label = r'Information Bit Rate $R_b$ [bits per symbol vector]'
                 y_scale = 'linear'
                 y_lim_bottom, y_lim_top = None, None
-            elif metric == 'Ebs':
-                data = np.divide(np.tile(SNRs, (len(labels), 1)), data_Rs, out=np.full((len(labels), len(SNRs)), np.nan), where=(data_Rs != 0))
+            elif metric == 'Eb':
+                data = SNRs - np.where(data_Rs == 0, np.nan, 10*np.log10(data_Rs))
                 title = titles[metric]
                 y_label = r'$\frac{\mathrm{E}_b}{\mathrm{N}_0}$ [dB]'
                 y_scale = 'linear'
@@ -578,10 +578,10 @@ class SuMimoSVD:
                     for j in range(len(SNRs)):
                         ax.scatter(SNRs[j], data[i][j], marker=markers[i], color=marker_colors[i], edgecolors=marker_colors[i], alpha=opacity[i][j], s=36, zorder=3)
 
-                    ax.plot([], [], label=labels[i], color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
+                    ax.plot([], [], label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
                 
                 else:
-                    ax.plot(SNRs, data[i], label=labels[i], color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
+                    ax.plot(SNRs, data[i], label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
             
             # Set the plot settings.
             ax.set_title(title)
@@ -595,7 +595,7 @@ class SuMimoSVD:
             fig.tight_layout()
             
             # Store the plot.
-            fig.savefig(f"../plots/performance/SNR_curves/{title.replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
+            fig.savefig(f"su-mimo/plots/performance/SNR_curves/{title.replace(' - ', '__').replace(' ', '_')}.png", dpi=300, bbox_inches="tight")
             plots[metric] = (fig, ax)
         
         return plots
@@ -700,7 +700,7 @@ class SuMimoSVD:
             a : 2D numpy array (dtype: complex, shape: (min(Nt, Nr), K))
                 Output - The data symbols (before power allocation and precoding, so this are constellation points).
             r_prime : 2D numpy array (dtype: complex, shape: (min(Nt, Nr), K))
-                Output - The received data symbols (after postcoding).
+                Output - The received data symbols (after combining).
             """
             
             # Transmitter Setup.
@@ -718,13 +718,13 @@ class SuMimoSVD:
             # 2. Simulate the channel operations.
             r = self.channel.simulate(s)
 
-            # 3. Simulate the receiver operations untill the postcoder.
-            r_prime = self.receiver.postcoder(r, self.channel.get_CSI()['U'])
+            # 3. Simulate the receiver operations untill the combiner.
+            r_prime = self.receiver.combiner(r, self.channel.get_CSI()['U'])
 
             # Return
             return a, r_prime
 
-        # Similate part of the system to obtain the transmitted data symbols (before power allocation and precoding) and the received data symbols (after postcoding).
+        # Similate part of the system to obtain the transmitted data symbols (before power allocation and precoding) and the received data symbols (after combining).
         a, r_prime = scatter_simulate(K)
 
         # Retrieve the CSI and CCI.
@@ -763,9 +763,9 @@ class SuMimoSVD:
             ax.axis('equal')
         
         # Overall plot settings.
-        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing \nSNR = {SNR} dB & R = {round(self.data_rate*100)}%')
+        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing \nSNR = {SNR} dB & ' + r'$R_b$' + f' = {round(self.data_rate*100)}%')
         fig.tight_layout()
-        fig.savefig(f"../plots/performance/scatter_plots/{(str(self) + '__SNR_' + str(SNR) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(f"su-mimo/plots/performance/scatter_plots/{(str(self) + '__SNR_' + str(SNR) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
     
         # Return the plot.
         return fig, axes

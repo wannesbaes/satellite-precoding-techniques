@@ -12,7 +12,7 @@ class Receiver:
 
     When the receiver is called and given an received input signal r, it ...
         determines the power allocation and constellation size on each receive antenna
-        postcodes and equalizes the received symbol vectors
+        combines and equalizes the received symbol vectors
         searches the most probable transmitted data symbol vectors
         demaps them into bit vectors
         and combines the reconstructed bits on each antenna to create the output bitstream.
@@ -57,10 +57,10 @@ class Receiver:
     
     resource_allocation():
         Determine and store the constellation size and power allocation for each receive antenna.
-    postcode():
-        Postcode the input signal using the left singular vectors of the channel matrix H.
+    combiner():
+        Combine the input signal using the left singular vectors of the channel matrix H.
     equalizer():
-        Equalize the postcoded symbol vectors, based on S and Pi.
+        Equalize the combined symbol vectors, based on S and Pi.
     detector():
         Convert the decision variable vectors into the most probable transmitted data symbol vectors.
     demapper():
@@ -334,11 +334,11 @@ class Receiver:
         self._Mi = Mi
         return
 
-    def postcoder(self, r, U):
+    def combiner(self, r, U):
         """
         Description
         -----------
-        Postcode the input signal (distorted data symbol vectors) using the left singular vectors of the channel matrix H.
+        Combine the input signal (distorted data symbol vectors) using the left singular vectors of the channel matrix H.
 
         Parameters
         ----------
@@ -349,23 +349,23 @@ class Receiver:
         
         Returns
         -------
-        r_prime : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
-            Output - postcoded symbol vectors.
+        r_tilda : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Output - combined symbol vectors.
         """
 
-        r_prime = U.conj().T @ r
-        return r_prime
+        r_tilda = U.conj().T @ r
+        return r_tilda
 
-    def equalizer(self, r_prime, S):
+    def equalizer(self, r_tilda, S):
         """
         Description
         -----------
-        Equalize the postcoded symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.
+        Equalize the combined symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.
 
         Parameters
         ----------
-        r_prime : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
-            Input - postcoded symbol vectors.
+        r_tilda : 2D numpy array (dtype: complex, shape: (Nr, N_symbols))
+            Input - combined symbol vectors.
         S : 1D numpy array (dtype: float, length=rank_H)
             The singular values of the channel matrix H.
 
@@ -376,7 +376,7 @@ class Receiver:
         """
 
         useful_eigenchannels = min(len(self._Pi[self._Pi>0]), len(S))
-        u = r_prime[:useful_eigenchannels] / (S * np.sqrt(self._Pi[:len(S)]))[:useful_eigenchannels][:, np.newaxis]
+        u = r_tilda[:useful_eigenchannels] / (S * np.sqrt(self._Pi[:len(S)]))[:useful_eigenchannels][:, np.newaxis]
 
         return u
 
@@ -384,7 +384,7 @@ class Receiver:
         """
         Description
         -----------
-        Convert the decision variable vectors (distorted (equalized & postcoded) data symbol vectors) into the most probable (minimum distance (MD) detection) transmitted data symbol vectors according to the specified modulation constellation for each transmit antenna.
+        Convert the decision variable vectors (distorted (equalized & combined) data symbol vectors) into the most probable (minimum distance (MD) detection) transmitted data symbol vectors according to the specified modulation constellation for each transmit antenna.
 
         Parameters
         ----------
@@ -455,8 +455,8 @@ class Receiver:
         Simulate the receiver operations:\n
         (1) Get the channel state information.\n
         (2) [resource_allocation] Set the resource allocation parameters, obtained from the control channel information.\n In case there is no control channel, execute the waterfilling algorithm to determine the constellation size and allocated power that will be received on each antenna.\n Note: If a fixed constellation size M is provided as input, the waterfilling algorithm is omitted. The available power is equally allocated across all antennas and this constant constellation size is used for all antennas.\n
-        (3) [postcoder] Postcode the received symbol vectors using the left singular vectors of the channel matrix H.\n
-        (4) [equalizer] Equalize the postcoded symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.\n
+        (3) [combiner] Combine the received symbol vectors using the left singular vectors of the channel matrix H.\n
+        (4) [equalizer] Equalize the combined symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.\n
         (5) [detector] Convert the decision variable vectors into the most probable data symbol vectors.\n
         (6) [demapper] Convert the reconstructed data symbol vectors into the corresponding bit vectors according to the specified modulation constellation.\n
         (7) [bit deallocator] Combine the reconstructed bit vectors to create the output bitstream.\n
@@ -489,8 +489,8 @@ class Receiver:
         self.resource_allocation(CSI, CCI)
         
         # Receiver Operations.
-        r_prime = self.postcoder(r, CSI['U'])
-        u = self.equalizer(r_prime, CSI['S'])
+        r_tilda = self.combiner(r, CSI['U'])
+        u = self.equalizer(r_tilda, CSI['S'])
         a_hat = self.detector(u)
         b_hat = self.demapper(a_hat)
         bitstream_hat = self.bit_deallocator(b_hat)
@@ -539,12 +539,12 @@ class Receiver:
         self._Mi = np.pad(Mi, pad_width=(0, self.Nr - len(Mi)), mode='constant', constant_values=1)
         print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(self._Pi, 2)},\n Channel capacities Ci = {np.round(self._Ci, 2)},\n Constellation sizes Mi = {self._Mi}\n\n")
 
-        # 3. Postcode the received symbols.
-        r_prime = self.postcoder(r[:, :K], CSI['U'])
-        print(f"----- the postcoded symbols -----\n{np.round(r_prime, 2)}\n\n")
+        # 3. Combine the received symbols.
+        r_tilda = self.combiner(r[:, :K], CSI['U'])
+        print(f"----- the combined symbols -----\n{np.round(r_tilda, 2)}\n\n")
 
-        # 4. Equalize the postcoded symbols.
-        u = self.equalizer(r_prime, CSI['S'])
+        # 4. Equalize the combined symbols.
+        u = self.equalizer(r_tilda, CSI['S'])
         print(f"----- the equalized symbols -----\n{np.round(u, 2)}\n\n")
 
         # 5. Detect the transmitted data symbols.

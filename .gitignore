@@ -17,3 +17,6 @@ draft_files/
 # LaTeX report files.
 su-mimo/reports/latex/
 su-mimo/reports/figures/
+
+# Plots.
+su-mimo/plots/
