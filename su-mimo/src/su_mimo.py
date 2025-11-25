@@ -47,6 +47,13 @@ class SuMimoSVD:
         Initialize the SU-MIMO SVD digital communication system with the given parameters.
     __str__()
         Return a string representation of the SU-MIMO SVD digital communication system.
+    
+    set_CSI()
+        Set the channel state information (CSI), to new values or leave unchanged.
+    reset_CSI()
+        Reset the channel state information (CSI), to new values or default initialization values.
+    set_RAS()
+        Set the resource allocation settings (RAS).
 
     simulate()
         Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the reconstructed bitstream.
@@ -67,28 +74,129 @@ class SuMimoSVD:
     
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt, Nr, c_type, Pt=1.0, B=0.5, data_rate=1.0, SNR=np.inf, H=None, c_size=None):
+    def __init__(self, Nt, Nr, c_type, Pt=1.0, B=0.5, RAS={}, SNR=np.inf, H=None):
+        """
+        Description
+        -----------
+        Initialize the SU-MIMO SVD digital communication system.
 
+        Parameters
+        ----------
+        Nt : int
+            Number of transmit antennas.
+        Nr : int
+            Number of receive antennas.
+        c_type : str
+            Constellation type. (Choose between 'PAM', 'PSK', or 'QAM'.)
+        Pt : float, optional
+            Total available transmit power (in W). Default is 1.0.
+        B : float, optional
+            Bandwidth of the communication system (in Hz). Default is 0.5.
+        RAS : dict
+            Resource allocation settings. See the documentation of resource_allocation() method in the Transmitter class for more details.
+        SNR : float, optional
+            Signal-to-noise ratio (in dB). Default is infinity (no noise).
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            Channel matrix. If None, a random complex Gaussian (CS, zero-mean, unit-variance) channel matrix is generated. Default is None.
+        """
+
+        # System settings.
         self.Nt = Nt
         self.Nr = Nr
-
         self.c_type = c_type
-        self.M = c_size
 
         self.Pt = Pt
         self.B = B
-        self.data_rate = data_rate
 
-        self.transmitter = tx.Transmitter(Nt, c_type, data_rate, Pt, B, c_size)
+        self.RAS = RAS
+
+        # System components.
+        self.transmitter = tx.Transmitter(Nt, c_type, Pt, B, RAS)
         self.channel = ch.Channel(Nt, Nr, SNR, H)
-        self.receiver = rx.Receiver(Nr, c_type, data_rate, Pt, B, c_size)
+        self.receiver = rx.Receiver(Nr, c_type, Pt, B, RAS)
 
     def __str__(self):
         """ String representation of the SU-MIMO DigCom system. """
-        return f'{self.Nt}x{self.Nr} ' + (f'{self.M}-' if self.M is not None else '') + f'{self.c_type} SU-MIMO SVD DigCom System'
+        return f'{self.Nt}x{self.Nr} {self.c_type} SU-MIMO SVD DigCom System'
 
 
     # FUNCTIONALITY
+
+    def set_CSI(self, SNR=None, H=None):
+        """
+        Description
+        -----------
+        Set the channel state information (CSI) of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
+        If no new values are provided, the current values are kept.
+
+        Parameters
+        ----------
+        SNR : float, optional
+            Signal-to-noise ratio (in dB).
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            Channel matrix.
+        """
+        
+        # Set the channel properties.
+        self.channel.set_CSI(SNR, H)
+
+        # Update the resource allocation at the transmitter and receiver.
+        self.transmitter.resource_allocation(self.channel.get_CSI())
+        self.receiver.resource_allocation(self.channel.get_CSI(), self.transmitter.get_CCI())
+
+    def reset_CSI(self, SNR=None, H=None):
+        """
+        Description
+        -----------
+        Reset the channel state information (CSI) of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
+        If no new value is provided, the default initialization values are used. For the SNR value, the default is infinity (no noise). For the channel matrix, the default is a random i.i.d. complex circularly-symmetric Gaussian (zero mean, unit variance) MIMO channel.
+
+        Parameters
+        ----------
+        SNR : float, optional
+            Signal-to-noise ratio (in dB).
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            Channel matrix.
+        """
+        
+        # Reset the channel properties.
+        self.channel.reset_CSI(SNR, H)
+
+        # Update the resource allocation at the transmitter and receiver.
+        self.transmitter.resource_allocation(self.channel.get_CSI())
+        self.receiver.resource_allocation(self.channel.get_CSI(), self.transmitter.get_CCI())
+    
+    def set_RAS(self, pa=None, ba=None, data_R=None, c_sizes=None, cc=None):
+        """
+        Description
+        -----------
+        Set the resource allocation settings of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
+        If no new value for a certain setting is provided, the current value for that setting is kept.
+
+        Parameters
+        ----------
+        pa : str, optional
+            Power allocation method. (Choose between 'optimal', 'eigenbeamforming', or 'equal'.)
+        ba : str, optional
+            Bit allocation method. (Choose between 'adaptive' or 'fixed'.)
+        data_R : float, optional
+            Target data rate, as a fraction of the channel capacity.
+        c_sizes : list, optional
+            Constellation sizes for each spatial stream.
+        cc : bool, optional
+            Control channel activation status.
+        """
+
+        # Update the resource allocation settings.
+        self.RAS |= {k: v for k, v in zip(['power allocation', 'bit allocation', 'data rate', 'constellation sizes', 'control channel'], [pa, ba, data_R, c_sizes, cc]) if v is not None}
+
+        self.transmitter.set_RAS(self.RAS)
+        self.receiver.set_RAS(self.RAS)
+
+        # Update the resource allocation at the transmitter and receiver.
+        self.transmitter.resource_allocation(self.channel.get_CSI())
+        self.receiver.resource_allocation(self.channel.get_CSI(), self.transmitter.get_CCI())
+
 
     def simulate(self, bitstream):
         """
@@ -109,14 +217,14 @@ class SuMimoSVD:
         """
 
         # 1. Transmitter
-        s = self.transmitter.simulate(bitstream, self.channel.get_CSI())
-        if s is None: return None
+        x = self.transmitter.simulate(bitstream, self.channel.get_CSI())
+        if x is None: return None
 
         # 2. Channel
-        r = self.channel.simulate(s)
+        y = self.channel.simulate(x)
 
         # 3. Receiver
-        bitstream_hat = self.receiver.simulate(r, self.channel.get_CSI(), self.transmitter.get_CCI())
+        bitstream_hat = self.receiver.simulate(y, self.channel.get_CSI(), self.transmitter.get_CCI())
 
         return bitstream_hat[:len(bitstream)]
     
@@ -185,8 +293,8 @@ class SuMimoSVD:
 
             for i, SNR_idx in enumerate(np.where( (counted_errors < num_errors) | (used_channels < num_channels) )[0]):
 
-                H = self.channel.get_CSI()['H'] if i != 0 else None
-                self.channel.reset(SNR=SNRs[SNR_idx], H=H)
+                if i == 0: self.reset_CSI(SNR=SNRs[SNR_idx])
+                else: self.set_CSI(SNR=SNRs[SNR_idx])
 
                 num_bits = 2400
                 bitstream = np.random.randint(0, 2, size=num_bits)
@@ -285,8 +393,8 @@ class SuMimoSVD:
 
             for i, SNR_idx in enumerate(np.where( (counted_errors[0, :] < num_errors) | (used_channels[0, :] < num_channels) )[0]):
 
-                H = self.channel.get_CSI()['H'] if i != 0 else None
-                self.channel.reset(SNR=SNRs[SNR_idx], H=H)
+                if i == 0: self.reset_CSI(SNR=SNRs[SNR_idx])
+                else: self.set_CSI(SNR=SNRs[SNR_idx])
 
                 num_bits = 2400
                 bitstream = np.random.randint(0, 2, size=num_bits)
@@ -466,8 +574,8 @@ class SuMimoSVD:
 
             for SNR_idx, SNR in enumerate(SNRs):
 
-                H = self.channel.get_CSI()['H'] if SNR_idx != 0 else None
-                self.channel.reset(SNR=SNR, H=H)
+                if SNR_idx == 0: self.reset_CSI(SNR=SNR)
+                else: self.set_CSI(SNR=SNR)
 
                 BERi, data_Ri = BER_analytical(settings['mode'])
                 BERs[:, SNR_idx, channel_idx] = BERi
@@ -713,13 +821,13 @@ class SuMimoSVD:
             b = self.transmitter.bit_allocator(bitstream)
             a = self.transmitter.mapper(b)
             s_prime = self.transmitter.power_allocator(a)
-            s = self.transmitter.precoder(s_prime, self.channel.get_CSI()['Vh'])
+            x = self.transmitter.precoder(s_prime, self.channel.get_CSI()['Vh'])
 
             # 2. Simulate the channel operations.
-            r = self.channel.simulate(s)
+            y = self.channel.simulate(x)
 
             # 3. Simulate the receiver operations untill the combiner.
-            r_prime = self.receiver.combiner(r, self.channel.get_CSI()['U'])
+            r_prime = self.receiver.combiner(y, self.channel.get_CSI()['U'])
 
             # Return
             return a, r_prime
@@ -790,9 +898,9 @@ class SuMimoSVD:
         
         print(f"\nStarting Simulation Example for \n{str(self)} ...\n\n")
 
-        s = self.transmitter.print_simulation_example(bitstream, self.channel.get_CSI(), K)
-        r = self.channel.print_simulation_example(s, K)
-        bits_hat = self.receiver.print_simulation_example(r, self.channel.get_CSI(), self.transmitter.get_CCI(), K)
+        x = self.transmitter.print_simulation_example(bitstream, self.channel.get_CSI(), K)
+        y = self.channel.print_simulation_example(x, K)
+        bits_hat = self.receiver.print_simulation_example(y, self.channel.get_CSI(), self.transmitter.get_CCI(), K)
 
         min_len = min(len(bitstream), len(bits_hat))
         BER = np.sum(bitstream[:min_len] != bits_hat[:min_len]) / bitstream.size

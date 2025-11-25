@@ -11,7 +11,7 @@ class Transmitter:
     The transmitter of a single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at the transmitter (and the receiver).
 
     When the transmitter is called and given an input bit sequence, it ...
-        determines the power allocation and constellation size for each transmit antenna, based on the given resource allocation settings (ras)
+        determines the power allocation and constellation size for each transmit antenna, based on the given resource allocation settings (RAS)
         allocates the input bits across the transmit antennas
         maps the input bit sequences to the corresponding data symbol sequences according to a specified modulation constellation for each transmit antenna
         allocates power across the transmit antennas
@@ -49,7 +49,7 @@ class Transmitter:
         Allow the transmitter object to be called as a function. When called, it executes the simulate() method.
     
     get_CCI()
-        Return the power allocation, eigenchannel capacities, and constellation sizes of each transmit antenna, for the current CSIT.
+        Return the power allocation and bit allocation of each transmit antenna, for the current CSIT. (This function represents a control channel between the transmitter and receiver.)
     
     resource_allocation()
         Determine and store power allocation and constellation size for each transmit antenna, based on the given resource allocation settings.
@@ -75,7 +75,7 @@ class Transmitter:
 
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt, c_type, ras, Pt=1.0, B=0.5):
+    def __init__(self, Nt, c_type, Pt=1.0, B=0.5, RAS={}):
         """
         Description
         -----------
@@ -87,14 +87,15 @@ class Transmitter:
             Number of transmit antennas.
         c_type : str
             Constellation type. (Choose between 'PAM', 'PSK', or 'QAM')
-        ras : dict
-            The resource allocation settings. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
-            - 'power allocation': 'optimal', 'eigenbeamforming' or 'equal'.
-            - 'constellation size': 'adaptive' or 'fixed'. 
         Pt : float, optional
             Total available transmit power. Default is 1.0.
         B : float, optional
             Bandwidth of the communication system. Default is 0.5.
+        RAS : dict
+            The resource allocation settings. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
+            - 'control channel': True or False.
+            - 'power allocation': 'optimal', 'eigenbeamforming' or 'equal'.
+            - 'bit allocation': 'adaptive' or 'fixed'.
         """
 
         # Transmitter Settings.
@@ -104,7 +105,7 @@ class Transmitter:
         self.Pt = Pt
         self.B = B
 
-        self.ras = ras
+        self._RAS = RAS
 
         # Resource Allocation.
         self._Pi = None
@@ -112,7 +113,7 @@ class Transmitter:
 
     def __str__(self):
         """ Return a string representation of the transmitter object. """
-        return f'Transmitter: \n  - Number of antennas = {self.Nt}\n  - Constellation = ' + (f'{self.M}' if self.M != None else '') + f'{self.c_type}' + f'\n  - Data rate = {self.data_rate*100}% \n  - Total transmit power Pt = {self.Pt} W\n  - Bandwidth B = {self.B} Hz\n'
+        return f'Transmitter:\n  - Number of antennas: {self.Nt}\n  - Total transmit power (Pt): {self.Pt} W\n  - Bandwidth (B): {self.B} Hz\n  - Power allocation: {self._RAS["power allocation"]}\n  - Bit Allocation: {self._RAS["bit allocation"]}\n' + (f'  - Data Rate: {round(self._RAS["data rate"]*100)}%\n' if "data rate" in self._RAS else '') + f'  - Constellation type: {self.c_type}\n\n'
 
     def __call__(self, bits, CSIT):
         """ Allow the transmitter object to be called as a function. When called, it executes the simulate() method. """
@@ -125,7 +126,8 @@ class Transmitter:
         """
         Description
         -----------
-        Return the power allocation and bit allocation (constellation sizes) of each transmit antenna, for the current CSIT. The function represents a control channel between the transmitter and receiver.
+        This function represents a control channel between the transmitter and receiver.
+        Return the power allocation and bit allocation (constellation sizes) of each transmit antenna, for the current CSIT, if a control channel is available.
 
         Returns
         -------
@@ -135,33 +137,44 @@ class Transmitter:
             - Mi: The constellation size for each used eigenchannel.
         """
         
-        CCI = {'Pi': self._Pi[self._Pi > 0], 'Mi': self._Mi[self._Mi > 1]}
+        CCI = {'Pi': self._Pi[self._Pi > 0], 'Mi': self._Mi[self._Mi > 1]} if self._RAS['control channel'] else None
         return CCI
 
-
-    def resource_allocation(self, ras, CSIT):
+    def set_RAS(self, RAS):
         """
         Description
         -----------
-        Determine and store the power allocation and bit allocation (constellation size) for each transmit antenna, based on the given resource allocation settings (ras).
+        Update the resource allocation settings (RAS) of the transmitter.
+
+        Parameters
+        ----------
+        RAS : dict
+            The resource allocation settings. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
+        """
+
+        self._RAS |= RAS
+        return
+
+
+    def resource_allocation(self, CSIT):
+        """
+        Description
+        -----------
+        Determine and store the power allocation and bit allocation (constellation size) for each transmit antenna, based on the given resource allocation settings (RAS).
 
         There are three possible options for the power allocation:
             (1) 'optimal': Execute the waterfilling algorithm to determine the optimal power allocation across the transmit antennas. CSIT is required for this mode.
             (2) 'eigenbeamforming': Allocate all power to the best eigenchannel. The waterfilling algorithm is omitted. CSIT is required for this mode.
             (3) 'equal': Equally divide the available transmit power across all transmit antennas. The waterfilling algorithm is omitted and CSIT is not required for this mode.
         
-        There are two possible options for the constellation size:
+        There are two possible options for the bit allocation:
             (1) 'adaptive': Determine the constellation size based on the eigenchannel capacities. CSIT is required for this mode. An extra key 'data rate' must be provided in the dictionary to specify the fraction of the channel capacity that is utilized.
-            (2) 'fixed': Use a constant constellation size for all transmit antennas. CSIT is not required for this mode. An extra key 'fixed sizes' must be provided in the dictionary to specify the constellation size on each transmit antenna (in case of equal constellation sizes across all transmit antennas, the value might be an integer instead of an array).\n
+            (2) 'fixed': Use a constant constellation size for all transmit antennas. CSIT is not required for this mode. An extra key 'constellation sizes' must be provided in the dictionary to specify the constellation size on each transmit antenna (in case of equal constellation sizes across all transmit antennas, the value might be an integer instead of an array).\n
 
         Parameters
         ----------
-        ras : dict
-            The resource allocation settings.
-            - 'power allocation': 'optimal', 'eigenbeamforming' or 'equal'.
-            - 'constellation size': 'adaptive' or 'fixed'.
         CSIT : dict
-            The channel state information (SNR, H, U, S, Vh).
+            The channel state information at the transmitter (SNR, H, U, S, Vh).
         
         Returns
         -------
@@ -235,14 +248,14 @@ class Transmitter:
             """
 
             # Parameters.
-            num_eigenchannels = min(self.Nt, CSIT['H'].shape[0])
-            rank_H = np.linalg.matrix_rank(CSIT['H'])
-            
             N0 = self.Pt / ((10**(CSIT['SNR']/10.0)) * 2*self.B)
             S = np.pad(CSIT['S'], (0, self.Nt - len(CSIT['S'])), 'constant')
 
             # Edge Case: The PSD of the noise is zero. The capacity of each eigenchannel becomes infinite.
-            if N0 == 0: return np.array([np.inf] * rank_H + [0] * (self.Nt - rank_H))
+            if N0 == 0:
+                rank_H = np.linalg.matrix_rank(CSIT['H'])
+                Ci = np.array([np.inf] * rank_H + [0] * (self.Nt - rank_H))
+                return Ci
 
             # Calculate the capacity for each eigenchannel.
             Ci = 2*self.B * np.log2( 1 + (Pi * (S**2)) / (2*self.B*N0) )
@@ -251,13 +264,13 @@ class Transmitter:
 
         # Power Allocation.
 
-        if ras.get('power allocation') == 'optimal':
+        if self._RAS.get('power allocation') == 'optimal':
             Pi = waterfilling(CSIT)
         
-        elif ras.get('power allocation') == 'eigenbeamforming':
+        elif self._RAS.get('power allocation') == 'eigenbeamforming':
             Pi = np.array([self.Pt] + [0]*(self.Nt - 1))
         
-        elif ras.get('power allocation') == 'equal':
+        elif self._RAS.get('power allocation') == 'equal':
             Pi = np.array([self.Pt / self.Nt] * self.Nt)
         
         else: raise ValueError(f'The power allocation method is invalid.\nChoose between "optimal", "eigenbeamforming", or "equal".')
@@ -265,15 +278,15 @@ class Transmitter:
 
         # Bit Allocation.
 
-        if ras.get('constellation size') == 'adaptive':
+        if self._RAS.get('bit allocation') == 'adaptive':
             Ci = eigenchannel_capacities(Pi, CSIT)
-            data_rate = ras.get('data rate', 1.0)
+            data_rate = self._RAS.get('data rate', 1.0)
             Mi = 2 ** np.floor( Ci * data_rate ).astype(int) if self.c_type != 'QAM' else 4 ** np.floor( (Ci * data_rate) / 2 ).astype(int)
         
-        elif ras.get('constellation size') == 'fixed':
-            Mi = np.full(self.Nt, ras.get('fixed sizes')) if isinstance(ras.get('fixed sizes'), int) else np.array(ras.get('fixed sizes'))
+        elif self._RAS.get('bit allocation') == 'fixed':
+            Mi = np.full(self.Nt, self._RAS.get('constellation sizes')) if isinstance(self._RAS.get('constellation sizes'), int) else np.array(self._RAS.get('constellation sizes'))
 
-        else: raise ValueError(f'The constellation size method is invalid.\nChoose between "adaptive" or "fixed".')
+        else: raise ValueError(f'The bit allocation method is invalid.\nChoose between "adaptive" or "fixed".')
 
 
         # Store the results. 
@@ -425,14 +438,14 @@ class Transmitter:
         
         Returns
         -------
-        s_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        x_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Output - powered data symbol vectors.
         """
         
-        s_tilda = np.diag(np.sqrt(self._Pi)) @ a
-        return s_tilda
+        x_tilda = np.diag(np.sqrt(self._Pi)) @ a
+        return x_tilda
 
-    def precoder(self, s_tilda, Vh):
+    def precoder(self, x_tilda, Vh):
         """ 
         Description
         -----------
@@ -440,19 +453,19 @@ class Transmitter:
 
         Parameters
         ----------
-        s_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        x_tilda : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Input - powered data symbol vectors.
         Vh : 2D numpy array (dtype: complex, shape: (Nt, Nt))
             Right singular vectors of the channel matrix H.
         
         Returns
         -------
-        s : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        x : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Output - precoded data symbol vectors.
         """
 
-        s = Vh.conj().T @ s_tilda
-        return s
+        x = Vh.conj().T @ x_tilda
+        return x
 
     def simulate(self, bitstream, CSIT):
         """
@@ -460,7 +473,7 @@ class Transmitter:
         -----------
         Simulate the transmitter operations:\n
         (1) Get the channel state information.\n
-        (2) [resource_allocation] Determine and store the power allocation and constellation size for each transmit antenna, based on the given resource allocation settings (ras).\n
+        (2) [resource_allocation] Determine and store the power allocation and constellation size for each transmit antenna, based on the given resource allocation settings (RAS).\n
         (3) [bit_allocator] Divide the input bits across the transmit antennas.\n
         (4) [mapper] Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.\n
         (5) [power_allocator] Allocate power across the transmit antennas.\n
@@ -483,12 +496,12 @@ class Transmitter:
 
         Returns
         -------
-        s : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
+        x : 2D numpy array (dtype: complex, shape: (Nt, N_symbols))
             Output - transmitted signal.
         """
 
         # Transmitter Setup.
-        self.resource_allocation(self.ras, CSIT)
+        self.resource_allocation(CSIT)
 
         # Edge Case: Transmission fails due to zero useful channel capacity.
         if np.sum( np.log2(self._Mi) ) == 0: return None
@@ -496,15 +509,15 @@ class Transmitter:
         # Transmitter Operations.
         b = self.bit_allocator(bitstream)
         a = self.mapper(b)
-        s_tilda = self.power_allocator(a)
-        s = self.precoder(s_tilda, CSIT['Vh'])
+        x_tilda = self.power_allocator(a)
+        x = self.precoder(x_tilda, CSIT['Vh'])
 
-        return s
+        return x
 
 
     # TESTS AND PLOTS
 
-    def plot_bit_allocation(self, ras, CSIT) -> None:
+    def plot_bit_allocation(self, CSIT):
         """
         Description
         -----------
@@ -513,8 +526,6 @@ class Transmitter:
 
         Parameters
         ----------
-        ras : dict
-            The resource allocation settings (power allocation, constellation size). We refer to the function description of resource_allocation() for more details on the meaning of these settings.
         CSIT : dict
             The channel state information (SNR, H, U, S, Vh).
         
@@ -524,47 +535,48 @@ class Transmitter:
             The figure and axis objects of the plot.
         """
         
-        def generate_title(ras, SNR):
-            title = f'{str(self)}\nAntenna Bit Allocation (SNR = {round(SNR)} dB)\n\n'
-            settings = f'power allocation: {ras.get("power allocation")}, bit allocation: {ras.get("constellation size")}'
-            detail_settings = (f'R = {ras.get("data rate")*100}%' if ras.get("constellation size") == 'adaptive' else f'M = {str(ras.get("fixed sizes"))}')
-            title = title + settings + detail_settings
+        def generate_title(RAS, CSIT):
+            title = f'Antenna Bit Allocation\n\n'
+            suptitle = f'{CSIT["H"].shape[0]}x{self.Nt}-{self.c_type}, SNR: {round(CSIT["SNR"])} dB\n'
+            settings = f'power allocation: {RAS.get("power allocation")}, bit allocation: {RAS.get("bit allocation")}, '
+            detail_settings = (f'data rate: {round(RAS.get("data rate")*100)}%' if RAS.get("bit allocation") == 'adaptive' else f'constellation sizes: {str(RAS.get("constellation sizes"))}')
+            title = title + suptitle + settings + detail_settings
             return title
 
-        def generate_file_name(ras, SNR):
+        def generate_file_name(RAS, CSIT):
             location = 'su-mimo/plots/resource_allocation/bit_allocation/'
-            system_name = str(self).replace(' - ', '__').replace('-', '__').replace(' ', '_')
-            settings = '__SNR_' + str(SNR) + '__pa_' + str(ras.get('power allocation')) + '__ba_' + str(ras.get('constellation size'))
-            detail_settings = (f'__R_{round(ras.get("data rate")*100)}%' if ras.get("constellation size") == 'adaptive' else f'__M_{str(ras.get("fixed sizes"))}')
+            title = f'{CSIT["H"].shape[0]}x{self.Nt}_{self.c_type}' + '__SNR_' + f'{CSIT["SNR"]}'
+            settings = '__pa_' + str(RAS.get('power allocation')) + '__ba_' + str(RAS.get('bit allocation'))
+            detail_settings = (f'__R_{round(RAS.get("data rate")*100)}' if RAS.get("bit allocation") == 'adaptive' else f'__M_{str(RAS.get("constellation sizes"))}')
             extension = '.png'
-            return location + system_name + settings + detail_settings + extension
-
+            return location + title + settings + detail_settings + extension
+        
         # Determine the bit allocation.
-        Pi, Mi = self.resource_allocation(self.ras, CSIT)
+        Pi, Mi = self.resource_allocation(CSIT)
         
         mc = np.log2(Mi).astype(int)
-        Ci = 2*self.B * np.log2( 1 + (10**(CSIT['SNR']/10.0)) * ((Pi[:min(self.Nt, CSIT['H'].shape[0])] * (CSIT['S']**2)) / self.Pt) )
+        Ci = 2*self.B * np.log2( 1 + (10**(CSIT['SNR']/10.0)) * ((Pi * (np.pad(CSIT['S'], (0, self.Nt - len(CSIT['S'])), 'constant')**2)) / self.Pt) )
 
         # Plot.
         fig, ax = plt.subplots(figsize=(8, 4))
         
-        x = np.arange(min(self.Nt, CSIT['H'].shape[0]))
+        x = np.arange(self.Nt)
         ax.bar(x - 0.35/2, Ci, width=0.35, color='tab:green', label='Eigenchannel capacity')
         ax.bar(x + 0.35/2, mc, width=0.35, color='tab:blue', label='Constellation size')
         
         ax.set_xlabel('Transmit Antenna')
         ax.set_ylabel('Bits')
-        ax.set_title(generate_title(self.ras, CSIT['SNR']))
+        ax.set_title(generate_title(self._RAS, CSIT))
         ax.set_xticks(x)
         ax.set_xticklabels(x + 1)
         ax.set_xlim(-0.5, len(Ci) - 0.5)
         ax.legend(loc='upper right')
         fig.tight_layout()
-        fig.savefig(generate_file_name(self.ras, CSIT['SNR']), dpi=300, bbox_inches='tight')
+        fig.savefig(generate_file_name(self._RAS, CSIT), dpi=300, bbox_inches='tight')
 
         return fig, ax
 
-    def plot_power_allocation(self,CSIT):
+    def plot_power_allocation(self, CSIT):
         """
         Description
         -----------
@@ -582,25 +594,25 @@ class Transmitter:
             The figure and axis objects of the plot.
         """
 
-        def generate_title(CSIT):
-            title = f'{str(self)}\nAntenna Power Allocation\n\n'
-            settings = f'power allocation: {self.ras.get("power allocation")}, SNR: {round(CSIT["SNR"])} dB'
-            return title + settings
+        def generate_title(RAS, CSIT):
+            title = f'Antenna Power Allocation\n'
+            suptitle = f'{CSIT["H"].shape[0]}x{self.Nt}-{self.c_type}, power allocation: {RAS.get("power allocation")}, SNR: {round(CSIT["SNR"])} dB'
+            return title + suptitle
 
-        def generate_file_name(CSIT):
+        def generate_file_name(RAS, CSIT):
             location = 'su-mimo/plots/resource_allocation/power_allocation/'
-            system_name = str(self).replace(' - ', '__').replace('-', '__').replace(' ', '_')
-            settings = '__SNR_' + str(round(CSIT['SNR'])) + '__pa_' + str(self.ras.get('power allocation'))
+            title = f'{CSIT["H"].shape[0]}x{self.Nt}_{self.c_type}'
+            settings = '__SNR_' + str(round(CSIT["SNR"])) + '__pa_' + str(RAS.get('power allocation'))
             extension = '.png'
-            return location + system_name + settings + extension
+            return location + title + settings + extension
 
         # Determine the power allocation.
-        Pi, _ = self.resource_allocation(self.ras, CSIT)
+        Pi, _ = self.resource_allocation(CSIT)
 
         N0 = self.Pt / ((10**(CSIT['SNR']/10.0)) * 2*self.B)
-        S = CSIT['S']
-        inverse_channel_gains = (2*self.B*N0) / (S[S > 0] ** 2)
-        waterlevels = Pi[Pi > 0] + inverse_channel_gains[Pi > 0]
+        S = CSIT['S'][:len(Pi[Pi > 0])]
+        inverse_channel_gains = (2*self.B*N0) / (S ** 2)
+        waterlevels = Pi[Pi > 0] + inverse_channel_gains
 
         # Plot.
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -611,12 +623,12 @@ class Transmitter:
         
         ax.set_xlabel('Transmit antenna')
         ax.set_ylabel('Power [W]')
-        ax.set_title(generate_title(CSIT))
+        ax.set_title(generate_title(self._RAS, CSIT))
         ax.set_xticks(np.arange(1, len(inverse_channel_gains) + 1))
         ax.set_xlim(0.5, len(inverse_channel_gains) + 0.5)
         ax.legend(loc='upper left')
         fig.tight_layout()
-        fig.savefig(generate_file_name(CSIT['SNR']), dpi=300, bbox_inches='tight')
+        fig.savefig(generate_file_name(self._RAS, CSIT), dpi=300, bbox_inches='tight')
         
         return fig, ax
 
@@ -637,7 +649,7 @@ class Transmitter:
         
         Return
         ------
-        s : 2D numpy array (dtype=complex, shape=(Nt, K))
+        x : 2D numpy array (dtype=complex, shape=(Nt, K))
             The output precoded data symbol vectors (first K vectors only).
         
         Notes
@@ -647,38 +659,37 @@ class Transmitter:
 
         # PRINTING EXAMPLE
         print("\n\n========== Transmitter Simulation Example ==========\n")
+        print(str(self))
         
-        # 0. Print the input bit sequence.
-        print(f"----- the input bit sequence -----\n{bitstream}\n\n")
+        # 0. Print the input bitstream.
+        print(f"----- the input bitstream -----\n{bitstream}\n\n")
         
         # 1. Get the channel state information.
         N0 = self.Pt / ((10**(CSIT['SNR']/10.0)) * 2*self.B)
         print(f"----- the channel state information -----\n\nH = \n{np.round(CSIT['H'], 2)}\n\nS = {np.round(CSIT['S'], 2)}\n\nU =\n {np.round(CSIT['U'], 2)}\n\nVh =\n {np.round(CSIT['Vh'], 2)}\n\nNoise power spectral density N0 = {round(N0, 4)} W/Hz\n\n\n")
 
-        # 2. Execute the waterfilling algorithm to determine the constellation size and power allocation for each transmit antenna.
-        Pi, Ci, Mi = self.waterfilling(N0, CSIT['H'], CSIT['S'])
-        self._Pi = np.pad(Pi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=0)
-        self._Mi = np.pad(Mi, pad_width=(0, self.Nt - len(Mi)), mode='constant', constant_values=1)
-        print(f"----- waterfilling algorithm results -----\n Power allocation Pi = {np.round(Pi, 2)},\n Channel capacities Ci = {np.round(Ci, 2)},\n Constellation sizes Mi = {Mi}\n\n")
+        # 2. Determine power allocation and the constellation size for each transmit antenna, according to the resource allocation settings.
+        Pi, Mi = self.resource_allocation(CSIT)
+        print(f"----- resource allocation results -----\n Power allocation Pi = {np.round(Pi, 2)}\n Constellation sizes Mi = {Mi}\n\n")
         
         # 3. Divide the input bits accross the transmit antennas.
         b = self.bit_allocator(bitstream)
         b = [b[:K * int(np.log2(self._Mi[i]))] for i, b in enumerate(b)]
-        print(f"----- the input bits, allocated across transmit antennas -----\n")
+        print(f"----- the bit vector -----\n")
         for i, row in enumerate(b): print(f'Antenna {i+1}: ' + '[' + ' '.join(map(str, row)) + ']')
 
         # 4. Map the input bit sequence to the corresponding data symbol sequence for each transmit antenna.
         a = self.mapper(b)
-        print(f"\n\n----- the data symbols for each transmit antenna -----\n{np.round(a, 2)}\n\n")
+        print(f"\n\n----- the data symbol vector -----\n{np.round(a, 2)}\n\n")
 
         # 5. Allocate power across the transmit antennas.
-        s_tilda = self.power_allocator(a)
-        print(f"----- the data symbols with power allocated for each transmit antenna -----\n{np.round(s_tilda, 2)}\n\n")
+        x_tilda = self.power_allocator(a)
+        print(f"----- the powered data symbol vector -----\n{np.round(x_tilda, 2)}\n\n")
 
         # 6. Precode the data symbols.
-        s = self.precoder(s_tilda, CSIT['Vh'])
-        print(f"----- the precoded data symbols ready for transmission -----\n{np.round(s, 2)}\n\n")
-
+        x = self.precoder(x_tilda, CSIT['Vh'])
+        print(f"----- the precoded data symbol vector -----\n{np.round(x, 2)}\n\n")
+        
         print("======== End Transmitter Simulation Example ========")
 
 
@@ -689,4 +700,4 @@ class Transmitter:
 
 
         # RETURN
-        return s
+        return x

@@ -1,7 +1,6 @@
 # This module contains the implementation of the channel component of a SU-MIMO SVD communication system.
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class Channel:
@@ -39,62 +38,65 @@ class Channel:
     __call__()
         Allow the channel object to be called as a function. When called, it executes the simulate() method.
     
-    set_CSI()
-        Initialize the MIMO channel matrix and compute its SVD.
     get_CSI()
-        Get the current channel state information (CSI), in terms of the signal-to-noise ratio (SNR), the channel matrix (H) and its SVD (U, S, Vh).
-    reset()
-        Reset the channel properties.
+        Get the current channel state information (CSI), in terms of the SNR, the channel matrix H and its SVD (U, S, Vh).
+    set_CSI()
+        Set the SNR value and the channel matrix. Compute the SVD of the channel matrix and store it.
+    reset_CSI()
+        Reset the SNR value and the channel matrix. Compute the SVD of the channel matrix and store it.
+    
     generate_noise()
         Generate complex white Gaussian noise (AWGN) vectors for every transmitted symbol vector, based on the current SNR.
     simulate()
-        Simulate the channel operations. Return the channel output signal r.
+        Simulate the channel operations. Return the channel output signal y.
     
     print_simulation_example()
-        Print a step-by-step example of the channel operations for a given input signal s.
+        Print a step-by-step example of the channel operations for a given input signal x.
     """
 
 
     # INITIALIZATION AND REPRESENTATION
 
-    def __init__(self, Nt, Nr, SNR=np.inf, H=None):
-        """ Initialize the channel. """
+    def __init__(self, Nt, Nr, SNR=None, H=None):
+        """ 
+        Description
+        -----------
+        Initialize the channel.
 
+        Parameters
+        ----------
+        Nt : int
+            The number of transmitting antennas.
+        Nr : int
+            The number of receiving antennas.
+        SNR : float, optional
+            The signal-to-noise ratio (SNR) in dB. Default is infinity (no noise).
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            The channel matrix. Default is a random i.i.d. complex circularly-symmetric Gaussian (zero mean, unit variance) matrix.
+        """
+
+        # System parameters
         self.Nt = Nt
         self.Nr = Nr
 
-        self._SNR = SNR
-
-        self._H = H
+        # Channel parameters.
+        self._SNR = None
+        self._H = None
         self._U = None
         self._S = None
         self._Vh = None
-        self.set_CSI()
+        self.reset_CSI(SNR, H)
     
     def __str__(self):
         """ Return a string representation of the channel object. """
-        return f"Channel of an {self.Nt} and {self.Nr} SU-MIMO system.\n\n  -The signal-to-noise ratio (SNR) in dB: {self._SNR}\n\n  - The channel matrix H: \n{self._H}\n\n  - The singular values S: \n{self._S}\n\n"
+        return f"Channel:\n  - The signal-to-noise ratio (SNR) in dB: {self._SNR}\n  - The singular values S: {self._S}\n  - The channel matrix H: \n{self._H}\n\n"
 
-    def __call__(self, s):
+    def __call__(self, x):
         """ Allow the channel object to be called as a function. When called, it executes the simulate() method. """
-        return self.simulate(s)
+        return self.simulate(x)
 
     
     # FUNCTIONALITY
-
-    def set_CSI(self):
-        """
-        Description
-        -----------
-        Initialize the MIMO channel matrix and compute its SVD!
-        If no channel is provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
-        """          
-        
-        # Initialize the MIMO channel matrix H with i.i.d. complex Gaussian (zero mean and unit variance) random variables, if no channel is provided.
-        if self._H is None: self._H = (np.random.randn(self.Nr, self.Nt) + 1j * np.random.randn(self.Nr, self.Nt)) / np.sqrt(2)
-        
-        # Compute the SVD of the channel matrix H and store the results in U, SIGMA, and Vh.
-        self._U, self._S, self._Vh = np.linalg.svd(self._H)
 
     def get_CSI(self):
         """
@@ -116,29 +118,49 @@ class Channel:
         CSI = {'SNR': self._SNR, 'H': self._H, 'U': self._U, 'S': self._S, 'Vh': self._Vh}
         return CSI
 
-    def reset(self, SNR=np.inf, H=None):
+    def set_CSI(self, SNR=None, H=None):
         """
         Description
         -----------
-        Reset the channel properties by re-initializing the signal-to-noise ratio (SNR), the MIMO channel matrix (H) and its SVD (U, S, Vh).
+        Set the SNR value and the channel matrix. Compute the singular-value-decomposition (SVD) of the channel matrix and store it.\n
+        If no new value is provided, the old value is left unchanged.
 
         Parameters
         ----------
         SNR : float, optional
             The signal-to-noise ratio (SNR) in dB.
-        H : 2D numpy array (dtype: complex, shape=(Nr, Nt)), optional
-            The channel matrix. If not provided, the channel matrix is initialized with i.i.d. complex Gaussian (zero mean and unit variance) random variables.
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            The channel matrix.
         """
 
-        self._SNR = SNR
+        if SNR is not None: 
+            self._SNR = SNR
         
-        self._H = H
-        self._U = None
-        self._S = None
-        self._Vh = None
-        self.set_CSI()
+        if H is not None:
+            self._H = H
+            self._U, self._S, self._Vh = np.linalg.svd(self._H)
+    
+    def reset_CSI(self, SNR=None, H=None):
+        """
+        Description
+        -----------
+        Reset the SNR value and the channel matrix. Compute the singular-value-decomposition (SVD) of the channel matrix and store it.\n
+        If no new value is provided, the default initialization values are used. For the SNR value, the default is infinity (no noise). For the channel matrix, the default is a random i.i.d. complex circularly-symmetric Gaussian (zero mean, unit variance) MIMO channel.
 
-    def generate_noise(self, s):
+        Parameters
+        ----------
+        SNR : float, optional
+            The signal-to-noise ratio (SNR) in dB.
+        H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
+            The channel matrix.
+        """
+        
+        if SNR is None: SNR = np.inf
+        if H is None: H = (np.random.randn(self.Nr, self.Nt) + 1j * np.random.randn(self.Nr, self.Nt)) / np.sqrt(2)
+        
+        self.set_CSI(SNR, H)    
+
+    def generate_noise(self, x):
         """
         Description
         -----------
@@ -146,7 +168,7 @@ class Channel:
 
         Parameters
         ----------
-        s : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
+        x : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
             The input signal.
         
         Returns
@@ -155,18 +177,18 @@ class Channel:
             The generated noise vectors. Shape: (Nr, N_symbols)
         """
         
-        # 1. Compute the noise power based on the current SNR and the signal power of s.
-        P_signal = np.mean( np.sum( np.abs(s)**2, axis=0 ) )
+        # 1. Compute the noise power based on the current SNR and the signal power of x.
+        P_signal = np.mean( np.sum( np.abs(x)**2, axis=0 ) )
         P_noise = P_signal / (10**(self._SNR/10))
         sigma = np.sqrt(P_noise / 2)
 
         # 2. Generate complex proper, circularly-symmetric AWGN noise vectors with the computed noise power.
-        noise = sigma * (np.random.randn(self.Nr, s.shape[1]) + 1j * np.random.randn(self.Nr, s.shape[1]))
+        noise = sigma * (np.random.randn(self.Nr, x.shape[1]) + 1j * np.random.randn(self.Nr, x.shape[1]))
 
         # 3. Return.
         return noise
 
-    def simulate(self, s):
+    def simulate(self, x):
         """
         Description
         -----------
@@ -176,44 +198,44 @@ class Channel:
 
         Parameters
         ----------
-        s : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
+        x : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
             The input signal.
         
         Returns
         -------
-        r : 2D numpy array (dtype: complex, shape=(Nr, N_symbols))
+        y : 2D numpy array (dtype: complex, shape=(Nr, N_symbols))
             The output signal.
         """
 
         # 1. Transmit the precoded symbols through the MIMO channel.
-        r = self._H @ s
+        y = self._H @ x
 
         # 2. Add complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the received symbols, based on the current SNR of the channel.
-        w = self.generate_noise(s)
-        r = r + w
+        w = self.generate_noise(x)
+        y = y + w
 
         # 3. Return.
-        return r
+        return y
 
 
     # TESTS AND PLOTS
 
-    def print_simulation_example(self, s, K=1):
+    def print_simulation_example(self, x, K=1):
         """
         Description
         -----------
-        Print a step-by-step example of the channel operations (see simulate() method) for a given input signal s. Only the first K symbol vectors are considered for illustration.
+        Print a step-by-step example of the channel operations (see simulate() method) for a given input signal x. Only the first K symbol vectors are considered for illustration.
 
         Parameters
         ----------
-        s : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
+        x : 2D numpy array (dtype: complex, shape=(Nt, N_symbols))
             The input signal.
         K : int, optional
             The maximum number of symbol vectors to consider for illustration.
         
         Return
         ------
-        r : 2D numpy array (dtype: complex, shape=(Nr, N_symbols))
+        y : 2D numpy array (dtype: complex, shape=(Nr, N_symbols))
             The output signal.
 
         Notes
@@ -224,20 +246,20 @@ class Channel:
         # PRINTING EXAMPLE
         print("\n\n========== Channel Simulation Example ==========\n")
 
-        # 0. Print the input symbol vector sequence.
-        print(f"----- the input symbol vector sequence -----\n{np.round(s, 2)}\n\n")
+        # 0. Print the input signal (precoded data symbol vector).
+        print(f"----- the input signal -----\n{np.round(x, 2)}\n\n")
 
         # 1. Transmit the precoded symbols through the MIMO channel.
-        r = self._H @ s
-        print(f"----- the received symbol vector sequence before adding noise -----\n{np.round(r, 2)}\n\n")
+        y = self._H @ x
+        print(f"----- the output signal before adding noise -----\n{np.round(y, 2)}\n\n")
 
         # 2. Add complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the received symbols, based on the specified SNR.
-        w = self.generate_noise(s, self._SNR)
-        r = r + w
-        SNR_calculated = 10 * np.log10( np.mean( np.sum( np.abs(self._H @ s)**2, axis=0 ) ) / np.mean( np.sum( np.abs(w)**2, axis=0 ) ) )
-        print(f"----- the received symbol vector sequence after adding noise -----\n{np.round(r, 2)}\nSNR [calculated]: {np.round(SNR_calculated, 2)} dB\n\n")
+        w = self.generate_noise(x)
+        y = y + w
+        SNR_calculated = 10 * np.log10( np.mean( np.sum( np.abs(self._H @ x)**2, axis=0 ) ) / np.mean( np.sum( np.abs(w)**2, axis=0 ) ) )
+        print(f"----- the output signal -----\n{np.round(y, 2)}\nSNR [calculated]: {np.round(SNR_calculated, 2)} dB\n\n")
 
         print("======== End Channel Simulation Example ========\n\n")
 
         # RETURN
-        return r
+        return y
