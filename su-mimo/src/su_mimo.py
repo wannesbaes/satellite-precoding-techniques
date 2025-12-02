@@ -3,8 +3,8 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-from matplotlib.colors import to_rgba, to_hex
-from matplotlib.collections import LineCollection
+from tqdm import tqdm
+from datetime import datetime
 
 from . import transmitter as tx
 from . import channel as ch
@@ -32,14 +32,12 @@ class SuMimoSVD:
         Total transmit power (in W). Default is 1.0.
     B : float, optional
         Bandwidth of the communication system (in Hz). Default is 0.5.
-    data_rate : float, optional
-        Target data rate, as a fraction of the channel capacity. Default is 100%.
+    RAS : dict, optional
+        Resource allocation settings. See the documentation of resource_allocation() method in the Transmitter class for more details about these strategy settings.
     SNR : float, optional
         Signal-to-noise ratio (in dB). Default is infinity (no noise).
     H : 2D numpy array (dtype: complex, shape: (Nr, Nt)), optional
         Channel matrix. If None, a random complex Gaussian (CS, zero-mean, unit-variance) channel matrix is generated. Default is None.
-    c_size : int, optional
-        Constellation size. If None, adaptive modulation is used based on the channel conditions. Default is None.
     
     Methods
     -------
@@ -53,7 +51,7 @@ class SuMimoSVD:
     reset_CSI()
         Reset the channel state information (CSI), to new values or default initialization values.
     set_RAS()
-        Set the resource allocation settings (RAS).
+        Set the resource allocation strategy (RAS).
 
     simulate()
         Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the reconstructed bitstream.
@@ -64,10 +62,6 @@ class SuMimoSVD:
     BERs_eigenchs_analytical()
         Calculate an analytical approximation or upper bound of the BER over a range of SNR values. Return the analytical BERs, information bit rates, and activation rates whether or not for each eigenchannel separately.
     
-    plot_performance()
-        Create the performance evaluation plots for the requested evaluation metrics.
-    plot_scatter_diagram()
-        Plot a scatter diagram of the received symbol vectors.
     print_simulation_example()
         Print an example simulation of the SU-MIMO SVD digital communication system. For demonstration purposes only.
     """
@@ -92,7 +86,7 @@ class SuMimoSVD:
             Total available transmit power (in W). Default is 1.0.
         B : float, optional
             Bandwidth of the communication system (in Hz). Default is 0.5.
-        RAS : dict
+        RAS : dict, optional
             Resource allocation settings. See the documentation of resource_allocation() method in the Transmitter class for more details.
         SNR : float, optional
             Signal-to-noise ratio (in dB). Default is infinity (no noise).
@@ -108,12 +102,12 @@ class SuMimoSVD:
         self.Pt = Pt
         self.B = B
 
-        self.RAS = RAS
+        self.RAS = RAS if RAS != {} else { 'power allocation': 'optimal', 'bit allocation': 'adaptive', 'data rate': 1.0, 'constellation sizes': None, 'control channel': True}
 
         # System components.
-        self.transmitter = tx.Transmitter(Nt, c_type, Pt, B, RAS)
+        self.transmitter = tx.Transmitter(Nt, c_type, Pt, B, self.RAS)
         self.channel = ch.Channel(Nt, Nr, SNR, H)
-        self.receiver = rx.Receiver(Nr, c_type, Pt, B, RAS)
+        self.receiver = rx.Receiver(Nr, c_type, Pt, B, self.RAS)
 
     def __str__(self):
         """ String representation of the SU-MIMO DigCom system. """
@@ -166,29 +160,21 @@ class SuMimoSVD:
         self.transmitter.resource_allocation(self.channel.get_CSI())
         self.receiver.resource_allocation(self.channel.get_CSI(), self.transmitter.get_CCI())
     
-    def set_RAS(self, pa=None, ba=None, data_R=None, c_sizes=None, cc=None):
+    def set_RAS(self, RAS):
         """
         Description
         -----------
-        Set the resource allocation settings of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
+        Set the resource allocation strategy of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
         If no new value for a certain setting is provided, the current value for that setting is kept.
 
         Parameters
         ----------
-        pa : str, optional
-            Power allocation method. (Choose between 'optimal', 'eigenbeamforming', or 'equal'.)
-        ba : str, optional
-            Bit allocation method. (Choose between 'adaptive' or 'fixed'.)
-        data_R : float, optional
-            Target data rate, as a fraction of the channel capacity.
-        c_sizes : list, optional
-            Constellation sizes for each spatial stream.
-        cc : bool, optional
-            Control channel activation status.
+        RAS : dict
+            Resource Allocation Strategy. See the documentation of resource_allocation() method in the Transmitter class for more details on these strategy settings.
         """
 
-        # Update the resource allocation settings.
-        self.RAS |= {k: v for k, v in zip(['power allocation', 'bit allocation', 'data rate', 'constellation sizes', 'control channel'], [pa, ba, data_R, c_sizes, cc]) if v is not None}
+        # Update the resource allocation strategy.
+        self.RAS |= RAS
 
         self.transmitter.set_RAS(self.RAS)
         self.receiver.set_RAS(self.RAS)
@@ -228,7 +214,7 @@ class SuMimoSVD:
 
         return bitstream_hat[:len(bitstream)]
     
-    def BERs_simulation(self, SNRs, num_errors=200, num_channels=50):
+    def BERs_simulation(self, SNRs, num_errors=500, num_channels=100):
         """
         Description
         -----------
@@ -248,10 +234,10 @@ class SuMimoSVD:
         -------
         BERs : 1D numpy array (dtype: float, length: N_SNRs)
             Output - The simulated Bit Error Rates (BERs) corresponding to each SNR value.
-        data_Rs : 1D numpy array (dtype: int, length: N_SNRs)
-            Output - The information bit rates (bits per symbol vector) corresponding to each SNR value.
-        activation_Rs : 1D numpy array (dtype: float, length: N_SNRs)
-            Output - The activation rate of the channel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
+        IBRs : 1D numpy array (dtype: int, length: N_SNRs)
+            Output - The simulated information bit rates (IBRs) (bits per symbol vector) corresponding to each SNR value.
+        ARs : 1D numpy array (dtype: float, length: N_SNRs)
+            Output - The simulated activation rates (ARs) of the channel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
         """
         
         def BER_simulation(bitstream):
@@ -277,37 +263,42 @@ class SuMimoSVD:
 
             return BER
         
-        print(f"\nStarting BER simulation for \n{str(self)} ...")
+        print(f"\n\nStarting BER simulation for \n{str(self)} ...\n")
 
 
         # Initialization.
+        error_progress, channel_progress = 0, 0
         counted_bits = np.zeros(len(SNRs), dtype=int)
         counted_errors = np.zeros(len(SNRs), dtype=float)
         used_channels = np.zeros(len(SNRs), dtype=int)
         realized_channels = np.zeros(len(SNRs), dtype=int)
-        data_Rs = [[] for _ in range(len(SNRs))]
+        IBRs = [[] for _ in range(len(SNRs))]
 
 
         # Iteration.
         while np.any(counted_errors < num_errors) or np.any(used_channels < num_channels):
-
+            
+            if (((np.min(counted_errors)/num_errors) >= error_progress + 0.10) and error_progress < 1.0) or (((np.min(used_channels)/num_channels) >= channel_progress + 0.10) and channel_progress < 1.0):
+                error_progress, channel_progress = (np.min(counted_errors)/num_errors), (np.min(used_channels)/num_channels)
+                print(f"\r    progress update...    errors: {error_progress:.0%}    channels: {channel_progress:.0%}")
+            
             for i, SNR_idx in enumerate(np.where( (counted_errors < num_errors) | (used_channels < num_channels) )[0]):
 
                 if i == 0: self.reset_CSI(SNR=SNRs[SNR_idx])
                 else: self.set_CSI(SNR=SNRs[SNR_idx])
 
-                num_bits = 2400
+                num_bits = 4800
                 bitstream = np.random.randint(0, 2, size=num_bits)
                 
                 BER = BER_simulation(bitstream)
-                R = np.sum(np.log2(self.transmitter.get_CCI()['Mi']))
+                IBR = np.sum(np.log2(self.transmitter._Mi))
 
                 
                 realized_channels[SNR_idx] += 1
                 
-                data_Rs[SNR_idx].append(R)
+                IBRs[SNR_idx].append(IBR)
                 
-                if R == 0: continue
+                if IBR == 0: continue
                 counted_bits[SNR_idx] += num_bits
                 counted_errors[SNR_idx] += num_bits*BER
                 used_channels[SNR_idx] += 1
@@ -315,12 +306,12 @@ class SuMimoSVD:
 
         # Termination.
         BERs = counted_errors / counted_bits
-        data_Rs = np.array([np.mean(np.array(data_Rs[i], dtype=float)) for i in range(len(SNRs))])
-        activation_Rs = used_channels / realized_channels
+        IBRs = np.array([np.mean(np.array(IBRs[i], dtype=float)) for i in range(len(SNRs))])
+        ARs = used_channels / realized_channels
         
-        return BERs, data_Rs, activation_Rs
+        return BERs, IBRs, ARs
 
-    def BERs_eigenchs_simulation(self, SNRs, num_errors=200, num_channels=50):
+    def BERs_eigenchs_simulation(self, SNRs, num_errors=500, num_channels=100):
         """
         Description
         -----------
@@ -340,10 +331,10 @@ class SuMimoSVD:
         -------
         BERs : 2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
             Output - The simulated Bit Error Rates (BERs) of each eigenchannel, corresponding to each SNR value.
-        data_Rs : 2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
-            Output - The total data transmit rate (bits per symbol) of each eigenchannel, corresponding to each SNR value.
-        activation_Rs : 1D numpy array (dtype: float, length: N_SNRs)
-            Output - The activation rate of every eigenchannel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data throught that eigenchannel.)
+        IBRs : 2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The simulated information bit rates (IBRs) (bits per symbol) of each eigenchannel, corresponding to each SNR value.
+        ARs : 1D numpy array (dtype: float, length: N_SNRs)
+            Output - The simulated activation rates (ARs) of every eigenchannel corresponding to each SNR value. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data throught that eigenchannel.)
         """
         
         def BER_eigenchs_simulation(bitstream):
@@ -381,15 +372,20 @@ class SuMimoSVD:
 
 
         # Initialization.
+        error_progress, channel_progress = 0, 0
         counted_bits = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
         counted_errors = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=float)
         used_channels = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=int)
         realized_channels = np.zeros((min(self.Nt, self.Nr), len(SNRs)), dtype=int)
-        data_Rs = [ [[] for _ in range(len(SNRs))] for _ in range(min(self.Nt, self.Nr)) ]
+        IBRs = [ [[] for _ in range(len(SNRs))] for _ in range(min(self.Nt, self.Nr)) ]
 
 
         # Iteration.
         while np.any(counted_errors[0, :] < num_errors) or np.any(used_channels[0, :] < num_channels):
+
+            if (((np.min(counted_errors[0, :])/num_errors) >= error_progress + 0.10) and error_progress < 1.0) or (((np.min(used_channels[0, :])/num_channels) >= channel_progress + 0.10) and channel_progress < 1.0):
+                error_progress, channel_progress = (np.min(counted_errors[0, :])/num_errors), (np.min(used_channels[0, :])/num_channels)
+                print(f"\r    progress update...    errors: {error_progress:.0%}    channels: {channel_progress:.0%}")
 
             for i, SNR_idx in enumerate(np.where( (counted_errors[0, :] < num_errors) | (used_channels[0, :] < num_channels) )[0]):
 
@@ -400,29 +396,29 @@ class SuMimoSVD:
                 bitstream = np.random.randint(0, 2, size=num_bits)
                 
                 BERi = BER_eigenchs_simulation(bitstream)
-                data_Ri = np.pad( np.log2(self.transmitter.get_CCI()['Mi']), pad_width=(0, min(self.Nt, self.Nr) - len(self.transmitter.get_CCI()['Mi'])), mode='constant', constant_values=0 )
+                IBRi = np.pad( np.log2(self.transmitter._Mi), pad_width=(0, min(self.Nt, self.Nr) - len(self.transmitter._Mi)), mode='constant', constant_values=0 )
                 
 
                 realized_channels[:, SNR_idx] += 1
                 
                 for eigench_idx in range(min(self.Nt, self.Nr)): 
-                    data_Rs[eigench_idx][SNR_idx].append(data_Ri[eigench_idx])
+                    IBRs[eigench_idx][SNR_idx].append(IBRi[eigench_idx])
 
-                if np.sum(data_Ri) == 0: continue
-                num_bits_i = np.ceil(num_bits * (data_Ri[data_Ri > 0] / np.sum(data_Ri)))
-                counted_bits[(data_Ri > 0), SNR_idx] += num_bits_i
-                counted_errors[(data_Ri > 0), SNR_idx] += num_bits_i*BERi[data_Ri > 0]
-                used_channels[(data_Ri > 0), SNR_idx] += (data_Ri > 0)[data_Ri > 0]
+                if np.sum(IBRi) == 0: continue
+                num_bits_i = np.ceil(num_bits * (IBRi[IBRi > 0] / np.sum(IBRi)))
+                counted_bits[(IBRi > 0), SNR_idx] += num_bits_i
+                counted_errors[(IBRi > 0), SNR_idx] += num_bits_i*BERi[IBRi > 0]
+                used_channels[(IBRi > 0), SNR_idx] += (IBRi > 0)[IBRi > 0]
         
 
         # Termination.
         BERs = np.divide(counted_errors, counted_bits, out=np.full((min(self.Nt, self.Nr), len(SNRs)), np.nan, dtype=float), where=(counted_bits != 0))
-        data_Rs = np.array([ [np.mean(np.array(data_Rs[eigench_idx][SNR_idx], dtype=float)) for SNR_idx in range(len(SNRs))] for eigench_idx in range(min(self.Nt, self.Nr)) ])
-        activation_Rs = used_channels / realized_channels
+        IBRs = np.array([ [np.mean(np.array(IBRs[eigench_idx][SNR_idx], dtype=float)) for SNR_idx in range(len(SNRs))] for eigench_idx in range(min(self.Nt, self.Nr)) ])
+        ARs = used_channels / realized_channels
         
-        return BERs, data_Rs, activation_Rs
+        return BERs, IBRs, ARs
 
-    def BERs_analytical(self, SNRs, num_channels, settings):
+    def BERs_analytical(self, SNRs, num_channels=100, settings={'mode': 'approximation', 'eigenchannels': False}):
         """
         Description
         -----------
@@ -448,10 +444,10 @@ class SuMimoSVD:
         -------
         BERs : 1D/2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
             Output - The analytical Bit Error Rates (BERs) corresponding to each SNR value, whether or not for every eigenchannel.
-        data_Rs : 1D/2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
-            Output - The information bit rates (bits per symbol vector) corresponding to each SNR value, whether or not for every eigenchannel.
-        activation_Rs : 1D/2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
-            Output - The activation rates of the channel corresponding to each SNR value, whether or not for every eigenchannel. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
+        IBRs : 1D/2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The information bit rates (IBRs) (bits per symbol vector) corresponding to each SNR value, whether or not for every eigenchannel.
+        ARs : 1D/2D numpy array (dtype: float, shape: (min(Nt, Nr), N_SNRs))
+            Output - The activation rates (ARs) of the channel corresponding to each SNR value, whether or not for every eigenchannel. (Indicates the fraction of channel realizations for which enough capacity was available to transmit data.)
         """
     
         def BER_analytical(mode):
@@ -470,9 +466,71 @@ class SuMimoSVD:
             -------
             BERi : 1D numpy array (dtype: float, length: min(Nt, Nr))
                 Output - The analytical Bit Error Rates (BERs) of each eigenchannel.
-            data_Ri : 1D numpy array (dtype: float, length: min(Nt, Nr))
-                Output - The information bit rates (bits per symbol) of each eigenchannel.
+            IBRi : 1D numpy array (dtype: float, length: min(Nt, Nr))
+                Output - The information bit rates (IBRs) (bits per symbol) of each eigenchannel.
             """
+
+            def demap(symbols_hat, M, c_type):
+                """
+                Description
+                -----------
+                Convert detected data symbols into the corresponding bits according to the specified modulation constellation.
+
+                Parameters
+                ----------
+                symbols_hat : 1D numpy array (dtype: complex, length: num_symbols)
+                    Input - detected data symbols.
+                M : int
+                    Constellation size.
+                c_type : str
+                    Constellation type. (Choose between 'PAM', 'PSK', 'QAM'.)
+                
+                Returns
+                -------
+                bits_hat : 1D numpy array (dtype: int, length: num_symbols * log2(M))
+                    Output - reconstructed bits.
+                """
+
+                # 1. Convert the data symbols to the corresponding decimal values, according to the specified constellation type.
+
+                if c_type == 'PAM':
+                    delta = np.sqrt(3/(M**2-1))
+                    decimals = np.round((1/2) * (symbols_hat / delta + (M-1))).astype(int)
+                
+                elif c_type == 'PSK':
+                    phases = np.angle(symbols_hat) % (2*np.pi)
+                    decimals = np.round((phases * M) / (2 * np.pi)).astype(int)
+                
+                elif c_type == 'QAM':
+                    c_sqrtM_PAM = np.arange(-(np.sqrt(M)-1), (np.sqrt(M)-1) + 1, 2) * np.sqrt(3 / (2*(M-1)))
+                    real_grid, imaginary_grid = np.meshgrid(c_sqrtM_PAM, c_sqrtM_PAM[::-1])
+                    constellation = (real_grid + 1j*imaginary_grid)
+                    constellation[1::2] = constellation[1::2, ::-1]
+                    constellation = constellation.flatten()
+
+                    sort_idx = np.argsort(constellation)
+                    pos = np.searchsorted(constellation[sort_idx], symbols_hat)
+                    decimals = sort_idx[pos]
+
+                else:
+                    raise ValueError(f'The constellation type is invalid.\nChoose between "PAM", "PSK", or "QAM". Right now, type is {c_type}.')
+                
+
+                # 2. Convert the decimal values to the corresponding blocks of m bits in gray code.
+
+                m = int(np.log2(M))
+                binarycodes = ((decimals[:, None].astype(int) & (1 << np.arange(m))[::-1].astype(int)) > 0).astype(int)
+
+                graycodes = np.zeros_like(binarycodes)
+                graycodes[:, 0] = binarycodes[:, 0]
+                for i in range(1, m):
+                    graycodes[:, i] = binarycodes[:, i] ^ binarycodes[:, i - 1]
+
+
+                # 3. Convert the gray code blocks to a single bit sequence and return it.
+
+                bits_hat = graycodes.flatten()
+                return bits_hat
 
             def construct_constellation(M, c_type):
 
@@ -498,7 +556,7 @@ class SuMimoSVD:
 
             def N(c, M, c_type):
                 """ Return the Hamming distance between any two constellation points. Cartesian product of the constellation c is created in the same way as in d(). """
-                b = (self.receiver.demap(c, M, c_type)).reshape(len(c), -1)
+                b = (demap(c, M, c_type)).reshape(len(c), -1)
                 i, j = np.meshgrid(np.arange(len(c)), np.arange(len(c)))
                 N = (np.sum(np.abs(b[i] - b[j]), axis=2)).ravel()
                 return N
@@ -558,161 +616,50 @@ class SuMimoSVD:
 
             # Termination.
             BERi = np.pad(BERi, pad_width=(0, min(self.Nt, self.Nr) - len(BERi)), mode='constant', constant_values=np.nan)
-            data_Ri = np.pad(np.log2(Mi).astype(int), pad_width=(0, min(self.Nt, self.Nr) - len(Mi)), mode='constant', constant_values=0)
-            return BERi, data_Ri
+            IBRi = np.pad(np.log2(Mi).astype(int), pad_width=(0, min(self.Nt, self.Nr) - len(Mi)), mode='constant', constant_values=0)
+            return BERi, IBRi
 
-        print(f"\nStarting eigenchannel BER {settings['mode']} calculation for \n{str(self)} ...")
+        print("\nStarting " + ("eigenchannel" if settings['eigenchannels'] else "") + f" BER {settings['mode']} calculation for \n{str(self)} ...")
 
 
         # Initialization.
         BERs = np.empty((min(self.Nt, self.Nr), len(SNRs), num_channels), dtype=float)
-        data_Rs = np.empty((min(self.Nt, self.Nr), len(SNRs), num_channels), dtype=float)
+        IBRs = np.empty((min(self.Nt, self.Nr), len(SNRs), num_channels), dtype=float)
 
 
         # Iteration.
-        for channel_idx in range(num_channels):
+        for channel_idx in tqdm(range(num_channels)):
 
             for SNR_idx, SNR in enumerate(SNRs):
 
                 if SNR_idx == 0: self.reset_CSI(SNR=SNR)
                 else: self.set_CSI(SNR=SNR)
 
-                BERi, data_Ri = BER_analytical(settings['mode'])
+                BERi, IBRi = BER_analytical(settings['mode'])
                 BERs[:, SNR_idx, channel_idx] = BERi
-                data_Rs[:, SNR_idx, channel_idx] = data_Ri
+                IBRs[:, SNR_idx, channel_idx] = IBRi
         
 
         # Termination.
-        activation_Rs = np.sum( data_Rs > 0, axis=2 ) / num_channels
+        ARs = np.sum( IBRs > 0, axis=2 ) / num_channels
         BERs = np.nanmean(BERs, axis=2)
-        data_Rs = np.mean(data_Rs, axis=2)
+        IBRs = np.mean(IBRs, axis=2)
         
         if not settings['eigenchannels']:
-            BERs = np.nansum( (data_Rs / np.where(data_Rs[0]==0, np.nan, np.sum(data_Rs, axis=0))) * BERs, axis=0 )
-            data_Rs = np.sum(data_Rs, axis=0)
-            activation_Rs = activation_Rs[0]
+            BERs = np.nansum( (IBRs / np.where(IBRs[0]==0, np.nan, np.sum(IBRs, axis=0))) * BERs, axis=0 )
+            IBRs = np.sum(IBRs, axis=0)
+            ARs = ARs[0]
 
-        return BERs, data_Rs, activation_Rs
+        return BERs, IBRs, ARs
 
 
     # TESTS AND PLOTS
-
-    def plot_performance(self, SNRs, BERs, data_Rs, settings):
-        """
-        Description
-        -----------
-        Create the performance evaluation plots for the requested evaluation metrics.
-
-        Parameters
-        ----------
-        SNRs : 1D numpy array (dtype: float, length: N_SNRs)
-            The range of signal-to-noise ratio (SNR) values in dB, for which the performance data is provided.
-        BERs : 2D numpy array (dtype: float, shape: (N_curves, N_SNRs))
-            The simulated Bit Error Rates (BERs) corresponding to each SNR value.
-        data_Rs : 2D numpy array (dtype: float, shape: (N_curves, N_SNRs))
-            The total data transmit rate (bits per symbol vector) corresponding to each SNR value.
-        settings : dict
-            A dictionary containing the plot settings for each evaluation metric.
-            - labels : the label, for each curve to be displayed in the legend. (list of str, length: N_curves)
-            - colors : the color, for each curve. Optional. (list of str, length: N_curves)
-            - markers : the type of the markers, for each curve. Optional. (list of str, length: N_curves)
-            - marker_colors : the color of the markers, for each curve. Optional. (list of str, length: N_curves)
-            - opacity : the opacity of the markers and curve parts, for each curve. Optional. (2D numpy array, dtype: float, shape: (N_curves, N_SNRs))
-            - titles : the title of each performance evaluation plot. \n
-            This also defines which different metrics are plotted! 
-            Possible options are:
-                * 'BER' : Bit Error Rate plot.
-                * 'data_R' : Data Transmit Rate plot.
-                * 'Eb' : The energy per bit to the noise power spectral density (BNR) plot.
-        
-        Returns
-        -------
-        plots : dict
-            A dictionary containing the created plots (values) for each requested evaluation metric (keys).
-        """
-
-        # Initialize a dictionary to hold the result plots.
-        plots = {metric: None for metric in settings['titles'].keys()}
-
-        # Initialize the plot settings.
-        labels = settings['labels']
-        colors = settings.get('colors', [to_hex(c) for c in plt.get_cmap('tab10').colors] + ['black']*(len(labels) - 10))
-        markers = settings.get('markers', ['v', '^', '<', '>', 'o', 's', '*', 'd', '8', 'p'] + ['o']*(len(labels) - 10))
-        marker_colors = settings.get('marker_colors', colors)
-        opacity = settings.get('opacity', None)
-        titles = settings['titles']
-
-        # Create the requested plots.
-        for metric in settings['titles'].keys():
-
-            # Get the data and data specific plot settings.
-            if metric == 'BER': 
-                data = BERs
-                title = titles[metric]
-                y_label = 'Bit Error Rate (BER)'
-                y_scale = 'log'
-                y_lim_bottom, y_lim_top = 1e-6, 1
-            elif metric == 'data_R': 
-                data = data_Rs
-                title = titles[metric]
-                y_label = r'Information Bit Rate $R_b$ [bits per symbol vector]'
-                y_scale = 'linear'
-                y_lim_bottom, y_lim_top = None, None
-            elif metric == 'Eb':
-                data = SNRs - np.where(data_Rs == 0, np.nan, 10*np.log10(data_Rs))
-                title = titles[metric]
-                y_label = r'$\frac{\mathrm{E}_b}{\mathrm{N}_0}$ [dB]'
-                y_scale = 'linear'
-                y_lim_bottom, y_lim_top = None, None
-            else: 
-                raise ValueError(f'The performance metric "{metric}" is not recognized.')
-
-            # Initialize the plot.
-            fig, ax = plt.subplots()
-
-            # Create each curve.
-            for i in range(len(labels)):
-                
-                if opacity is not None:
-                    
-                    points = np.array([SNRs, data[i]]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                    segment_colors = np.tile(to_rgba(colors[i]), (len(segments), 1))
-                    segment_colors[:, 3] = (opacity[i][:-1] + opacity[i][1:]) / 2
-                    
-                    lc = LineCollection(segments, colors=segment_colors, linewidth=1.5)
-                    ax.add_collection(lc)
-
-                    for j in range(len(SNRs)):
-                        ax.scatter(SNRs[j], data[i][j], marker=markers[i], color=marker_colors[i], edgecolors=marker_colors[i], alpha=opacity[i][j], s=36, zorder=3)
-
-                    ax.plot([], [], label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
-                
-                else:
-                    ax.plot(SNRs, data[i], label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
-            
-            # Set the plot settings.
-            ax.set_title(title)
-            ax.set_yscale(y_scale)
-            ax.set_xlabel('SNR [dB]')
-            ax.set_ylabel(y_label)
-            ax.set_xlim(SNRs[0]-(SNRs[1]-SNRs[0]), SNRs[-1]+(SNRs[1]-SNRs[0]))
-            ax.set_ylim(y_lim_bottom, y_lim_top)
-            ax.grid(True, which='both', linestyle='--', alpha=0.6)
-            ax.legend()
-            fig.tight_layout()
-            
-            # Store the plot.
-            fig.savefig(f"su-mimo/plots/performance/SNR_curves/{title.replace(' - ', '__').replace(' ', '_')}.png", dpi=300, bbox_inches="tight")
-            plots[metric] = (fig, ax)
-        
-        return plots
 
     def plot_scatter_diagram(self, K=100):
         """
         Description
         -----------
-        Plot a scatter diagram of the received symbol vectors.
+        Plot a scatter diagram of the received symbol vectors.\n
         Every distinct transmitted symbol is represented by a different color. Every used eigenchannel (antenna) has its own subplot. The amount of symbol vectors to consider is specified by K.
 
         Parameters
@@ -871,9 +818,9 @@ class SuMimoSVD:
             ax.axis('equal')
         
         # Overall plot settings.
-        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing \nSNR = {SNR} dB & ' + r'$R_b$' + f' = {round(self.data_rate*100)}%')
+        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing' + f'\nSNR: {SNR} dB & ' + f'data rate: {round(self.RAS['data rate']*100)}%')
         fig.tight_layout()
-        fig.savefig(f"su-mimo/plots/performance/scatter_plots/{(str(self) + '__SNR_' + str(SNR) + '__R_' + str(round(self.data_rate*100))).replace(' ', '_').replace('-', '__')}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(f'su-mimo/report/plots/1_simulation/scatter_plots/{self.Nt}x{self.Nr}_{self.c_type}__SNR_{SNR}__pa__{self.RAS['power allocation']}' + (f'__ba_adaptive__R_{round(self.RAS['data rate']*100)}' if self.RAS['bit allocation'] == 'adaptive' else f'__ba_fixed__M_{(np.log2(self.RAS["constellation sizes"])).astype(int)}') + datetime.now().strftime('__%Y%m%d_%H%M%S') + '.png', dpi=300, bbox_inches="tight")
     
         # Return the plot.
         return fig, axes

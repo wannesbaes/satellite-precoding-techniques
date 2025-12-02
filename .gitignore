@@ -6,17 +6,24 @@
 # Virtual environment
 .venv/
 
+# VS Code settings
+.vscode/
+
 # Python
 __pycache__/
 .pytest_cache__/
 *.pyc
 
-# Draft files
-draft_files/
+# Application help files.
+~$*
+.$*
 
-# LaTeX report files.
-su-mimo/reports/latex/
-su-mimo/reports/figures/
+# Reports: data folders.
+su-mimo/report/LaTeX/
+su-mimo/report/figures/
+su-mimo/report/plots/
+su-mimo/report/*.pptx
 
-# Plots.
-su-mimo/plots/
+mu-mimo/report/LaTeX/
+mu-mimo/report/figures/
+mu-mimo/report/plots/

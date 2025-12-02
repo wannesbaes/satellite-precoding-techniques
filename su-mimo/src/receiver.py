@@ -22,14 +22,12 @@ class Receiver:
         Number of receiving antennas.
     c_type : str
         Constellation type. (Choose between 'PAM', 'PSK', or 'QAM'.)
-    data_rate : float
-        The data rate at which data is transmitted. It is specified is the fraction of the channel capacity. Default is 1.0.
     Pt : float
         Total available transmit power. Default is 1.0.
     B : float
         Bandwidth of the communication system. Default is 0.5.
-    c_size : int, optional
-        Constellation size. Only used if a fixed constellation size is desired. Default is None.
+    RAS : dict
+        The resource allocation strategy. We refer to the function description of resource_allocation() for more details on the meaning of these strategy settings.
     
     _Pi : 1D numpy array (dtype: float, length: Nr)
         The power allocation for each receive antenna for the current CSI.
@@ -48,7 +46,7 @@ class Receiver:
         Allow the receiver object to be called as a function. When called, it executes the simulate() method.
     
     resource_allocation():
-        Determine and store the power allocation and constellation size for each receive antenna, based on the given control channel information (CCI) or resource allocation settings (RAS).
+        Determine and store the power allocation and constellation size for each receive antenna, based on the given control channel information (CCI) or resource allocation strategy (RAS).
     combiner():
         Combine the input signal using the left singular vectors of the channel matrix H.
     equalizer():
@@ -83,7 +81,7 @@ class Receiver:
         B : float, optional
             Bandwidth of the communication system. Default is 0.5.
         RAS : dict
-            The resource allocation settings. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
+            The resource allocation strategy. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
             - 'control channel': True or False.
             - 'power allocation': 'optimal', 'eigenbeamforming' or 'equal'.
             - 'bit allocation': 'adaptive' or 'fixed'. 
@@ -117,12 +115,12 @@ class Receiver:
         """
         Description
         -----------
-        Update the resource allocation settings (RAS) for the receiver.
+        Update the resource allocation strategy (RAS) for the receiver.
 
         Parameters
         ----------
         RAS : dict
-            The resource allocation settings. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
+            The resource allocation strategy. We refer to the function description of resource_allocation() for more details on the meaning of these settings.
         """
 
         self._RAS |= RAS
@@ -133,18 +131,18 @@ class Receiver:
         """
         Description
         -----------
-        Determine and store the power allocation and bit allocation (constellation size) for each receive antenna, based on the given resource allocation settings (RAS).
+        Determine and store the power allocation and bit allocation (constellation size) for each receive antenna, based on the given resource allocation strategy (RAS).
 
         If a control channel is available, the resource allocation is acquired from the the control channel information (CCI).
         Otherwise, the resource allocation is calculated completely analogously as in the transmitter.
 
         There are three possible options for the power allocation:
-            (1) 'optimal': Execute the waterfilling algorithm to determine the optimal power allocation across the receive antennas. CSIR is required for this mode.
-            (2) 'eigenbeamforming': Allocate all power to the best eigenchannel. The waterfilling algorithm is omitted. CSIR is required for this mode.
+            (1) 'optimal': Execute the waterfilling algorithm to determine the optimal power allocation across the receive antennas. CSIR is required for this mode. (Default)
+            (2) 'eigenbeamforming': Allocate all power to the best eigenchannel. The waterfilling algorithm is omitted and CSIR is not required for this mode.
             (3) 'equal': Equally divide the available transmit power across all receive antennas. The waterfilling algorithm is omitted and CSIR is not required for this mode.
         
         There are two possible options for the bit allocation:
-            (1) 'adaptive': Determine the constellation size based on the eigenchannel capacities. CSIR is required for this mode. An extra key 'data rate' must be provided in the dictionary to specify the fraction of the channel capacity that is utilized.
+            (1) 'adaptive': Determine the constellation size based on the eigenchannel capacities. CSIR is required for this mode. An extra key 'data rate' must be provided in the dictionary to specify the fraction of the channel capacity that is utilized. (Default)
             (2) 'fixed': Use a constant constellation size for all receive antennas. CSIR is not required for this mode. An extra key 'constellation sizes' must be provided in the dictionary to specify the constellation size on each receive antenna (in case of equal constellation sizes across all receive antennas, the value might be an integer instead of an array).\n
 
         Parameters
@@ -277,6 +275,7 @@ class Receiver:
         
         elif self._RAS.get('bit allocation') == 'fixed':
             Mi = np.full(self.Nr, self._RAS.get('constellation sizes')) if isinstance(self._RAS.get('constellation sizes'), int) else np.array(self._RAS.get('constellation sizes'))
+            Mi[Pi == 0] = 1
 
         else: raise ValueError(f'The bit allocation method is invalid.\nChoose between "adaptive" or "fixed".')
 
@@ -521,7 +520,7 @@ class Receiver:
         -----------
         Simulate the receiver operations:\n
         (1) Get the channel state information.\n
-        (2) [resource_allocation] Determine and store power allocation and constellation size for each receive antenna, based on the given control channel information or resource allocation settings.\n
+        (2) [resource_allocation] Determine and store power allocation and constellation size for each receive antenna, based on the given control channel information or resource allocation strategy.\n
         (3) [combiner] Combine the received symbol vectors using the left singular vectors of the channel matrix H.\n
         (4) [equalizer] Equalize the combined symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.\n
         (5) [detector] Convert the decision variable vectors into the most probable data symbol vectors.\n
