@@ -3,6 +3,31 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 
+def waterfilling(S, SNR_dB, Nr, Nt, Pt=1, B=0.5):
+
+    # Parameters.
+    N0 = Pt / ((10**(SNR_dB/10.0)) * 2*B)
+    Ns = min(Nr, Nt)
+
+    # Edge Case: The PSD of the noise is zero. The optimal strategy is to equally divide the power across all eigenchannels.
+    if N0 == 0: return np.array([Pt / Ns] * Ns + [0] * (Nt - Ns))
+
+    # Initialization.
+    gamma = Pt / (2*B*N0)
+    used_eigenchannels = Ns
+    waterlevel = (gamma / used_eigenchannels) + (1 / used_eigenchannels) * np.sum(1 / (S[:used_eigenchannels]**2))
+
+    # Iteration.
+    while ( waterlevel < (1 / (S[used_eigenchannels-1]**2)) ):
+        used_eigenchannels -= 1
+        waterlevel = (gamma / used_eigenchannels) + (1 / used_eigenchannels) * np.sum(1 / (S[:used_eigenchannels]**2))
+
+    # Termination.
+    Pi = np.maximum((waterlevel - (1 / (S[:used_eigenchannels]**2))) * (2*B*N0), 0)
+    Pi = np.concatenate( (Pi, np.zeros(Ns - used_eigenchannels)) )
+    return Pi
+
+
 def simulate_mu_mimo(M, K, Nr, Nt, Ns, nu, SNR_dB):
 
 
@@ -24,9 +49,20 @@ def simulate_mu_mimo(M, K, Nr, Nt, Ns, nu, SNR_dB):
         F = H_BS.conj().T @ np.linalg.inv(H_BS @ H_BS.conj().T)
         return F
 
-    def compute_compound_power_allocation_matrix(K, Ns, nu, H, W, N0):
-        P = np.eye(K*Ns) / (K*Ns)
-        return P
+    def compute_compound_power_allocation_matrix(H, W, K, Nr, Nt, SNR_dB):
+        H_BS = W @ H
+        S = np.diag(np.linalg.inv(H_BS @ H_BS.conj().T))
+        
+        sort_idx = np.argsort(S)
+        S_sorted = S[sort_idx]
+        
+        P_sorted = waterfilling(S_sorted, SNR_dB, K*Nr, Nt)
+
+        P = np.zeros_like(P_sorted)
+        P[sort_idx] = P_sorted
+
+        P_matrix = np.diag(P)
+        return P_matrix.real
 
 
     def generate_noise_vector(K, Nr, SNR_dB, M):
@@ -47,18 +83,18 @@ def simulate_mu_mimo(M, K, Nr, Nt, Ns, nu, SNR_dB):
     H = generate_compound_channel_matrix(K, Nr, Nt)
     W = compute_compound_combining_matrix(H, K, Nr, Ns)
     F = compute_compound_precoding_matrix(H, W)
-    P = compute_compound_power_allocation_matrix(K, Ns, nu, H, W, SNR_dB)
+    P = compute_compound_power_allocation_matrix(H, W, K, Nr, Nt, SNR_dB)
 
     n = generate_noise_vector(K, Nr, SNR_dB, M)
     a = genereate_data_symbols(M, K, Ns)
     x = F @ P @ a
     y = H @ x + n
     z = W @ y
-    # u = (1/P) @ z
-    a_hat = detect_data_symbols(z)
+    u = np.diag(1 / np.diag(P)) @ z
+    a_hat = detect_data_symbols(u)
 
     ber = np.mean(a != a_hat)
-    return ber
+    return ber, P
 
 def simulate_su_mimo(M, Nr, Nt, nu, SNR_dB):
 
@@ -76,8 +112,10 @@ def simulate_su_mimo(M, Nr, Nt, nu, SNR_dB):
         F = Vh.conj().T
         return F
     
-    def compute_power_allocation_matrix(Nr, nu, H, W, N0):
-        P = np.eye(Nr) / Nr
+    def compute_power_allocation_matrix(Nr, Nt, H, SNR_dB):
+        _, S, _ = np.linalg.svd(H)
+        P_values = waterfilling(S, SNR_dB, Nr, Nt)
+        P = np.diag(P_values)
         return P
     
 
@@ -99,18 +137,18 @@ def simulate_su_mimo(M, Nr, Nt, nu, SNR_dB):
     H = generate_channel_matrix(Nr, Nt)
     W = compute_combining_matrix(H)
     F = compute_precoding_matrix(H)
-    P = compute_power_allocation_matrix(Nr, nu, H, W, SNR_dB)
+    P = compute_power_allocation_matrix(Nr, Nt, H, SNR_dB)
     
     n = generate_noise_vector(Nr, SNR_dB, M)
     a = generate_data_symbols(M, Nr)
     x = F[:, :Nr] @ P @ a
     y = H @ x + n
     z = W @ y
-    #u = (1/P) @ z
-    a_hat = detect_data_symbols(z)
+    u = np.diag(1 / np.diag(P)) @ z
+    a_hat = detect_data_symbols(u)
 
     ber = np.mean(a != a_hat)
-    return ber
+    return ber, P
 
 def su_theory_ber(snr_dB, Nr, Nt):
 
@@ -149,30 +187,34 @@ if __name__ == "__main__":
     Nr = 2    # Number of receive antennas per UT
     Ns = 2    # Number of data streams per UT
     
-    snrs_dB = np.arange(-5, 30, 2.5)
+    snrs_dB = np.arange(-5, 31, 2.5)
     
     bers_mu = []
     for SNR_dB in snrs_dB:
-        ber = np.mean( [simulate_mu_mimo(1000, K, Nr, Nt, Ns, nu=1, SNR_dB=SNR_dB) for _ in range(1000)] )
+        ber, P = np.mean( [simulate_mu_mimo(1000, K, Nr, Nt, Ns, nu=1, SNR_dB=SNR_dB)[0] for _ in range(1000)] ), simulate_mu_mimo(1, K, Nr, Nt, Ns, nu=1, SNR_dB=SNR_dB)[1]
         bers_mu.append(ber)
+        print(' SNR_dB:', SNR_dB, 'BER:', round(ber, 4), 'latest P:', np.round(np.diag(P),4))
     print("MU-MIMO simulation done.")
     
     bers_su_8x8 = []
     for SNR_dB in snrs_dB:
-        ber = np.mean( [simulate_su_mimo(1000, Nt, Nt, nu=1, SNR_dB=SNR_dB) for _ in range(1000)] )
+        ber, P = np.mean( [simulate_su_mimo(1000, Nt, Nt, nu=1, SNR_dB=SNR_dB)[0] for _ in range(1000)] ), simulate_su_mimo(1, Nt, Nt, nu=1, SNR_dB=SNR_dB)[1]
         bers_su_8x8.append(ber)
+        print(' SNR_dB:', SNR_dB, 'BER:', round(ber, 4), 'latest P:', np.round(np.diag(P),4))
     print("SU-MIMO 8x8 simulation done.")
     
     bers_su_2x2 = []
     for SNR_dB in snrs_dB:
-        ber = np.mean( [simulate_su_mimo(1000, Nr, Nr, nu=1, SNR_dB=SNR_dB) for _ in range(1000)] )
+        ber, P = np.mean( [simulate_su_mimo(1000, Nr, Nr, nu=1, SNR_dB=SNR_dB)[0] for _ in range(1000)] ), simulate_su_mimo(1, Nr, Nr, nu=1, SNR_dB=SNR_dB)[1]
         bers_su_2x2.append(ber)
+        print(' SNR_dB:', SNR_dB, 'BER:', round(ber, 4), 'latest P:', np.round(np.diag(P),4))
     print("SU-MIMO 2x2 simulation done.")
 
     bers_su_8x2 = []
     for SNR_dB in snrs_dB:
-        ber = np.mean( [simulate_su_mimo(1000, Nr, Nt, nu=1, SNR_dB=SNR_dB) for _ in range(1000)] )
+        ber, P = np.mean( [simulate_su_mimo(1000, Nr, Nt, nu=1, SNR_dB=SNR_dB)[0] for _ in range(1000)] ), simulate_su_mimo(1, Nr, Nt, nu=1, SNR_dB=SNR_dB)[1]
         bers_su_8x2.append(ber)
+        print(' SNR_dB:', SNR_dB, 'BER:', round(ber, 4), 'latest P:', np.round(np.diag(P),4))
     print("SU-MIMO 8x2 simulation done.")
     
     # bers_su_8x8_theory = []
