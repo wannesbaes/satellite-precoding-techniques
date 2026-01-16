@@ -118,11 +118,13 @@ def plot_waterfilling(Nt, Nr, snr_dB, p_signal=None, p_noise=None, num_samples=1
 
     wl = (inv_cnr[0] + p[0])
     y_max = 1.1 * wl if wl > inv_cnr[-1] else 1.6 * wl
-    for eigenchannel_idx, (inv_cnr_i, p_i) in enumerate(zip(inv_cnr, p), start=1):
-        if inv_cnr_i / y_max > 0.1: 
-            ax.text(eigenchannel_idx, 0.5*inv_cnr_i if (inv_cnr_i < y_max) else 0.5*y_max, rf"$\mathrm{{\gamma_{{{eigenchannel_idx}}}^{{-1}}}}$", ha='center', va='center', fontsize=10)
-        if p_i / y_max > 0.1: 
-            ax.text(eigenchannel_idx, inv_cnr_i + 0.5*p_i, rf"$\mathrm{{P_{{{eigenchannel_idx}}}}}$", ha='center', va='center', fontsize=10)
+
+    text_inv_cnr = [ax.text(i + 1, 0.5*(inv_cnr[i] if inv_cnr[i] < y_max else y_max), rf"$\mathrm{{\gamma_{{{i+1}}}^{{-1}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_p = [ax.text(i + 1, inv_cnr[i] + 0.5*p[i], rf"$\mathrm{{P_{{{i+1}}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+
+    for i in range(min(Nt, Nr)):
+        if inv_cnr[i] / y_max > 0.1: text_inv_cnr[i].set_visible(True)
+        if p[i] / y_max > 0.1: text_p[i].set_visible(True)
 
     ax.set_xlabel('Eigenchannel Index')
     ax.set_ylabel('Power [W]')
@@ -204,6 +206,9 @@ def demo_waterfilling(Nt, Nr, snr_dB_list, p_signal=None, p_noise=None, num_samp
     line_wl = ax.axhline(y = (inv_cnr[0, 0] + p[0, 0]), color='tab:red', linestyle='--', linewidth=3, label='Water Level')
     title = ax.set_title(f'Optimal Power Allocation ({Nt}x{Nr})\nSNR = {snr_dB_list[0]:.1f} dB')
 
+    text_inv_cnr = [ax.text(i + 1, 0, rf"$\mathrm{{\gamma_{{{i+1}}}^{{-1}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_p = [ax.text(i + 1, 0, rf"$\mathrm{{P_{{{i+1}}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+
     ax.set_xlabel('Eigenchannel Index')
     ax.set_ylabel('Power [W]')
     ax.set_xticks(np.arange(1, min(Nt, Nr) + 1))
@@ -213,14 +218,17 @@ def demo_waterfilling(Nt, Nr, snr_dB_list, p_signal=None, p_noise=None, num_samp
 
     def update(snr_frame):
         
+        # Update the bars heights that represent the inverse CNR and allocated power.
         for bar_inv_cnr, h_inv_cnr, bar_p, h_p in zip(bars_inv_cnr, inv_cnr[snr_frame], bars_p, p[snr_frame]): 
             bar_inv_cnr.set_height(h_inv_cnr)
             bar_p.set_height(h_p)
             bar_p.set_y(h_inv_cnr)
         
+        # Update the water level height (red dashed line).
         wl = (inv_cnr[snr_frame][p[snr_frame] > 0] + p[snr_frame][p[snr_frame] > 0])[0]
         line_wl.set_ydata([wl, wl])
         
+        # Update the scaling of the y-axis based on the current water level and maximum inverse CNR.
         if constant_power == 'signal':
             if wl < inv_cnr[snr_frame][-1]: y_max = 1.9 * wl
             elif inv_cnr[snr_frame][-1] < wl and 1.1*wl < 1.9*inv_cnr[snr_frame][-1]: y_max = 1.9 * inv_cnr[snr_frame][-1]
@@ -229,10 +237,27 @@ def demo_waterfilling(Nt, Nr, snr_dB_list, p_signal=None, p_noise=None, num_samp
             if wl < 1.45*inv_cnr[snr_frame][-1]: y_max = 1.55 * inv_cnr[snr_frame][-1]
             elif wl > 1.45*inv_cnr[snr_frame][-1]: y_max = 1.55/1.45 * wl
         ax.set_ylim(0, y_max)
-        
+
+        # Update the position of the text labels on each bar.
+        for i in range(min(Nt, Nr)):
+            
+            if inv_cnr[snr_frame][i] / y_max > 0.1:
+                text_inv_cnr[i].set_position((i + 1, 0.5*(inv_cnr[snr_frame][i] if inv_cnr[snr_frame][i] < y_max else y_max)))
+                text_inv_cnr[i].set_visible(True)
+            else:
+                text_inv_cnr[i].set_visible(False)
+
+            if p[snr_frame][i] / y_max > 0.1:
+                text_p[i].set_position((i + 1, inv_cnr[snr_frame][i] + 0.5*p[snr_frame][i]))
+                text_p[i].set_visible(True)
+            else:
+                text_p[i].set_visible(False)
+
+            
+        # Update the title with the current SNR value.
         title.set_text(f'Optimal Power Allocation ({Nt}x{Nr})\nSNR = {snr_dB_list[snr_frame]:.1f} dB')
         
-        return bars_p, bars_inv_cnr, line_wl, title
+        return bars_p, bars_inv_cnr, line_wl, title, text_inv_cnr, text_p
 
     animation = FuncAnimation( fig, update, frames=len(snr_dB_list), blit=False)
     animation.save(f'su-mimo/waterfilling/demos/{Nt}x{Nr}__' + ('Pt' if constant_power == 'signal' else 'N0') + '_constant.mp4', fps=25)
@@ -243,6 +268,8 @@ def demo_waterfilling(Nt, Nr, snr_dB_list, p_signal=None, p_noise=None, num_samp
 
 if __name__ == "__main__":
 
-    plot_waterfilling(Nt=4, Nr=4, snr_dB=10, p_signal=1, num_samples=1e7)
-    #demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_signal=1, num_samples=1e7)
-    #demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_noise=0.05, num_samples=1e7)
+    for snr_dB in range(-10, 31, 5):
+        plot_waterfilling(Nt=4, Nr=4, snr_dB=snr_dB, p_signal=1, num_samples=1e7)
+
+    demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_signal=1, num_samples=1e7)
+    demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_noise=0.05, num_samples=1e7)
