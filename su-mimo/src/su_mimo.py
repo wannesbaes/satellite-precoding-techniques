@@ -801,7 +801,6 @@ class SuMimoSVD:
             colors = [colormaps[eigenchannel][symbol] for symbol in a[eigenchannel]]
             ax.scatter(r_prime[eigenchannel].real, r_prime[eigenchannel].imag, color=colors, marker='.', alpha= 0.75, s=50)
 
-
             # Plot the constellation points for reference.
             constellation_points = generate_constellation(Mi[eigenchannel], self.c_type)
             colors = [colormaps[eigenchannel][point] for point in constellation_points]
@@ -814,13 +813,38 @@ class SuMimoSVD:
             ax.set_title(f'Eigenchannel {eigenchannel+1}: {Mi[eigenchannel]}-{self.c_type}')
             ax.set_xlabel('Real Part')
             ax.set_ylabel('Imaginary Part')
-            ax.grid(True, which='both', linestyle='--', alpha=0.7)
+
+            def set_ticks_and_grid(constellation_points, ax):
+                """ Set a grid on the scatter diagram based on the constellation points. """
+                
+                x_cpoints = np.sort(np.unique(constellation_points.real))
+                x_midpoints = (x_cpoints[:-1] + x_cpoints[1:]) / 2
+                x_ticks = np.empty(len(x_cpoints) + len(x_midpoints))
+                x_ticks[0::2] = x_cpoints
+                x_ticks[1::2] = x_midpoints
+                
+                ax.set_xticks(x_ticks, minor=True)
+                ax.set_xticks(np.arange(np.floor(x_ticks.min()), np.ceil(x_ticks.max()) + 1))
+
+                y_cpoints = np.sort(np.unique(constellation_points.imag))
+                y_midpoints = (y_cpoints[:-1] + y_cpoints[1:]) / 2
+                y_ticks = np.empty(len(y_cpoints) + len(y_midpoints))
+                y_ticks[0::2] = y_cpoints
+                y_ticks[1::2] = y_midpoints
+
+                ax.set_yticks(y_ticks, minor=True)
+                ax.set_yticks(np.arange(np.floor(y_ticks.min()), np.ceil(y_ticks.max()) + 1))
+
+                ax.tick_params(which='minor', length=0)
+                ax.grid(True, which='minor', linestyle='--', alpha=0.7)
+            
+            set_ticks_and_grid(constellation_points, ax)
             ax.axis('equal')
-        
+
         # Overall plot settings.
-        fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing' + f'\nSNR: {SNR} dB & ' + f'data rate: {round(self.RAS['data rate']*100)}%')
+        #fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing' + f'\nSNR: {SNR} dB & ' + f'data rate: {round(self.RAS['data rate']*100)}%')
         fig.tight_layout()
-        fig.savefig(f'su-mimo/report/plots/1_simulation/scatter_plots/{self.Nt}x{self.Nr}_{self.c_type}__SNR_{SNR}__pa__{self.RAS['power allocation']}' + (f'__ba_adaptive__R_{round(self.RAS['data rate']*100)}' if self.RAS['bit allocation'] == 'adaptive' else f'__ba_fixed__M_{(np.log2(self.RAS["constellation sizes"])).astype(int)}') + datetime.now().strftime('__%Y%m%d_%H%M%S') + '.png', dpi=300, bbox_inches="tight")
+        fig.savefig(f'su-mimo/report/plots/1_simulation/scatter_plots/2__{self.Nt}x{self.Nr}_{self.c_type}__SNR_{SNR}__pa__{self.RAS['power allocation']}' + (f'__ba_adaptive__R_{round(self.RAS['data rate']*100)}' if self.RAS['bit allocation'] == 'adaptive' else f'__ba_fixed__M_{(np.log2(self.RAS["constellation sizes"])).astype(int)}') + datetime.now().strftime('__%Y%m%d_%H%M%S') + '.png', dpi=300, bbox_inches="tight")
     
         # Return the plot.
         return fig, axes

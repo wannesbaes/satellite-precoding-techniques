@@ -28,10 +28,9 @@ su-mimo/report/figures/
 su-mimo/report/plots/
 su-mimo/report/*.pptx
 
-su-mimo/waterfilling/plots/
-su-mimo/waterfilling/demos/
-su-mimo/waterfilling/eigenchannel_gains/plots/
-su-mimo/waterfilling/eigenchannel_gains/stats/
+su-mimo/src/resource_allocation/bit_allocation/
+su-mimo/src/resource_allocation/power_allocation/
+su-mimo/src/resource_allocation/eigenchannel_gains/*/
 
 mu-mimo/report/LaTeX/
 mu-mimo/report/figures/

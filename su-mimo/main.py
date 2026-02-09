@@ -361,8 +361,9 @@ def test_1_1_0(Nt, Nr, c_type, SNR, data_rates):
 
     plots = []
     for data_rate in data_rates:
+
         su_mimo_svd.set_RAS({'power allocation': 'optimal', 'bit allocation': 'adaptive', 'data rate': data_rate, 'constellation sizes': None, 'control channel': True})
-        plot = su_mimo_svd.plot_scatter_diagram(K=200)
+        plot = su_mimo_svd.plot_scatter_diagram(K=5000)
         plots.append(plot)
 
     return plots
@@ -484,7 +485,7 @@ def test_1_1_2(Nt, Nr, c_type, SNRs):
 
 def test_1_2_0(c_type, SNR, antenna_counts):
     
-    plots = [SuMimoSVD(Nt, Nr, c_type, SNR=SNR).plot_scatter_diagram(K=200) for Nt, Nr in antenna_counts]
+    plots = [SuMimoSVD(Nt, Nr, c_type, SNR=SNR).plot_scatter_diagram(K=5000) for Nt, Nr in antenna_counts]
     return plots
 
 def test_1_2_1(c_type, SNRs, antenna_counts):
@@ -890,3 +891,5 @@ def test_2_2_2(Nt, Nr, c_type, SNRs, modes, mc):
 # example:
 # plots = test_0_2_1(Nt=4, Nr=4, c_types=['PAM', 'PSK', 'QAM'], SNRs=np.arange(0, 31, 5))
 # plt.show()
+for i in range(10):
+    test_1_2_0('QAM', 15, [(2, 2)])
