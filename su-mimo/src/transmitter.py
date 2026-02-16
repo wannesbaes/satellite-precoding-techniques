@@ -6,17 +6,6 @@ import matplotlib.pyplot as plt
 
 class Transmitter:
     """
-    Description
-    -----------
-    The transmitter of a single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at the transmitter (and the receiver).
-
-    When the transmitter is called and given an input bit sequence, it ...
-        determines the power allocation and constellation size for each transmit antenna, based on the given resource allocation strategy (RAS)
-        allocates the input bits across the transmit antennas
-        maps the input bit sequences to the corresponding data symbol sequences according to a specified modulation constellation for each transmit antenna
-        allocates power across the transmit antennas
-        and precodes the data symbols using the right singular vectors of the channel matrix H.
-
     Attributes
     ----------
     Nt : int
@@ -24,9 +13,9 @@ class Transmitter:
     c_type : str
         Constellation type. (Choose between 'PAM', 'PSK', or 'QAM')
     Pt : float, optional
-        Total available transmit power. Default is 1.0.
+        Total available transmit power in Watt. Default is 1.0 W.
     B : float, optional
-        Bandwidth of the communication system. Default is 0.5.
+        Bandwidth of the communication system in Hertz. Default is 0.5 Hz.
     RAS : dict
         The resource allocation strategy. For more details on the meaning of these strategy settings, refer to the function description of resource_allocation().
     
@@ -45,25 +34,6 @@ class Transmitter:
         Return a string representation of the transmitter object.
     __call__()
         Allow the transmitter object to be called as a function. When called, it executes the simulate() method.
-    
-    get_CCI()
-        Return the power allocation and bit allocation of each transmit antenna, for the current CSIT. (This function represents a control channel between the transmitter and receiver.)
-    
-    resource_allocation()
-        Determine and store power allocation and constellation size for each transmit antenna, based on the given resource allocation strategy.
-    bit_allocator()
-        Allocate the input bitstream across the transmit antennas based on the calculated constellation size for each antenna.
-    mapper()
-        Convert bit vectors into the corresponding data symbol vectors according to the specified modulation constellation for each transmit antenna.
-    power_allocator()
-        Allocate power across the transmit antennas based on the calculated power for each antenna.
-    precoder()
-        Precode the powered data symbol vectors using the right singular vectors of the channel matrix H.
-    simulate()
-        Simulate the transmitter operations. Return the transmitter output signal.
-
-    print_simulation_example()
-        Print a step-by-step example of the transmitter operations for given input bits and channel state information (CSIT).
     """
 
 
@@ -71,8 +41,6 @@ class Transmitter:
 
     def __init__(self, Nt, c_type, Pt=1.0, B=0.5, RAS={}):
         """
-        Description
-        -----------
         Initialize the transmitter.
 
         Parameters
@@ -118,8 +86,6 @@ class Transmitter:
 
     def get_CCI(self):
         """
-        Description
-        -----------
         This function represents a control channel between the transmitter and receiver.
         Return the power allocation and bit allocation (constellation sizes) of each transmit antenna, for the current CSIT, if a control channel is available.
 
@@ -136,8 +102,6 @@ class Transmitter:
 
     def set_RAS(self, RAS):
         """
-        Description
-        -----------
         Update the resource allocation strategy (RAS) of the transmitter.
 
         Parameters
@@ -152,8 +116,6 @@ class Transmitter:
 
     def resource_allocation(self, CSIT):
         """
-        Description
-        -----------
         Determine and store the power allocation and bit allocation (constellation size) for each transmit antenna, based on the given resource allocation strategy (RAS).
 
         There are three possible options for the power allocation:
@@ -292,8 +254,6 @@ class Transmitter:
 
     def bit_allocator(self, bitstream):
         """
-        Description
-        -----------
         Allocate the input bitstream across the transmit antennas based on the calculated constellation size for each antenna. 
         
         Every antenna will have to send an equal amount of data symbols. If the number of bits in the bitstream does not perfectly align with an an equal amount of symbols per antenna, it is padded with zeros.
@@ -326,8 +286,6 @@ class Transmitter:
 
     def mapper(self, b):
         """
-        Description
-        -----------
         Convert bit vectors into the corresponding data symbol vectors according to the specified modulation constellation for each transmit antenna.
 
         Parameters
@@ -422,8 +380,6 @@ class Transmitter:
 
     def power_allocator(self, a):
         """
-        Description
-        -----------
         Allocate power across the transmit antennas based on the calculated power for each antenna.
 
         Parameters
@@ -442,8 +398,6 @@ class Transmitter:
 
     def precoder(self, x_tilda, Vh):
         """ 
-        Description
-        -----------
         Precode the powered data symbol vectors using the right singular vectors of the channel matrix H.
 
         Parameters
@@ -464,8 +418,6 @@ class Transmitter:
 
     def simulate(self, bitstream, CSIT):
         """
-        Description
-        -----------
         Simulate the transmitter operations:\n
         (1) Get the channel state information.\n
         (2) [resource_allocation] Determine and store the power allocation and constellation size for each transmit antenna, based on the given resource allocation strategy (RAS).\n
@@ -514,8 +466,6 @@ class Transmitter:
 
     def plot_bit_allocation(self, CSIT):
         """
-        Description
-        -----------
         Plot the bit allocation across the transmit antennas as determined by the resource allocation strategy.
         On the x-axis, the transmit antennas are shown. On the y-axis, the number of bits allocated to each transmit antenna is shown, as well as the capacity of the eigenchannel corresponding to each transmit antenna.
 
@@ -575,8 +525,6 @@ class Transmitter:
 
     def plot_power_allocation(self, CSIT):
         """
-        Description
-        -----------
         Plot the power allocation across the transmit antennas, as determined by the resource allocation strategy.
         On the x-axis, the transmit antennas are shown. On the y-axis, the inverse channel gain is shown in grey and the amount of power allocated to each transmit antenna is shown in blue.
 
@@ -640,8 +588,6 @@ class Transmitter:
 
     def print_simulation_example(self, bitstream, CSIT, K=1) -> None:
         """
-        Description
-        -----------
         Print a step-by-step example of the transmitter operations (see simulate() method) for given input bits and CSIT. Only the first K data symbols vectors are considered.
 
         Parameters

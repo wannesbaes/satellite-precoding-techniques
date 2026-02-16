@@ -1,15 +1,11 @@
-Satellite Precoding Techniques Documentation
-============================================
+Satellite Precoding Techniques
+==============================
 
-Welcome to the documentation for the Satellite Precoding Techniques project.
-
-Contents
---------
+Welcome to the code documentation of my thesis about Satellite Precoding Techniques.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Modules
+   :titlesonly:
 
-   waterfilling
-
-
+   su-mimo

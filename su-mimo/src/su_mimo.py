@@ -6,20 +6,13 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from datetime import datetime
 
-from . import transmitter as tx
-from . import channel as ch
-from . import receiver as rx
+import transmitter as tx
+import channel as ch
+import receiver as rx
 
 
 class SuMimoSVD:
     """
-    Description
-    -----------
-    A single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at both the transmitter and receiver.
-    
-    The communication system consists of a transmitter, a flat-fading MIMO channel, and a receiver. 
-    The singular value decomposition (SVD) of the channel matrix is used for precoding at the transmitter and combining at the receiver.
-
     Attributes
     ----------
     Nt : int
@@ -45,33 +38,12 @@ class SuMimoSVD:
         Initialize the SU-MIMO SVD digital communication system with the given parameters.
     __str__()
         Return a string representation of the SU-MIMO SVD digital communication system.
-    
-    set_CSI()
-        Set the channel state information (CSI), to new values or leave unchanged.
-    reset_CSI()
-        Reset the channel state information (CSI), to new values or default initialization values.
-    set_RAS()
-        Set the resource allocation strategy (RAS).
-
-    simulate()
-        Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the reconstructed bitstream.
-    BERs_simulation()
-        Simulate the SU-MIMO SVD digital communication system over a range of SNR values. Return the simulated BERs, information bit rates, and activation rates.
-    BERs_eigenchs_simulation()
-        Simulate the SU-MIMO SVD digital communication system over a range of SNR values. Return the simulated BERs, information bit rates, and activation rates for each eigenchannel separately.
-    BERs_eigenchs_analytical()
-        Calculate an analytical approximation or upper bound of the BER over a range of SNR values. Return the analytical BERs, information bit rates, and activation rates whether or not for each eigenchannel separately.
-    
-    print_simulation_example()
-        Print an example simulation of the SU-MIMO SVD digital communication system. For demonstration purposes only.
     """
     
     # INITIALIZATION AND REPRESENTATION
 
     def __init__(self, Nt, Nr, c_type, Pt=1.0, B=0.5, RAS={}, SNR=np.inf, H=None):
         """
-        Description
-        -----------
         Initialize the SU-MIMO SVD digital communication system.
 
         Parameters
@@ -118,8 +90,6 @@ class SuMimoSVD:
 
     def set_CSI(self, SNR=None, H=None):
         """
-        Description
-        -----------
         Set the channel state information (CSI) of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
         If no new values are provided, the current values are kept.
 
@@ -140,8 +110,6 @@ class SuMimoSVD:
 
     def reset_CSI(self, SNR=None, H=None):
         """
-        Description
-        -----------
         Reset the channel state information (CSI) of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
         If no new value is provided, the default initialization values are used. For the SNR value, the default is infinity (no noise). For the channel matrix, the default is a random i.i.d. complex circularly-symmetric Gaussian (zero mean, unit variance) MIMO channel.
 
@@ -162,8 +130,6 @@ class SuMimoSVD:
     
     def set_RAS(self, RAS):
         """
-        Description
-        -----------
         Set the resource allocation strategy of the SU-MIMO SVD digital communication system. Also, the resource allocation at the transmitter and receiver is updated accordingly, so no invalid configurations remain.\n
         If no new value for a certain setting is provided, the current value for that setting is kept.
 
@@ -186,8 +152,6 @@ class SuMimoSVD:
 
     def simulate(self, bitstream):
         """
-        Description
-        -----------
         Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the reconstructed bitstream at the receiver.\n
         If no capacity is available on the channel, the transmission fails and None is returned.
 
@@ -216,8 +180,6 @@ class SuMimoSVD:
     
     def BERs_simulation(self, SNRs, num_errors=500, num_channels=100):
         """
-        Description
-        -----------
         Simulate the SU-MIMO SVD digital communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations.\n
         Return the simulated BERs for each SNR value, along with the average information bit rate and activation rate.
         
@@ -242,8 +204,6 @@ class SuMimoSVD:
         
         def BER_simulation(bitstream):
             """
-            Description
-            -----------
             Simulate the SU-MIMO SVD communication system for a given input bitstream. Return the Bit Error Rate (BER).\n
             If no capacity is available on the channel, NaN is returned.
 
@@ -313,8 +273,6 @@ class SuMimoSVD:
 
     def BERs_eigenchs_simulation(self, SNRs, num_errors=500, num_channels=100):
         """
-        Description
-        -----------
         Simulate the SU-MIMO SVD digital communication system over a range of SNR values until a specified number of bit errors are reached. Also, average over a specified number of channel realizations.\n
         Return the simulated BERs of each eigenchannel (!) for every SNR value.
 
@@ -339,8 +297,6 @@ class SuMimoSVD:
         
         def BER_eigenchs_simulation(bitstream):
             """
-            Description
-            -----------
             Simulate the SU-MIMO SVD digital communication system for a given input bitstream. Return the Bit Error Rate (BER) of each eigenchannel.
             If no capacity is available on the eigenchannel, np.NaN is returned for that eigenchannel.
 
@@ -420,8 +376,6 @@ class SuMimoSVD:
 
     def BERs_analytical(self, SNRs, num_channels=100, settings={'mode': 'approximation', 'eigenchannels': False}):
         """
-        Description
-        -----------
         Calculate an analytical approximation or upper bound of the Bit Error Rate (BER) over a range of SNR values, for every eigenchannel. Average the result over a specified number of channel realizations.\n
 
         Return the analytical BERs for each SNR value, along with the information bit rates and activation rates.
@@ -435,10 +389,10 @@ class SuMimoSVD:
             The number of different channel realizations to average over.
         settings : dict
             The calculation settings.
-            - mode: (str)
-                'upper bound' or 'approximation'. For more information on the calculation method, see the documentation under the section 'Bit Error Rate Calculation'.
-            - eigenchannels: (bool)
-                If True, return the BERs for every eigenchannel separately (outputs are 2D arrays). If False, return the weighted average BER over all eigenchannels (outputs are 1D arrays).
+                - mode: (str)
+                    'upper bound' or 'approximation'. For more information on the calculation method, see the documentation under the section 'Bit Error Rate Calculation'.
+                - eigenchannels: (bool)
+                    If True, return the BERs for every eigenchannel separately (outputs are 2D arrays). If False, return the weighted average BER over all eigenchannels (outputs are 1D arrays).
         
         Returns
         -------
@@ -452,8 +406,6 @@ class SuMimoSVD:
     
         def BER_analytical(mode):
             """
-            Description
-            -----------
             Calculate an analytical approximation or upper bound of the Bit Error Rate (BER) of each eigenchannel for the current channel realization and the current SNR. 
             Return the analytical BERs, along with the information bit rates of each eigenchannel.
 
@@ -472,8 +424,6 @@ class SuMimoSVD:
 
             def demap(symbols_hat, M, c_type):
                 """
-                Description
-                -----------
                 Convert detected data symbols into the corresponding bits according to the specified modulation constellation.
 
                 Parameters
@@ -657,8 +607,6 @@ class SuMimoSVD:
 
     def plot_scatter_diagram(self, K=100):
         """
-        Description
-        -----------
         Plot a scatter diagram of the received symbol vectors.\n
         Every distinct transmitted symbol is represented by a different color. Every used eigenchannel (antenna) has its own subplot. The amount of symbol vectors to consider is specified by K.
 
@@ -851,8 +799,6 @@ class SuMimoSVD:
 
     def print_simulation_example(self, bitstream, K=1):
         """ 
-        Description
-        -----------
         Print a step-by-step example of the transmitter, channel and receiver operations (see simulate() methods) for a given input bitstream. Only the first K data symbols vectors are considered for illustration.
 
         Parameters

@@ -5,17 +5,6 @@ import numpy as np
 
 class Receiver:
     """
-    Description
-    -----------
-    The receiver of a single-user multiple-input multiple-output (SU-MIMO) digital communication system, in which the channel state information is available at the receiver (and transmitter).
-
-    When the receiver is called and given an received input signal y, it ...
-        determines the power allocation and constellation size on each receive antenna
-        combines and equalizes the received symbol vectors
-        searches the most probable transmitted data symbol vectors
-        demaps them into bit vectors
-        and combines the reconstructed bits on each antenna to create the output bitstream.
-
     Attributes
     ----------
     Nr : int
@@ -44,21 +33,6 @@ class Receiver:
         Return a string representation of the receiver object.
     __call__():
         Allow the receiver object to be called as a function. When called, it executes the simulate() method.
-    
-    resource_allocation():
-        Determine and store the power allocation and constellation size for each receive antenna, based on the given control channel information (CCI) or resource allocation strategy (RAS).
-    combiner():
-        Combine the input signal using the left singular vectors of the channel matrix H.
-    equalizer():
-        Equalize the combined symbol vectors, based on S and Pi.
-    detector():
-        Convert the decision variable vectors into the most probable transmitted data symbol vectors.
-    demapper():
-        Convert the detected data symbol vectors into the corresponding bit vectors according to the specified modulation constellation.
-    bit_deallocator():
-        Combine the reconstructed bits on each antenna to create the output bitstream.
-    simulate():
-        Simulate the receiver operations. Return the reconstructed bitstream.
     """
 
     
@@ -66,8 +40,6 @@ class Receiver:
 
     def __init__(self, Nr, c_type, Pt=1.0, B=0.5, RAS={}):
         """
-        Description
-        -----------
         Initialize the receiver.
 
         Parameters
@@ -113,8 +85,6 @@ class Receiver:
 
     def set_RAS(self, RAS):
         """
-        Description
-        -----------
         Update the resource allocation strategy (RAS) for the receiver.
 
         Parameters
@@ -129,8 +99,6 @@ class Receiver:
     
     def resource_allocation(self, CSIR, CCI=None):
         """
-        Description
-        -----------
         Determine and store the power allocation and bit allocation (constellation size) for each receive antenna, based on the given resource allocation strategy (RAS).
 
         If a control channel is available, the resource allocation is acquired from the the control channel information (CCI).
@@ -162,8 +130,6 @@ class Receiver:
 
         def waterfilling(CSIR):
             """
-            Description
-            -----------
             Execute the waterfilling algorithm to determine the optimal power allocation for each receive antenna, given the channel state information (CSI).\n
             
             Parameters
@@ -206,8 +172,6 @@ class Receiver:
 
         def eigenchannel_capacities(Pi, CSIR):
             """
-            Description
-            -----------
             Calculate the capacity of each eigenchannel, given the power allocation and channel state information (CSI).\n
 
             Parameters
@@ -287,8 +251,6 @@ class Receiver:
 
     def combiner(self, y, U):
         """
-        Description
-        -----------
         Combine the input signal (distorted data symbol vectors) using the left singular vectors of the channel matrix H.
 
         Parameters
@@ -307,11 +269,9 @@ class Receiver:
         y_tilda = U.conj().T @ y
         return y_tilda
 
-    def equalizer(self, y_tilda, S):
+    def power_deallocator(self, y_tilda, S):
         """
-        Description
-        -----------
-        Equalize the combined symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.
+        Deallocate the power from the scaled decision variables using the singular values of the channel matrix H and the allocated power on each antenna.
 
         Parameters
         ----------
@@ -333,8 +293,6 @@ class Receiver:
 
     def detector(self, u):
         """
-        Description
-        -----------
         Convert the decision variable vectors (distorted (equalized & combined) data symbol vectors) into the most probable (minimum distance (MD) detection) transmitted data symbol vectors according to the specified modulation constellation for each transmit antenna.
 
         Parameters
@@ -350,8 +308,6 @@ class Receiver:
         
         def detect(decision_variables, M, c_type):
             """
-            Description
-            -----------
             Convert the decision variables into the most probable (minimum distance detection) transmitted data symbols according to the specified modulation constellation.
 
             Parameters
@@ -407,8 +363,6 @@ class Receiver:
 
     def demapper(self, a_hat):
         """
-        Description
-        -----------
         Convert the detected data symbol vectors into the corresponding bit vectors according to the specified modulation constellation. It performs the inverse operation of the mapper in the transmitter.
 
         Parameters
@@ -424,8 +378,6 @@ class Receiver:
 
         def demap(symbols_hat, M, c_type):
             """
-            Description
-            -----------
             Convert detected data symbols into the corresponding bits according to the specified modulation constellation.
 
             Parameters
@@ -489,8 +441,6 @@ class Receiver:
     
     def bit_deallocator(self, b_hat):
         """
-        Description
-        -----------
         Combine the reconstructed bit vectors to create the output bitstream. It performs the inverse operation of the bit_allocator in the transmitter.
 
         Parameters
@@ -516,13 +466,11 @@ class Receiver:
 
     def simulate(self, y, CSI, CCI=None):
         """
-        Description
-        -----------
         Simulate the receiver operations:\n
         (1) Get the channel state information.\n
         (2) [resource_allocation] Determine and store power allocation and constellation size for each receive antenna, based on the given control channel information or resource allocation strategy.\n
         (3) [combiner] Combine the received symbol vectors using the left singular vectors of the channel matrix H.\n
-        (4) [equalizer] Equalize the combined symbol vectors using the singular values of the channel matrix H and the allocated power on each antenna.\n
+        (4) [power_deallocator] Deallocate the power from the scaled decision variables.\n
         (5) [detector] Convert the decision variable vectors into the most probable data symbol vectors.\n
         (6) [demapper] Convert the reconstructed data symbol vectors into the corresponding bit vectors according to the specified modulation constellation.\n
         (7) [bit deallocator] Combine the reconstructed bit vectors to create the output bitstream.\n
@@ -555,7 +503,7 @@ class Receiver:
         
         # Receiver Operations.
         y_tilda = self.combiner(y, CSI['U'])
-        u = self.equalizer(y_tilda, CSI['S'])
+        u = self.power_deallocator(y_tilda, CSI['S'])
         a_hat = self.detector(u)
         b_hat = self.demapper(a_hat)
         bitstream_hat = self.bit_deallocator(b_hat)
@@ -567,8 +515,6 @@ class Receiver:
 
     def print_simulation_example(self, y, CSI, CCI, K=1):
         """
-        Description
-        -----------
         Print a step-by-step example of the receiver operations (see simulate() method) for given input signal y, and channel state information (CSI). Only the first K data symbols vectors are considered.
 
         Parameters
@@ -607,8 +553,8 @@ class Receiver:
         y_tilda = self.combiner(y[:, :K], CSI['U'])
         print(f"----- the combined symbols -----\n{np.round(y_tilda, 2)}\n\n")
 
-        # 4. Equalize the combined symbols.
-        u = self.equalizer(y_tilda, CSI['S'])
+        # 4. Deallocate the power from the scaled decision variables.
+        u = self.power_deallocator(y_tilda, CSI['S'])
         print(f"----- the equalized symbols -----\n{np.round(u, 2)}\n\n")
 
         # 5. Detect the transmitted data symbols.

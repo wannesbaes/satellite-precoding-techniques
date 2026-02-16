@@ -20,7 +20,7 @@ def waterfilling_v1(gamma, pt):
 
         \begin{aligned}
             & \underset{\{p_n\}}{\text{max}}
-            & & \sum_{n=1}^{N} \log_2 \left( 1 + a_n \, p_n \right) \\
+            & & \sum_{n=1}^{N} \log_2 \left( 1 + \gamma_n \, p_n \right) \\
             & \text{s. t.}
             & & \sum_{n=1}^{N} p_n = p_t \\
             & & & \forall n \in \{1, \ldots, N\} : \, p_n \geq 0
@@ -65,7 +65,9 @@ def waterfilling_v1(gamma, pt):
 
 def equal_power_allocation(Ns, pt):
     r"""
-    Equal power allocation across the eigenchannels of a single-user MIMO system.
+    Equal power allocation across the eigenchannels of a SU-MIMO system.
+
+    Each eigenchannel is allocated an equal share of the total available transmit power, regardless of the channel conditions. This strategy is simple to implement and does not require any channel state information (CSI) at the transmitter.
 
     Parameters
     ----------
@@ -90,7 +92,9 @@ def equal_power_allocation(Ns, pt):
 
 def eigenbeamforming(Ns, pt):
     r"""
-    Power allocation using the eigenbeamforming method.
+    Eigenbeamforming power allocation across the eigenchannels of a SU-MIMO system.
+
+    All of the available transmit power is allocated to the strongest eigenchannel, while the remaining eigenchannels are allocated zero power.
 
     Parameters
     ----------
@@ -323,7 +327,9 @@ def demo_waterfilling(Nt, Nr, snr_dB_list, p_signal=None, p_noise=None, num_samp
 
 def adaptive_bit_allocation(gamma, p, B=0.5, R=1.0, c_type="QAM"):
     r"""
-    Adaptive bit allocation for a single-user MIMO system based on the capacity of each eigenchannel.
+    Adaptive bit allocation for a SU-MIMO system based on the capacity of each eigenchannel.
+
+    Each eigenchannel is allocated a constellation size (in bits), i.e. the number of bits per symbol, equal to a fraction of the capacity of the eigenchannel.
 
     Parameters
     ----------
@@ -344,8 +350,8 @@ def adaptive_bit_allocation(gamma, p, B=0.5, R=1.0, c_type="QAM"):
         The capacity of each eigenchannel.
     ibr : ndarray, shape (Ns,), dtype=int
         The information bit rate (IBR) for each eigenchannel.
-
     """
+
     # STEP 0: Check the validity of the input parameters.
     assert len(p) == len(gamma), "The power allocation vector 'p' must have the same length as the CNR vector 'gamma'."
     assert B > 0, "The bandwidth 'B' must be positive."

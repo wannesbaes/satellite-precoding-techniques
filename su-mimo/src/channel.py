@@ -5,13 +5,6 @@ import numpy as np
 
 class Channel:
     """
-    Description
-    -----------
-    The channel of a single-user multiple-input multiple-output (SU-MIMO) digital communication system.
-
-    The channel is modeled as a flat-fading MIMO channel. The channel matrix can be either provided or initialized with independent and identically distributed (i.i.d.) complex Gaussian random variables. 
-    In addition, the channel adds complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the transmitted symbols, based on a specified signal-to-noise ratio (SNR) (in dB).
-
     Attributes
     ----------
     Nt : int
@@ -37,21 +30,6 @@ class Channel:
         Return a string representation of the channel object.
     __call__()
         Allow the channel object to be called as a function. When called, it executes the simulate() method.
-    
-    get_CSI()
-        Get the current channel state information (CSI), in terms of the SNR, the channel matrix H and its SVD (U, S, Vh).
-    set_CSI()
-        Set the SNR value and the channel matrix. Compute the SVD of the channel matrix and store it.
-    reset_CSI()
-        Reset the SNR value and the channel matrix. Compute the SVD of the channel matrix and store it.
-    
-    generate_noise()
-        Generate complex white Gaussian noise (AWGN) vectors for every transmitted symbol vector, based on the current SNR.
-    simulate()
-        Simulate the channel operations. Return the channel output signal y.
-    
-    print_simulation_example()
-        Print a step-by-step example of the channel operations for a given input signal x.
     """
 
 
@@ -59,8 +37,6 @@ class Channel:
 
     def __init__(self, Nt, Nr, SNR=None, H=None):
         """ 
-        Description
-        -----------
         Initialize the channel.
 
         Parameters
@@ -100,8 +76,6 @@ class Channel:
 
     def get_CSI(self):
         """
-        Description
-        -----------
         Get the current channel state information (CSI), in terms of the SNR, the channel matrix H and its SVD (U, S, Vh).
 
         Returns
@@ -120,8 +94,6 @@ class Channel:
 
     def set_CSI(self, SNR=None, H=None):
         """
-        Description
-        -----------
         Set the SNR value and the channel matrix. Compute the singular-value-decomposition (SVD) of the channel matrix and store it.\n
         If no new value is provided, the old value is left unchanged.
 
@@ -142,8 +114,6 @@ class Channel:
     
     def reset_CSI(self, SNR=None, H=None):
         """
-        Description
-        -----------
         Reset the SNR value and the channel matrix. Compute the singular-value-decomposition (SVD) of the channel matrix and store it.\n
         If no new value is provided, the default initialization values are used. For the SNR value, the default is infinity (no noise). For the channel matrix, the default is a random i.i.d. complex circularly-symmetric Gaussian (zero mean, unit variance) MIMO channel.
 
@@ -162,8 +132,6 @@ class Channel:
 
     def generate_noise(self, x):
         """
-        Description
-        -----------
         Generate complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors (w[k]) for every transmitted symbol vector, based on the current SNR of the channel.
 
         Parameters
@@ -190,8 +158,6 @@ class Channel:
 
     def simulate(self, x):
         """
-        Description
-        -----------
         Simulate the channel operations:\n
         (1) Transmit the precoded symbols through the MIMO channel. This is modeled as a matrix multiplication between the channel matrix H and the precoded symbols.\n
         (2) Add complex proper, circularly-symmetric additive white Gaussian noise (AWGN) to the received symbols, based on the current SNR of the channel.\n
@@ -222,8 +188,6 @@ class Channel:
 
     def print_simulation_example(self, x, K=1):
         """
-        Description
-        -----------
         Print a step-by-step example of the channel operations (see simulate() method) for a given input signal x. Only the first K symbol vectors are considered for illustration.
 
         Parameters
@@ -233,8 +197,8 @@ class Channel:
         K : int, optional
             The maximum number of symbol vectors to consider for illustration.
         
-        Return
-        ------
+        Returns
+        -------
         y : 2D numpy array (dtype: complex, shape=(Nr, N_symbols))
             The output signal.
 
