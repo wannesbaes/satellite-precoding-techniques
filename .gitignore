@@ -16,7 +16,6 @@ __pycache__/
 
 # Sphinx Documentation
 docs/build/
-docs/source/_*
 
 # Application help files.
 ~$*
