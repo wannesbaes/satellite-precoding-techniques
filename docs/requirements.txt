@@ -1,3 +1,4 @@
 sphinx>=7
 myst-parser>=2
 numpy
+matplotlib
