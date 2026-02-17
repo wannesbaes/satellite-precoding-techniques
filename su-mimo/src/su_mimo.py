@@ -792,7 +792,7 @@ class SuMimoSVD:
         # Overall plot settings.
         #fig.suptitle(f'{str(self)}' + f'\n\nScatter Diagram after SVD Processing' + f'\nSNR: {SNR} dB & ' + f'data rate: {round(self.RAS['data rate']*100)}%')
         fig.tight_layout()
-        fig.savefig(f'su-mimo/report/plots/1_simulation/scatter_plots/2__{self.Nt}x{self.Nr}_{self.c_type}__SNR_{SNR}__pa__{self.RAS['power allocation']}' + (f'__ba_adaptive__R_{round(self.RAS['data rate']*100)}' if self.RAS['bit allocation'] == 'adaptive' else f'__ba_fixed__M_{(np.log2(self.RAS["constellation sizes"])).astype(int)}') + datetime.now().strftime('__%Y%m%d_%H%M%S') + '.png', dpi=300, bbox_inches="tight")
+        fig.savefig(f"su-mimo/report/plots/1_simulation/scatter_plots/2__{self.Nt}x{self.Nr}_{self.c_type}__SNR_{SNR}__pa__{self.RAS['power allocation']}" + (f"__ba_adaptive__R_{round(self.RAS['data rate']*100)}" if self.RAS['bit allocation'] == 'adaptive' else f"__ba_fixed__M_{(np.log2(self.RAS['constellation sizes'])).astype(int)}") + datetime.now().strftime("__%Y%m%d_%H%M%S") + ".png", dpi=300, bbox_inches="tight")
     
         # Return the plot.
         return fig, axes

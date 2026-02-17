@@ -39,7 +39,7 @@ jobs:
         env:
             MPLBACKEND: Agg
         run: |
-          make -C docs html
+          make -C docs html SPHINXOPTS="-W --keep-going"
 
       - name: Upload Pages artifact (built site)
         uses: actions/upload-pages-artifact@v3
