@@ -22,15 +22,12 @@ docs/build/
 .$*
 
 # Reports: data folders.
-su-mimo/report/LaTeX/
-su-mimo/report/figures/
-su-mimo/report/plots/
-su-mimo/report/*.pptx
+*/report/LaTeX/src/
+*/report/figures/src/
 
 su-mimo/src/resource_allocation/bit_allocation/
 su-mimo/src/resource_allocation/power_allocation/
 su-mimo/src/resource_allocation/eigenchannel_gains/*/
 
-mu-mimo/report/LaTeX/
-mu-mimo/report/figures/
-mu-mimo/report/plots/
+
+su-mimo/report/plots/
