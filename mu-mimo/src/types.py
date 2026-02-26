@@ -29,7 +29,7 @@ class ChannelStateInformation:
     ----------
     snr : float
         The signal-to-noise ratio. (optional, default None)
-    H_eff : ComplexArray, shape (Nr, Nt) or (Ns_total, Nt)
+    H_eff : ComplexArray, shape (K*Nr, Nt) or (Ns_total, Nt)
         The effective channel matrix. (optional, default None)
         In case of coordinated beamforming, the effective channel matrix equals the actual channel matrix.
         In case of non-coordinated beamforming, the effective channel matrix equals the the actual channel matrix followed by the compound combining matrix (G * H).
@@ -315,7 +315,7 @@ class SimConfig:
     num_bit_errors_scope : Literal["system-wide", "uts", "streams"]
         The scope over which the minimum number of bit errors are considered.
     num_symbols : int
-        The number of symbols that are sent at once (per channel realization).
+        The number of symbol vectors that are sent at once (per channel realization).
     """
 
     snr_dB_values: RealArray = field(default_factory=lambda: np.arange(-5, 31, 2.5))
@@ -331,7 +331,7 @@ class SimConfig:
     def __post_init__(self):
         if self.num_channel_realizations <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
         if self.num_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
-        if self.num_symbols <= 0: raise ValueError("The minimum number of symbols that are sent per channel realization must be a positive integer.")
+        if self.num_symbols <= 0: raise ValueError("The minimum number of symbol vectors that are sent per channel realization must be a positive integer.")
 
     def __eq__(self, other: object) -> bool:
         
@@ -378,7 +378,7 @@ class SingleSnrSimResult:
         Average UT activation rate.
     
     num_symbols : int
-        The number of symbols that were sent per channel realization.
+        The number of symbol vectors that were sent per channel realization.
     num_channel_realizations : int
         The number of channel realizations that were simulated.
     

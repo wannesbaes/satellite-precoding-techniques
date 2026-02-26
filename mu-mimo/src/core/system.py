@@ -6,7 +6,7 @@ from pathlib import Path
 from tqdm import tqdm
 from ..types import (
     RealArray, ComplexArray, IntArray, BitArray,
-    ChannelStateInformation,
+    ChannelStateInformation, BaseStationState, UserTerminalState,
     TransmitPilotMessage, ReceivePilotMessage, TransmitFeedbackMessage, ReceiveFeedbackMessage, TransmitFeedforwardMessage, ReceiveFeedforwardMessage,
     SystemConfig, BaseStationConfig, UserTerminalConfig, ChannelConfig,
     SimConfig, SimResult, SingleSnrSimResult )
@@ -16,7 +16,6 @@ from ..processing import (
     BitAllocator, BitDeallocator,
     Mapper, Demapper, Detector,
     ChannelModel, NoiseModel )
-
 
 
 class SimulationRunner:
@@ -510,11 +509,7 @@ class BaseStation:
         self.precoder: Precoder = configs.precoder()
 
         # State.
-        self.F: ComplexArray | None = None
-        self.P: RealArray | None = None
-        self.ibr: IntArray | None = None
-        self.Ns: IntArray | None = None
-        self.G: ComplexArray | None = None
+        self.state: BaseStationState | None = None
 
     def reset_state(self) -> None:
         """
@@ -523,12 +518,7 @@ class BaseStation:
         It clears the precoder F, the power allocation P, the information bit rates ibr, the number of data streams for each UT Ns and the combining matrices G for each UT in case of coordinated beamforming from the previous channel realization and SNR.
         """
         
-        self.F = None
-        self.P = None
-        self.ibr = None
-        self.Ns = None
-        self.G = None
-
+        self.state = None
         return
 
     def transmit_pilots(self) -> TransmitPilotMessage:
@@ -548,7 +538,8 @@ class BaseStation:
         """
         Receive and process the feedback messages from the UTs.
 
-        The feedback message contains the current CSI, which is used to compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR. In case of coordinated beamforming, it also contains the combining matrices for each UT, which are used to compute the precoder matrix.
+        The feedback message contains the current CSI, which is used to compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR, according to the specific algorithms implemented in the processing components of the BS. 
+        In case of non-coordinated beamforming, the effective channel matrix (part of the CSI) equals the channel matrix H followed by the compound combining matrix G. 
 
         Parameters
         ----------
@@ -556,20 +547,13 @@ class BaseStation:
             The compound feedback message.
         """
 
-        # Retrieve the effective channel matrix and the snr from the received feedback message.
-        H_eff = rx_fb_msg.csi.H_eff
-        snr = rx_fb_msg.csi.snr
-
         # Compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR. In case of coordinated beamforming, also compute the combining matrices.
-        F, G = self.precoder.compute(H_eff)
-        P = self.power_allocator.compute(H_eff, snr)
-        ibr = self.bit_allocator.compute(H_eff, P)
+        F, G = self.precoder.compute(rx_fb_msg.csi)
+        P = self.power_allocator.compute(rx_fb_msg.csi, F, G)
+        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P)
 
         # Update the state of the BS to the current channel realization and SNR.
-        self.F = F
-        self.P = P
-        self.ibr = ibr
-        self.G = G
+        self.state = BaseStationState(F=F, P=P, ibr=ibr, Ns=Ns, G=G)
 
         return
 
@@ -585,7 +569,7 @@ class BaseStation:
             The feedforward messages.
         """
 
-        tx_ff_msg = TransmitFeedforwardMessage(P=self.P, ibr=self.ibr, Ns=self.Ns, G=self.G)
+        tx_ff_msg = TransmitFeedforwardMessage(P=self.state.P, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
         return tx_ff_msg
 
     def transmit(self, num_symbols: int) -> tuple[list[list[BitArray]], ComplexArray]:
@@ -611,12 +595,10 @@ class BaseStation:
             The transmitted signal.
         """
 
-        b = self.bit_allocator.execute(self.ibr, num_symbols)
-        a = self.mapper.execute(self.ibr, b)
-        a_p = self.power_allocator.execute(self.P, a)
-        x = self.precoder.execute(self.F, a_p)
-
-        tx_bits_list = [ [ b[k*self.Ns + s] for s in range(self.Ns) ] for k in range(len(b) // self.Ns) ]
+        tx_bits_list, b = self.bit_allocator.apply(self.state.ibr, num_symbols, self.state.Ns)
+        a = self.mapper.apply(self.state.ibr, b)
+        a_p = self.power_allocator.apply(self.state.P, a)
+        x = self.precoder.apply(self.state.F, a_p)
 
         return tx_bits_list, x
 
@@ -651,8 +633,7 @@ class Channel:
         self.noise_model = configs.noise_model()
 
         # State.
-        self.snr: float | None = None
-        self.H: ComplexArray | None = None
+        self.state: ChannelStateInformation | None = None
 
     def set(self, csi: ChannelStateInformation) -> None:
         """
@@ -666,8 +647,8 @@ class Channel:
             The channel state information to set.
         """
        
-        if csi.snr is not None: self.snr = csi.snr
-        if csi.H is not None: self.H = csi.H
+        if csi.snr is not None: self.state.snr = csi.snr
+        if csi.H_eff is not None: self.state.H_eff = csi.H_eff
 
         return
 
@@ -690,7 +671,7 @@ class Channel:
         """
         
         if csi.snr is None: csi.snr = np.inf
-        if csi.H is None: csi.H = self.channel_model.generate(self.K, self.Nr, self.Nt)
+        if csi.H_eff is None: csi.H_eff = self.channel_model.generate(self.K * self.Nr, self.Nt)
         
         self.set(csi)
 
@@ -713,7 +694,7 @@ class Channel:
             The list of pilot messages that will be received by each UT.
         """
 
-        rx_pilot_msgs = [ReceivePilotMessage(H_k = self.H[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
+        rx_pilot_msgs = [ReceivePilotMessage(H_k = self.state.H_eff[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
         return rx_pilot_msgs
 
     def propagate_feedback(self, tx_fb_msgs: list[TransmitFeedbackMessage]) -> ReceiveFeedbackMessage:
@@ -739,7 +720,7 @@ class Channel:
             H_eff[tx_fb_msg_k.ut_id*self.Nr : (tx_fb_msg_k.ut_id+1)*self.Nr, : ] = tx_fb_msg_k.H_eff_k
         
         # Generate the feedback message that will be received by the BS.
-        rx_fb_msg = ReceiveFeedbackMessage(snr=self.snr, H_eff=H_eff)
+        rx_fb_msg = ReceiveFeedbackMessage(snr=self.state.snr, H_eff=H_eff)
 
         return rx_fb_msg
 
@@ -767,10 +748,10 @@ class Channel:
         G = tx_ff_msg.G
 
         # Split the transmitted feedforward message elemtens into K different elements for each UT.
-        Ns_cumulative = np.cumsum(Ns)
-        P_k_list = [ P[ (Ns_cumulative[k-1] if k > 0 else 0) : Ns_cumulative[k]] for k in range(self.K)]
-        ibr_k_list = [ ibr[ (Ns_cumulative[k-1] if k > 0 else 0) : Ns_cumulative[k]] for k in range(self.K)]
-        G_k_list = [ G[(Ns_cumulative[k-1] if k > 0 else 0) : Ns_cumulative[k], k*self.Nr : (k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
+        Ns_cumulative = np.concatenate(([0], np.cumsum(Ns)))
+        P_k_list = [ P[ Ns_cumulative[k] : Ns_cumulative[k+1] ] for k in range(self.K)]
+        ibr_k_list = [ ibr[ Ns_cumulative[k] : Ns_cumulative[k+1] ] for k in range(self.K)]
+        G_k_list = [ G[ Ns_cumulative[k] : Ns_cumulative[k+1], k*self.Nr : (k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
 
         # Generate the feedforward messages that will be received by the UTs.
         rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, P_k=P_k, ibr_k=ibr_k, Ns_k=Ns[k], G_k=G_k) for k, (P_k, ibr_k, G_k) in enumerate(zip(P_k_list, ibr_k_list, G_k_list))]
@@ -798,10 +779,10 @@ class Channel:
         """
 
         # Generate the noise samples according to the specified noise model.
-        noise = self.noise_model.generate(self.snr, x, self.K * self.Nr)
+        noise = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
-        y_noiseless = self.channel_model.apply(self.H, x)
+        y_noiseless = self.channel_model.apply(self.state.H_eff, x)
         y = self.noise_model.apply(noise, y_noiseless)
 
         # Split the received signal y into K different signals y_k, one for each UT.
@@ -839,11 +820,7 @@ class UserTerminal:
         self.bit_deallocator = configs.bit_deallocator()
 
         # State.
-        self.H_k: ComplexArray | None = None
-        self.G_k: ComplexArray | None = None
-        self.P_k: RealArray | None = None
-        self.ibr_k: IntArray | None = None
-        self.Ns_k: int | None = None
+        self.state: UserTerminalState | None = None
 
         # UT ID.
         self.ut_id = ut_id
@@ -855,12 +832,7 @@ class UserTerminal:
         It clears the channel matrix H_k, the combining matrix G_k, the power allocation P_k, the information bit rates ibr_k and the number of data streams Ns_k for the previous channel realization and SNR.
         """
         
-        self.H_k = None
-        self.G_k = None
-        self.P_k = None
-        self.ibr_k = None
-        self.Ns_k = None
-
+        self.state = None
         return
 
     def receive_pilots(self, rx_pilots_msg: ReceivePilotMessage) -> None:
@@ -884,8 +856,7 @@ class UserTerminal:
         G_k = self.combiner.compute(H_k)
 
         # Update the state of the UT to the current channel realization.
-        self.H_k = H_k
-        self.G_k = G_k
+        self.state = UserTerminalState(H_k=H_k, G_k=G_k, P_k=None, ibr_k=None, Ns_k=None)
         
         return
     
@@ -902,7 +873,7 @@ class UserTerminal:
             The feedback message transmitted by the UT.
         """
 
-        tx_fb_msg = TransmitFeedbackMessage(ut_id = self.ut_id, H_eff_k = self.G_k @ self.H_k)
+        tx_fb_msg = TransmitFeedbackMessage(ut_id=self.ut_id, H_eff_k= self.state.G_k @ self.state.H_k)
         return tx_fb_msg
 
     def receive_feedforward(self, rx_ff_msg: ReceiveFeedforwardMessage) -> None:
@@ -918,10 +889,10 @@ class UserTerminal:
         """
         
         # Update the state of the UT to the current channel realization.
-        self.G_k = rx_ff_msg.G_k if rx_ff_msg.G_k is not None else self.G_k
-        self.P_k = rx_ff_msg.P_k
-        self.ibr_k = rx_ff_msg.ibr_k
-        self.Ns_k = rx_ff_msg.Ns_k
+        if rx_ff_msg.G_k is not None: self.state.G_k = rx_ff_msg.G_k
+        self.state.P_k = rx_ff_msg.P_k
+        self.state.ibr_k = rx_ff_msg.ibr_k
+        self.state.Ns_k = rx_ff_msg.Ns_k
 
         return
 
@@ -947,11 +918,11 @@ class UserTerminal:
             The list of estimated bitstreams for each data stream s of this UT.
         """
         
-        z_k = self.combiner.execute(self.G_k, y_k)
-        u_k = self.power_deallocator.execute(self.P_k, z_k)
-        a_hat_k = self.detector.execute(self.ibr_k, u_k)
-        b_hat_k = self.demapper.execute(self.ibr_k, a_hat_k)
-        rx_bits_list = self.bit_deallocator.execute(self.ibr_k, b_hat_k)
+        z_k = self.combiner.apply(self.state.G_k, y_k)
+        u_k = self.power_deallocator.apply(self.state.P_k, z_k)
+        a_hat_k = self.detector.apply(self.state.ibr_k, u_k)
+        b_hat_k = self.demapper.apply(self.state.ibr_k, a_hat_k)
+        rx_bits_list = self.bit_deallocator.apply(self.state.ibr_k, b_hat_k)
         
         return rx_bits_list
 
