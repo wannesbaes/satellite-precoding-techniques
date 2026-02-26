@@ -9,3 +9,4 @@ Welcome to the code documentation of my thesis about Satellite Precoding Techniq
    :titlesonly:
 
    su-mimo
+   mu-mimo
