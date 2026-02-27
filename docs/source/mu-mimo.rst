@@ -28,14 +28,7 @@ Every iteration progresses through three phases:
 
 After each realization, performance metrics are computed and stored for analysis.
 
-This is illustrated in the sequence diagram below, in which the interactions between the different components become clear as well.
-
-.. figure:: /_static/mu-mimo/figures/sequence_diagram.png
-   :width: 100%
-   :align: center
-   :alt: Simulation Model Sequence Diagram
-
-   Figure: sequence diagram of the simulation model.
+This is illustrated in the :download:`sequence diagram </_static/mu-mimo/figures/sequence_diagram.png>`, in which the interactions between the different components become clear as well.
 
 
 Documentation

@@ -18,6 +18,7 @@ RealArray = NDArray[np.floating]
 ComplexArray = NDArray[np.complexfloating]
 IntArray = NDArray[np.integer]
 BitArray = NDArray[np.integer]
+ConstType = Literal["PAM", "PSK", "QAM"]
 
 
 @dataclass()
@@ -73,6 +74,8 @@ class UserTerminalState:
         The channel matrix of this UT.
     G_k : ComplexArray, shape (Ns_k, Nr)
         The combining matrix of this UT.
+    c_type_k : ConstType
+        The constellation type for the data streams to this UT.
     P_k : RealArray, shape (Ns_k,)
         The power allocation vector of this UT.
     ibr_k : IntArray, shape (Ns_k,)
@@ -82,6 +85,7 @@ class UserTerminalState:
     """
     H_k: ComplexArray
     G_k: ComplexArray
+    c_type_k: ConstType | None
     P_k: RealArray | None
     ibr_k: IntArray | None
     Ns_k: int | None
@@ -139,6 +143,8 @@ class TransmitFeedforwardMessage:
 
     Parameters
     ----------
+    c_type : list[ConstType]
+        The constellation types for the data streams to each UT.
     P : RealArray, shape (Ns_total,)
         The power allocation vector. It contains the power allocated to each data stream of each UT.
     ibr : IntArray, shape (Ns_total,)
@@ -148,6 +154,7 @@ class TransmitFeedforwardMessage:
     G : ComplexArray, shape (Ns_total, K * Nr)
         The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
+    c_type: list[ConstType]
     P: RealArray
     ibr: IntArray
     Ns: IntArray
@@ -162,6 +169,8 @@ class ReceiveFeedforwardMessage:
     ----------
     ut_id : int
         The ID of the UT that receives this feedforward message.
+    c_type_k : ConstType
+        The constellation type for the data streams to this UT.
     P_k : RealArray, shape (Ns_k,)
         The power allocation vector of this UT.
     ibr_k : IntArray, shape (Ns_k,)
@@ -172,10 +181,27 @@ class ReceiveFeedforwardMessage:
         The combining matrix of this UT. It is None in case of non-coordinated beamforming.
     """
     ut_id: int
+    c_type_k: ConstType
     P_k: RealArray
     ibr_k: IntArray
     Ns_k: int
     G_k: ComplexArray | None
+
+
+@dataclass()
+class ConstConfig:
+    """
+    The constellation configuration settings for the data transmission between the BS and one UT.
+
+    Parameters
+    ----------
+    types : list[ConstType]
+        The constellation types for the data streams to each UT.
+    sizes : int
+        The constellation sizes in bits, i.e. the number of bits per data symbol (point in the constellation), for the data streams to each UT.
+    """
+    types: ConstType | list[ConstType]
+    sizes: int | IntArray | None = None
 
 
 @dataclass()
@@ -252,6 +278,9 @@ class SystemConfig:
     Nr : int
         The number of receive antennas per user terminal.
     
+    c_configs : ConstConfig
+        The constellation configuration settings for each UT.
+    
     base_station_configs : BaseStationConfig
         The configuration settings of the base station.
     user_terminal_configs : UserTerminalConfig
@@ -263,6 +292,8 @@ class SystemConfig:
     K: int
     Nt: int
     Nr: int
+
+    c_configs: ConstConfig
 
     base_station_configs: BaseStationConfig
     user_terminal_configs: UserTerminalConfig
@@ -278,9 +309,23 @@ class SystemConfig:
         if self.K * self.Nr > self.Nt: raise ValueError("We assume that the base station has at least as many transmit antennas as the total number of receive antennas across all UTs.")
         
         # Validate the types of the processing components in the BS and UT configurations.
-        if self.user_terminal_configs.demapper is not self.base_station_configs.mapper.demapper_class: raise ValueError("Mapper and demapper do not match.")
-        if self.user_terminal_configs.combiner is not self.base_station_configs.precoder.combiner_class: raise ValueError("Precoder and combiner do not match.")
-        if self.base_station_configs.power_allocator is not self.base_station_configs.precoder.power_allocator_class: raise ValueError("This power allocator is not compatible with the precoder.")
+        for k in range(self.K):
+            if self.user_terminal_configs[k].demapper is not self.base_station_configs.mapper.demapper_class: raise ValueError("Mapper and demapper do not match.")
+            if self.user_terminal_configs[k].combiner is not self.base_station_configs.precoder.combiner_class: raise ValueError("Precoder and combiner do not match.")
+            if self.base_station_configs.power_allocator is not self.base_station_configs.precoder.power_allocator_class: raise ValueError("This power allocator is not compatible with the precoder.")
+        
+        # Validate the constellation configuration settings.
+        if isinstance(self.c_configs.types, ConstType):
+            self.c_configs.types = [self.c_configs.types] * self.K
+        else:
+            if len(self.c_configs.types) != self.K:
+                raise ValueError("The number of different constellation types must match the number of user terminals.")
+
+        if isinstance(self.c_configs.sizes, int):
+            self.c_configs.sizes = [self.c_configs.sizes] * self.K
+        else:
+            if len(self.c_configs.sizes) != self.K:
+                raise ValueError("The number of different constellation sizes must match the number of user terminals.")
 
     def __eq__(self, other: object) -> bool:
         

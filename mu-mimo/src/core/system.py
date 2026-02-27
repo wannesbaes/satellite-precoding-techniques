@@ -8,7 +8,7 @@ from ..types import (
     RealArray, ComplexArray, IntArray, BitArray,
     ChannelStateInformation, BaseStationState, UserTerminalState,
     TransmitPilotMessage, ReceivePilotMessage, TransmitFeedbackMessage, ReceiveFeedbackMessage, TransmitFeedforwardMessage, ReceiveFeedforwardMessage,
-    SystemConfig, BaseStationConfig, UserTerminalConfig, ChannelConfig,
+    ConstConfig, SystemConfig, BaseStationConfig, UserTerminalConfig, ChannelConfig,
     SimConfig, SimResult, SingleSnrSimResult )
 from ..processing import (
     Precoder, Combiner,
@@ -16,7 +16,6 @@ from ..processing import (
     BitAllocator, BitDeallocator,
     Mapper, Demapper, Detector,
     ChannelModel, NoiseModel )
-
 
 class SimulationRunner:
     """
@@ -374,7 +373,6 @@ class SimulationRunner:
         
         return
 
-
 class MuMimoSystem:
     """
     Represents a MU-MIMO downlink digital communication system.
@@ -395,7 +393,7 @@ class MuMimoSystem:
         Nt = system_config.Nt
         Nr = system_config.Nr
 
-        self.bs = BaseStation(K, Nt, system_config.base_station_configs)
+        self.bs = BaseStation(K, Nt, system_config.base_station_configs, system_config.c_configs)
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
 
@@ -479,13 +477,12 @@ class MuMimoSystem:
 
         return tx_bits_list, rx_bits_list
 
-
 class BaseStation:
     """
     Represents the base station (BS) in a MU-MIMO downlink system.
     """
 
-    def __init__(self, K: int, Nt: int, configs: BaseStationConfig):
+    def __init__(self, K: int, Nt: int, configs: BaseStationConfig, c_configs: ConstConfig):
         """
         Initialize a base station.
 
@@ -497,6 +494,8 @@ class BaseStation:
             The number of transmit antennas at the BS.
         configs: BaseStationConfig
             The configuration of the processing components (bit allocator, mapper, power allocator and precoder) in the BS.
+        c_configs: ConstConfig
+            The constellation configuration settings for each UT.
         """
 
         self.K = K
@@ -509,6 +508,7 @@ class BaseStation:
         self.precoder: Precoder = configs.precoder()
 
         # State.
+        self.c_configs = c_configs
         self.state: BaseStationState | None = None
 
     def reset_state(self) -> None:
@@ -550,7 +550,7 @@ class BaseStation:
         # Compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR. In case of coordinated beamforming, also compute the combining matrices.
         F, G = self.precoder.compute(rx_fb_msg.csi)
         P = self.power_allocator.compute(rx_fb_msg.csi, F, G)
-        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P)
+        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P, self.c_configs)
 
         # Update the state of the BS to the current channel realization and SNR.
         self.state = BaseStationState(F=F, P=P, ibr=ibr, Ns=Ns, G=G)
@@ -561,7 +561,7 @@ class BaseStation:
         """
         Transmits the feedforward messages from the BS through the channel.
 
-        The feedforward message contains the power allocation, the information bit rates, the number of data streams for each UT and the combining matrices for each UT in case of coordinated beamforming for the current channel realization and SNR.
+        The feedforward message contains the constellation type, the power allocation, the information bit rates and the number of data streams for each UT and the combining matrices for each UT in case of coordinated beamforming for the current channel realization and SNR.
 
         Returns
         -------
@@ -569,7 +569,7 @@ class BaseStation:
             The feedforward messages.
         """
 
-        tx_ff_msg = TransmitFeedforwardMessage(P=self.state.P, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
+        tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, P=self.state.P, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
         return tx_ff_msg
 
     def transmit(self, num_symbols: int) -> tuple[list[list[BitArray]], ComplexArray]:
@@ -596,12 +596,11 @@ class BaseStation:
         """
 
         tx_bits_list, b = self.bit_allocator.apply(self.state.ibr, num_symbols, self.state.Ns)
-        a = self.mapper.apply(self.state.ibr, b)
-        a_p = self.power_allocator.apply(self.state.P, a)
-        x = self.precoder.apply(self.state.F, a_p)
+        a = self.mapper.apply(b, self.state.ibr, self.c_configs.types, self.state.Ns)
+        a_p = self.power_allocator.apply(a, self.state.P)
+        x = self.precoder.apply(a_p, self.state.F)
 
         return tx_bits_list, x
-
 
 class Channel:
     """
@@ -728,7 +727,7 @@ class Channel:
         """
         Propagates the feedforward messages from the BS to the UTs.
 
-        The feedforward message transmitted by the BS is split into K different feedforward messages, one for each UT. Each feedforward message contains the power allocation, the information bit rates, the number of data streams for each UT and, in case of coordinated beamforming, the combining matrices for each UT for the current channel realization and SNR.
+        The feedforward message transmitted by the BS is split into K different feedforward messages, one for each UT. Each feedforward message contains the constellation type, the power allocation, the information bit rates, the number of data streams for each UT and, in case of coordinated beamforming, the combining matrices for each UT for the current channel realization and SNR.
 
         Parameters
         ----------
@@ -742,6 +741,7 @@ class Channel:
         """
         
         # Retrieve the transmitted feedforward message elements.
+        c_type = tx_ff_msg.c_type
         P = tx_ff_msg.P
         ibr = tx_ff_msg.ibr
         Ns = tx_ff_msg.Ns
@@ -754,7 +754,7 @@ class Channel:
         G_k_list = [ G[ Ns_cumulative[k] : Ns_cumulative[k+1], k*self.Nr : (k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
 
         # Generate the feedforward messages that will be received by the UTs.
-        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, P_k=P_k, ibr_k=ibr_k, Ns_k=Ns[k], G_k=G_k) for k, (P_k, ibr_k, G_k) in enumerate(zip(P_k_list, ibr_k_list, G_k_list))]
+        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, c_type_k=c_type[k], P_k=P_k, ibr_k=ibr_k, Ns_k=Ns[k], G_k=G_k) for k, (P_k, ibr_k, G_k) in enumerate(zip(P_k_list, ibr_k_list, G_k_list))]
 
         return rx_ff_msgs
 
@@ -782,14 +782,13 @@ class Channel:
         noise = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
-        y_noiseless = self.channel_model.apply(self.state.H_eff, x)
-        y = self.noise_model.apply(noise, y_noiseless)
+        y_noiseless = self.channel_model.apply(x, self.state.H_eff)
+        y = self.noise_model.apply(y_noiseless, noise)
 
         # Split the received signal y into K different signals y_k, one for each UT.
         y_k_list = [ y[k*self.Nr:(k+1)*self.Nr, :] for k in range(self.K) ]
 
         return y_k_list
-
 
 class UserTerminal:
     """ 
@@ -856,7 +855,7 @@ class UserTerminal:
         G_k = self.combiner.compute(H_k)
 
         # Update the state of the UT to the current channel realization.
-        self.state = UserTerminalState(H_k=H_k, G_k=G_k, P_k=None, ibr_k=None, Ns_k=None)
+        self.state = UserTerminalState(H_k=H_k, G_k=G_k, c_type_k=None, P_k=None, ibr_k=None, Ns_k=None)
         
         return
     
@@ -880,7 +879,7 @@ class UserTerminal:
         """
         Receive and process the feedforward message from the BS.
 
-        The feedforward message contains the power allocation P_k, the information bit rates ibr_k, and the number of data streams Ns_k of this UT, for the current channel realization and SNR. In case of coordinated beamforming, it also contains the combining matrix G_k for this UT.
+        The feedforward message contains the constellation type c_type_k, the power allocation P_k, the information bit rates ibr_k, and the number of data streams Ns_k of this UT, for the current channel realization and SNR. In case of coordinated beamforming, it also contains the combining matrix G_k for this UT.
 
         Parameters
         ----------
@@ -890,6 +889,7 @@ class UserTerminal:
         
         # Update the state of the UT to the current channel realization.
         if rx_ff_msg.G_k is not None: self.state.G_k = rx_ff_msg.G_k
+        self.state.c_type_k = rx_ff_msg.c_type_k
         self.state.P_k = rx_ff_msg.P_k
         self.state.ibr_k = rx_ff_msg.ibr_k
         self.state.Ns_k = rx_ff_msg.Ns_k
@@ -918,11 +918,10 @@ class UserTerminal:
             The list of estimated bitstreams for each data stream s of this UT.
         """
         
-        z_k = self.combiner.apply(self.state.G_k, y_k)
-        u_k = self.power_deallocator.apply(self.state.P_k, z_k)
-        a_hat_k = self.detector.apply(self.state.ibr_k, u_k)
-        b_hat_k = self.demapper.apply(self.state.ibr_k, a_hat_k)
-        rx_bits_list = self.bit_deallocator.apply(self.state.ibr_k, b_hat_k)
+        z_k = self.combiner.apply(y_k, self.state.G_k)
+        u_k = self.power_deallocator.apply(z_k, self.state.P_k)
+        a_hat_k = self.detector.apply(u_k, self.state.ibr_k)
+        b_hat_k = self.demapper.apply(a_hat_k, self.state.ibr_k)
+        rx_bits_list = self.bit_deallocator.apply(b_hat_k, self.state.ibr_k)
         
         return rx_bits_list
-

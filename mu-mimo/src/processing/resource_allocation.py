@@ -32,7 +32,6 @@ class BitDeallocator(ABC):
         """
         return b_hat_k
 
-
 # Bit Allocators.
 
 class BitAllocator(ABC):
@@ -106,13 +105,12 @@ class BitAllocator(ABC):
 
         return tx_bits_list, b
 
-
 class NeutralBitAllocator(BitAllocator):
     """
     Neutral Bit Allocator.
 
     Acts as a 'neutral element' for bit allocation. 
-    It always allocates one bit per symbol to each data stream (2 in case of QAM modulation, since 1 is not allowed), and creates as many data streams per UT as it has antennas.
+    It always allocates one bit per symbol to each data stream, and creates as many data streams per UT as it has antennas.
     """
 
     def compute(self, csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, P: RealArray) -> tuple[IntArray, IntArray]:
@@ -122,34 +120,10 @@ class NeutralBitAllocator(BitAllocator):
         Nr = csi.H_eff.shape[0] // K
         
         # Define the information bit rate for each data stream and the number of data streams for each UT.
-        ibr = np.ones(K * Nr, dtype=int) * (2 if self.c_type == "QAM" else 1)
+        ibr = np.ones(K * Nr, dtype=int)
         Ns = np.full(K, Nr, dtype=int)
         
         return ibr, Ns
 
 
-
 # POWER ALLOCATION
-
-class PowerDeallocator(ABC):
-
-    def execute(self, P_k: RealArray, z_k: ComplexArray) -> RealArray:
-        pass
-
-
-class PowerAllocator(ABC):
-
-    @abstractmethod
-    def compute(self, Pt: float, H_eff: ComplexArray, snr: int, K: int, Ns: int, Nt: int) -> RealArray:
-        raise NotImplementedError
-
-    def execute(self, P: RealArray, a: ComplexArray) -> RealArray:
-        a_p = np.diag(P) * a
-        return a_p
-
-
-class NeutralPowerAllocator(PowerAllocator):
-
-    def compute(self, Pt: float, H_eff: ComplexArray, snr: int, K: int, Ns: int, Nt: int) -> RealArray:
-        P = np.ones(K * Nt)
-        return P

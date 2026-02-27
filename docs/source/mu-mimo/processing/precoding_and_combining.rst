@@ -1,3 +1,3 @@
-Precoding and Componing Processing Components
+Precoding and Combining Processing Components
 ==============================================
 
