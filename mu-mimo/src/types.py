@@ -31,7 +31,7 @@ class ChannelStateInformation:
     snr : float
         The signal-to-noise ratio. (optional, default None)
     H_eff : ComplexArray, shape (K*Nr, Nt) or (Ns_total, Nt)
-        The effective channel matrix. (optional, default None)
+        The effective channel matrix. (optional, default None)\\
         In case of coordinated beamforming, the effective channel matrix equals the actual channel matrix.
         In case of non-coordinated beamforming, the effective channel matrix equals the the actual channel matrix followed by the compound combining matrix (G * H).
     """
@@ -195,13 +195,22 @@ class ConstConfig:
 
     Parameters
     ----------
-    types : list[ConstType]
-        The constellation types for the data streams to each UT.
-    sizes : int
-        The constellation sizes in bits, i.e. the number of bits per data symbol (point in the constellation), for the data streams to each UT.
+    types : list[ConstType], shape (K,)
+        The constellation types for the data streams to each UT. \\
+        (If the same constellation type is used for all UTs, this can also be provided as a single ConstType at the moment of initialization.)
+    sizes : IntArray, shape (K,) | None
+        The constellation sizes in bits, i.e. the number of bits per data symbol (point in the constellation), for the data streams to each UT. \\
+        If the same constellation size is used for all UTs, this can also be provided as a single int at the moment of initialization. \n
+        In case of adaptive bit allocation, the constellation sizes are not predetermined but will be calculated by the bit allocator. In that case, this can be set to None.
+    capacity_fractions : RealArray, shape (K,) | None
+        The fractions of channel capacities that are allocated to each UT. \\
+        If the same capacity fraction is allocated to all UTs, this can also be provided as a single float at the moment of initialization. \n
+        For adaptive bit allocation, the bit allocator computes the achievable rates (shannon capacity) for each stream of all UTs. Then it calculates the information bit rates for the data streams to each UT as the fraction of their achievable rates.\\
+        In case of fixed bit allocation, the information bit rates are predetermined. In that case, this can be set to None.
     """
     types: ConstType | list[ConstType]
     sizes: int | IntArray | None = None
+    capacity_fractions: float | RealArray | None = None
 
 
 @dataclass()
@@ -271,6 +280,11 @@ class SystemConfig:
 
     Parameters
     ----------
+    Pt : float
+        The total available transmit power (in Watt).
+    B : float
+        The system frequency bandwidth (in Hertz).
+
     K : int
         The number of user terminals.
     Nt : int
@@ -288,6 +302,9 @@ class SystemConfig:
     channel_configs : ChannelConfig
         The configuration settings of the channel.
     """
+
+    Pt: float
+    B: float
 
     K: int
     Nt: int
@@ -322,11 +339,19 @@ class SystemConfig:
                 raise ValueError("The number of different constellation types must match the number of user terminals.")
 
         if isinstance(self.c_configs.sizes, int):
-            self.c_configs.sizes = [self.c_configs.sizes] * self.K
-        else:
+            self.c_configs.sizes = np.array([self.c_configs.sizes] * self.K, dtype=int)
+        elif isinstance(self.c_configs.sizes, IntArray):
             if len(self.c_configs.sizes) != self.K:
                 raise ValueError("The number of different constellation sizes must match the number of user terminals.")
-
+        
+        if isinstance(self.c_configs.capacity_fractions, float):
+            self.c_configs.capacity_fractions = np.array([self.c_configs.capacity_fractions] * self.K, dtype=float)
+        elif isinstance(self.c_configs.capacity_fractions, RealArray):
+            if len(self.c_configs.capacity_fractions) != self.K:
+                raise ValueError("The number of different capacity fractions must match the number of user terminals.")
+            if np.all(self.c_configs.capacity_fractions >= 0) and np.all(self.c_configs.capacity_fractions <= 1):
+                raise ValueError("The capacity fractions must be between 0 and 1.")
+        
     def __eq__(self, other: object) -> bool:
         
         if not isinstance(other, SystemConfig):

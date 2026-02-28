@@ -21,7 +21,7 @@ class Constellation:
     type : ConstType
         The constellation type.
     size : int
-        The constellation size.
+        The constellation size (number of points in the constellation).
     points : ComplexArray, shape (size,)
         The constellation points.
     """
@@ -62,7 +62,7 @@ class NumberRepresentation:
     """
 
     @staticmethod
-    def binary_to_decimal(b: BitArray) -> IntArray:
+    def binary_to_decimal(b: BitArray) -> int:
         """
         Convert a binary number to its decimal representation.
 
@@ -73,10 +73,12 @@ class NumberRepresentation:
 
         Returns
         -------
-        d : IntArray, shape (N,)
+        d : int
             The corresponding decimal representation.
         """
-        raise NotImplementedError
+        powers = 1 << np.arange(b.size - 1, -1, -1, dtype=int)
+        d = int(b @ powers)
+        return d
 
     @staticmethod
     def decimal_to_binary(d: int) -> BitArray:
@@ -93,7 +95,11 @@ class NumberRepresentation:
         b : BitArray
             The corresponding binary representation.
         """
-        raise NotImplementedError
+        if d < 0: 
+            raise ValueError("The decimal input must be non-negative.")
+        
+        b = np.array(list(np.binary_repr(int(d))), dtype=int)
+        return b
 
     @staticmethod
     def gray_to_binary(g: BitArray) -> BitArray:
@@ -110,7 +116,8 @@ class NumberRepresentation:
         b : BitArray
             The corresponding binary representation.
         """
-        raise NotImplementedError
+        b =  np.bitwise_xor.accumulate(g).astype(int)
+        return b
 
     @staticmethod
     def binary_to_gray(b: BitArray) -> BitArray:
@@ -127,7 +134,15 @@ class NumberRepresentation:
         g : BitArray
             The corresponding Gray code representation.
         """
-        raise NotImplementedError
+        if b.size == 0: 
+            return np.array([], dtype=int)
+        
+        g = np.empty_like(b, dtype=int)
+        g[0] = b[0]
+        if b.size > 1:
+            g[1:] = np.bitwise_xor(b[:-1], b[1:])
+
+        return g
 
     @staticmethod
     def gray_to_decimal(g: BitArray) -> int:
@@ -144,7 +159,9 @@ class NumberRepresentation:
         d : int
             The corresponding decimal representation.
         """
-        raise NotImplementedError
+        b = NumberRepresentation.gray_to_binary(g)
+        d = NumberRepresentation.binary_to_decimal(b)
+        return d
 
     @staticmethod
     def decimal_to_gray(d: int) -> BitArray:
@@ -161,7 +178,9 @@ class NumberRepresentation:
         g : BitArray
             The corresponding Gray code representation.
         """
-        raise NotImplementedError
+        b = NumberRepresentation.decimal_to_binary(d)
+        g = NumberRepresentation.binary_to_gray(b)
+        return g
 
 
 # MAPPING & DEMAPPING
@@ -248,3 +267,14 @@ class NeutralDemapper(Demapper):
 class GrayCodeDemapper(Demapper):
     pass
 
+
+# DETECTION
+
+class Detector(ABC):
+    pass
+
+class NeutralDetector(Detector):
+    pass
+
+class MDetector(Detector):
+    pass

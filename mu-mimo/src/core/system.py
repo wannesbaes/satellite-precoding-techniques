@@ -385,15 +385,18 @@ class MuMimoSystem:
         Parameters
         ----------
         system_config: SystemConfig
-            The configuration of the MU-MIMO system. 
-            This includes the number of user terminals (UTs), the number of transmit antennas at the base station (BS), the number of receive antennas per UT. Also, it includes the configurations of the BS, UTs and channel.
+            The configuration of the MU-MIMO system.\\
+            This includes the total available transmit power, the system bandwidth, the number of user terminals (UTs), the number of transmit antennas at the base station (BS), the number of receive antennas per UT and the modulation constellation settings. Also, it includes the configurations of the BS, UTs and channel.
         """
 
+        Pt = system_config.Pt
+        B = system_config.B
+        
         K = system_config.K
         Nt = system_config.Nt
         Nr = system_config.Nr
 
-        self.bs = BaseStation(K, Nt, system_config.base_station_configs, system_config.c_configs)
+        self.bs = BaseStation(Pt, B, K, Nt, system_config.base_station_configs, system_config.c_configs)
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
 
@@ -482,22 +485,31 @@ class BaseStation:
     Represents the base station (BS) in a MU-MIMO downlink system.
     """
 
-    def __init__(self, K: int, Nt: int, configs: BaseStationConfig, c_configs: ConstConfig):
+    def __init__(self, Pt: float, B: float, K: int, Nt: int, configs: BaseStationConfig, c_configs: ConstConfig):
         """
         Initialize a base station.
 
         Parameters
         ----------
+        Pt : float
+            The total transmit power at the BS.
+        B : float
+            The bandwidth of the system.
+
         K: int
             The number of user terminals (UTs) in the system.
         Nt: int
             The number of transmit antennas at the BS.
+        
         configs: BaseStationConfig
             The configuration of the processing components (bit allocator, mapper, power allocator and precoder) in the BS.
         c_configs: ConstConfig
             The constellation configuration settings for each UT.
         """
 
+        self.Pt = Pt
+        self.B = B
+        
         self.K = K
         self.Nt = Nt
 
@@ -508,7 +520,7 @@ class BaseStation:
         self.precoder: Precoder = configs.precoder()
 
         # State.
-        self.c_configs = c_configs
+        self.c_configs: ConstConfig = c_configs
         self.state: BaseStationState | None = None
 
     def reset_state(self) -> None:
@@ -549,8 +561,8 @@ class BaseStation:
 
         # Compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR. In case of coordinated beamforming, also compute the combining matrices.
         F, G = self.precoder.compute(rx_fb_msg.csi)
-        P = self.power_allocator.compute(rx_fb_msg.csi, F, G)
-        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P, self.c_configs)
+        P = self.power_allocator.compute(rx_fb_msg.csi, F, G, self.Pt, B=self.B)
+        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P, self.c_configs, Pt=self.Pt, B=self.B)
 
         # Update the state of the BS to the current channel realization and SNR.
         self.state = BaseStationState(F=F, P=P, ibr=ibr, Ns=Ns, G=G)
