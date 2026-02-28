@@ -272,16 +272,16 @@ class Demapper(ABC):
     Demapper Abstract Base Class.
     """
 
-    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
         """
         Apply the demapper operation to the reconstructed symbol streams.
 
-        For each data stream of this user terminal, the demapper converts the reconstructed data symbol stream into a bitstream according to the used modulation scheme (constellation typpe and sizes).
+        For each data stream of this user terminal, the demapper converts the reconstructed data symbol stream into a bitstream, based to the used modulation scheme (constellation typpe and sizes) and the constellation point indices of the reconstructed data symbols.
 
         Parameters
         ----------
-        a_k_hat : ComplexArray, shape (Ns_k, num_symbols)
-            The reconstructed data symbol stream for this user terminal.
+        cpi_k_hat : IntArray, shape (Ns_k, num_symbols)
+            The indices of the constellation points (decimal integers) corresponding to the reconstructed data symbols, for each data stream of this user terminal.
         ibr_k : IntArray, shape (Ns_k,)
             The information bit rate for each data stream of this user terminal.
         c_type : ConstType
@@ -299,18 +299,18 @@ class NeutralDemapper(Demapper):
     Neutral Demapper.
 
     Acts as a 'neutral element' for demapping.\\
-    It simply converts the reconstructed data symbol stream into a bitstream by interpreting the symbols as bits, without applying any demodulation scheme. So in practice, the reconstructed data symbol stream passes through the demapper without any change. A requirement for this demapper is that the information bit rate equals one bit per symbol for each data stream (neutral bit allocation) and that the datasymbols are either 0 or 1 (neutral mapping).
+    It simply converts the constellation point indices into a bitstream by interpreting the indices of the constellation points as bits, without applying any demodulation scheme. So in practice, the constellation point indices pass through the demapper without any change.
     """
 
-    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
 
         if not np.all(ibr_k == 1):
             raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDemapper.")
         
-        if not np.all(np.isin(a_k_hat, [0, 1])):
+        if not np.all(np.isin(cpi_k_hat, [0, 1])):
             raise ValueError("The reconstructed data symbol stream must consist of symbols that are either 0 or 1 when using the NeutralDemapper.")
         
-        b_k_hat = [a_k_hat[s] for s in range(a_k_hat.shape[0])]
+        b_k_hat = [cpi_k_hat[s] for s in range(cpi_k_hat.shape[0])]
         return b_k_hat
 
 class GrayCodeDemapper(Demapper):
@@ -318,23 +318,17 @@ class GrayCodeDemapper(Demapper):
     Gray Code Demapper.
     """
 
-    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
 
         # Determine the number of data streams and the number of symbol vectors.
-        Ns = a_k_hat.shape[0]
-        num_symbols = a_k_hat.shape[1]
-
-        # Convert the constellation points to their decimal index number.
-        d = np.empty((Ns, num_symbols), dtype=int)
-        for s in range(Ns):
-            constellation_points = Constellation(type=c_type, size=2**ibr_k[s]).points
-            d[s] = np.argmin( np.abs(np.tile(constellation_points, (num_symbols, 1)) - a_k_hat[s][:, np.newaxis]), axis=1)
+        Ns_k = cpi_k_hat.shape[0]
+        num_symbols = cpi_k_hat.shape[1]
         
-        # Convert the decimal numbers to their Gray code representations.
-        b_k_hat = [np.empty(ibr_k[s]*num_symbols) for s in range(Ns)]
-        for s in range(Ns):
+        # Convert the decimal index numbers to their Gray code representations.
+        b_k_hat = [np.empty(ibr_k[s]*num_symbols) for s in range(Ns_k)]
+        for s in range(Ns_k):
             for i in range(num_symbols):
-                b_k_hat[s][i*ibr_k[s] : (i+1)*ibr_k[s]] = NumberRepresentation.decimal_to_gray(d[s, i], length=ibr_k[s])
+                b_k_hat[s][i*ibr_k[s] : (i+1)*ibr_k[s]] = NumberRepresentation.decimal_to_gray(cpi_k_hat[s, i], length=ibr_k[s])
         
         return b_k_hat
 
@@ -342,10 +336,65 @@ class GrayCodeDemapper(Demapper):
 # DETECTION
 
 class Detector(ABC):
-    pass
+    """
+    Detector Abstract Base Class.
+    """
+
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> IntArray:
+        """
+        Apply the detector operation to the decision variable streams.
+
+        For each data stream of this user terminal, the detector converts the decision variable stream into a stream of constellation point indices (decimal integers), based on the used modulation scheme. The indices correspond to the constellation points that are most likely transmitted by the base station.
+
+        The desicion of which constellation points that are most likely depends on the type of the detector and might be suboptimal for certain detector types.
+
+        Parameters
+        ----------
+        u_k : ComplexArray, shape (Ns_k, num_symbols)
+            The decision variable streams of this user terminal.
+        ibr_k : IntArray, shape (Ns_k,)
+            The information bit rate for each data stream of this user terminal.
+        c_type : ConstType
+            The constellation type for the data streams to this user terminal.
+        
+        Returns
+        -------
+        cpi_k_hat : IntArray, shape (Ns_k, num_symbols)
+            The indices of the constellation points (decimal integers) corresponding to the reconstructed data symbols, for each data stream of this user terminal.
+        """
+        raise NotImplementedError
 
 class NeutralDetector(Detector):
-    pass
+    """
+    Neutral Detector.
 
-class MDetector(Detector):
-    pass
+    Acts as a 'neutral element' for detection.\\
+    It simply converts the decision variable stream into a stream of constellation point indices by interpreting the decision variables as integers, without applying any detection scheme. So in practice, the decision variable streams pass through the detector without any change.
+    """
+
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> IntArray:
+
+        if not np.all(ibr_k == 1):
+            raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDetector.")
+        
+        cpi_k_hat = np.array(u_k, dtype=int)
+        return cpi_k_hat
+
+class MDDetector(Detector):
+    """
+    Minimum Distance Detector.
+    """
+    
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> IntArray:
+
+        # Determine the number of data streams and the number of symbol vectors.
+        Ns_k = u_k.shape[0]
+        num_symbols = u_k.shape[1]
+
+        # Decide the constellation points that are most likely transmitted by finding the constellation points that are closest to the decision variables. Then, retrieve the corresponding constellation point indices (decimal integers) of the decided constellation points.
+        cpi_k_hat = np.empty((Ns_k, num_symbols), dtype=int)
+        for s in range(Ns_k):
+            constellation_points = Constellation(type=c_type, size=2**ibr_k[s]).points
+            cpi_k_hat[s] = np.argmin( np.abs(np.tile(constellation_points, (num_symbols, 1)) - u_k[s][:, np.newaxis]), axis=1)
+
+        return cpi_k_hat
