@@ -31,6 +31,30 @@ After each realization, performance metrics are computed and stored for analysis
 This is illustrated in the :download:`sequence diagram </_static/mu-mimo/figures/sequence_diagram.png>`, in which the interactions between the different components become clear as well.
 
 
+Example Usage
+-------------
+
+.. code-block:: python
+
+   from mu_mimo.datatypes import SimConfig, SimResult
+   from mu_mimo.core.simulation_runner import SimulationRunner
+
+   # Define the simulation configuration settings
+   config = SimConfig(
+       num_users=4,
+       num_antennas=8,
+       snr_range=(0, 30),
+       num_realizations=100,
+       precoding_strategy='zf',
+       resource_allocation_strategy='round_robin',
+       channel_model='rayleigh'
+   )
+
+   # Create and run the simulation
+   runner = SimulationRunner(config)
+   results = runner.run()
+
+
 Documentation
 -------------
 

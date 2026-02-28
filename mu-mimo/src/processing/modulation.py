@@ -81,7 +81,7 @@ class NumberRepresentation:
         return d
 
     @staticmethod
-    def decimal_to_binary(d: int) -> BitArray:
+    def decimal_to_binary(d: int, length: int = None) -> BitArray:
         """
         Convert a decimal number to its binary representation.
 
@@ -89,6 +89,9 @@ class NumberRepresentation:
         ----------
         d : int
             The decimal number.
+        length : int, optional
+            The length of the binary representation.\\
+            If None, the length is the minimum required to represent the decimal number.
 
         Returns
         -------
@@ -98,7 +101,7 @@ class NumberRepresentation:
         if d < 0: 
             raise ValueError("The decimal input must be non-negative.")
         
-        b = np.array(list(np.binary_repr(int(d))), dtype=int)
+        b = np.array(list(np.binary_repr(int(d), width=length)), dtype=int)
         return b
 
     @staticmethod
@@ -164,7 +167,7 @@ class NumberRepresentation:
         return d
 
     @staticmethod
-    def decimal_to_gray(d: int) -> BitArray:
+    def decimal_to_gray(d: int, length: int = None) -> BitArray:
         """
         Convert a decimal number to its Gray code representation.
 
@@ -172,13 +175,16 @@ class NumberRepresentation:
         ----------
         d : int
             The decimal number.
+        length : int, optional
+            The length of the Gray code representation.\\
+            If None, the length is the minimum required to represent the decimal number.
 
         Returns
         -------
         g : BitArray
             The corresponding Gray code representation.
         """
-        b = NumberRepresentation.decimal_to_binary(d)
+        b = NumberRepresentation.decimal_to_binary(d, length=length)
         g = NumberRepresentation.binary_to_gray(b)
         return g
 
@@ -188,6 +194,9 @@ class NumberRepresentation:
 # Mapping.
 
 class Mapper(ABC):
+    """
+    Mapper Abstract Base Class.
+    """
 
     @abstractmethod
     def apply(self, b: list[BitArray], ibr: IntArray, c_types: list[ConstType], Ns: IntArray) -> ComplexArray:
@@ -218,7 +227,7 @@ class NeutralMapper(Mapper):
     """
     Neutral Mapper.
 
-    Acts as a 'neutral element' for mapping.
+    Acts as a 'neutral element' for mapping.\\
     It simply converts the bitstream into a data symbol stream by interpreting the bits as integers, without applying any modulation scheme. So in practice, the bitstreams pass through the mapper without any change. A requirement for this mapper is that the information bit rate equals one bit per symbol for each data stream (neutral bit allocation)!
     """
 
@@ -259,13 +268,75 @@ class GrayCodeMapper(Mapper):
 # Demapping.
 
 class Demapper(ABC):
-    pass
+    """
+    Demapper Abstract Base Class.
+    """
+
+    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+        """
+        Apply the demapper operation to the reconstructed symbol streams.
+
+        For each data stream of this user terminal, the demapper converts the reconstructed data symbol stream into a bitstream according to the used modulation scheme (constellation typpe and sizes).
+
+        Parameters
+        ----------
+        a_k_hat : ComplexArray, shape (Ns_k, num_symbols)
+            The reconstructed data symbol stream for this user terminal.
+        ibr_k : IntArray, shape (Ns_k,)
+            The information bit rate for each data stream of this user terminal.
+        c_type : ConstType
+            The constellation type for the data streams to this user terminal.
+        
+        Returns
+        -------
+        b_k_hat : BitArray, shape (Ns_k, ibr_k[s] * num_symbols)
+            The list of reconstructed bitstreams of this user terminal.
+        """
+        raise NotImplementedError
 
 class NeutralDemapper(Demapper):
-    pass
+    """
+    Neutral Demapper.
+
+    Acts as a 'neutral element' for demapping.\\
+    It simply converts the reconstructed data symbol stream into a bitstream by interpreting the symbols as bits, without applying any demodulation scheme. So in practice, the reconstructed data symbol stream passes through the demapper without any change. A requirement for this demapper is that the information bit rate equals one bit per symbol for each data stream (neutral bit allocation) and that the datasymbols are either 0 or 1 (neutral mapping).
+    """
+
+    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+
+        if not np.all(ibr_k == 1):
+            raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDemapper.")
+        
+        if not np.all(np.isin(a_k_hat, [0, 1])):
+            raise ValueError("The reconstructed data symbol stream must consist of symbols that are either 0 or 1 when using the NeutralDemapper.")
+        
+        b_k_hat = [a_k_hat[s] for s in range(a_k_hat.shape[0])]
+        return b_k_hat
 
 class GrayCodeDemapper(Demapper):
-    pass
+    """
+    Gray Code Demapper.
+    """
+
+    def apply(a_k_hat: ComplexArray, ibr_k: IntArray, c_type: ConstType) -> list[BitArray]:
+
+        # Determine the number of data streams and the number of symbol vectors.
+        Ns = a_k_hat.shape[0]
+        num_symbols = a_k_hat.shape[1]
+
+        # Convert the constellation points to their decimal index number.
+        d = np.empty((Ns, num_symbols), dtype=int)
+        for s in range(Ns):
+            constellation_points = Constellation(type=c_type, size=2**ibr_k[s]).points
+            d[s] = np.argmin( np.abs(np.tile(constellation_points, (num_symbols, 1)) - a_k_hat[s][:, np.newaxis]), axis=1)
+        
+        # Convert the decimal numbers to their Gray code representations.
+        b_k_hat = [np.empty(ibr_k[s]*num_symbols) for s in range(Ns)]
+        for s in range(Ns):
+            for i in range(num_symbols):
+                b_k_hat[s][i*ibr_k[s] : (i+1)*ibr_k[s]] = NumberRepresentation.decimal_to_gray(d[s, i], length=ibr_k[s])
+        
+        return b_k_hat
 
 
 # DETECTION

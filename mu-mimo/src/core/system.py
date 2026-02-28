@@ -932,8 +932,8 @@ class UserTerminal:
         
         z_k = self.combiner.apply(y_k, self.state.G_k)
         u_k = self.power_deallocator.apply(z_k, self.state.P_k)
-        a_hat_k = self.detector.apply(u_k, self.state.ibr_k)
-        b_hat_k = self.demapper.apply(a_hat_k, self.state.ibr_k)
-        rx_bits_list = self.bit_deallocator.apply(b_hat_k, self.state.ibr_k)
+        a_k_hat = self.detector.apply(u_k, self.state.ibr_k)
+        b_k_hat = self.demapper.apply(a_k_hat, self.state.ibr_k, self.state.c_type_k)
+        rx_bits_list = self.bit_deallocator.apply(b_k_hat, self.state.ibr_k)
         
         return rx_bits_list
