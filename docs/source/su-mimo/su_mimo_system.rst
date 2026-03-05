@@ -15,7 +15,7 @@ It consists of a :doc:`transmitter <transmitter>` component, a :doc:`channel <ch
 Documentation
 -------------
 
-.. autoclass:: su_mimo.SuMimoSVD
+.. autoclass:: su_mimo_svd.SuMimoSVD
    :members:
    :undoc-members:
    :show-inheritance:
