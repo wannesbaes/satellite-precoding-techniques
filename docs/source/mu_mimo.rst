@@ -1,14 +1,13 @@
 MU-MIMO
 =======
 
-This module provides a simulation framework for multi-user MIMO digital communication systems,
-designed to evaluate and compare different precoding strategies and channel models in a structured way.
+This module provides a simulation framework for multi-user MIMO digital communication systems, designed to evaluate and compare different precoding strategies and channel models in a structured way.
 
 
 Model Architecture
 ------------------
 
-The simulation is built around a modular class hierarchy that separates the core system components from the interchangeable processing algorithms. The :doc:`simulation runner <mu-mimo/core/simulation_runner>` orchestrates the simulation loop, driving a :doc:`MU-MIMO system <mu-mimo/core/mu_mimo_system>` that encapsulates a :doc:`base station (BS) <mu-mimo/core/base_station>`, a set of :doc:`user terminal (UT) <mu-mimo/core/user_terminal>` instances, and a :doc:`channel <mu-mimo/core/channel>`.
+The simulation is built around a modular class hierarchy that separates the core system components from the interchangeable processing algorithms. The :doc:`simulation runner <mu_mimo/core/simulation_runner>` orchestrates the simulation loop, driving a :doc:`MU-MIMO system <mu_mimo/core/mu_mimo_system>` that encapsulates a :doc:`base station (BS) <mu_mimo/core/base_station>`, a set of :doc:`user terminal (UT) <mu_mimo/core/user_terminal>` instances, and a :doc:`channel <mu_mimo/core/channel>`.
 Each core component delegates its signal processing to abstract processing classes, which can be swapped out independently to test different algorithms, as shown in the class diagram below.
 
 .. figure:: /_static/mu-mimo/figures/class_diagram.png
@@ -36,8 +35,7 @@ Example Usage
 
 .. code-block:: python
 
-   from mu_mimo.datatypes import SystemConfig, SimConfig, SimResult
-   from mu_mimo.core.simulation_runner import SimulationRunner
+   from mu_mimo import *
 
    # Define the system configuration settings
    system_configs = SystemConfig(
@@ -65,13 +63,13 @@ Core Components
 .. toctree::
    :maxdepth: 1
 
-   mu-mimo/core/simulation_runner.rst
-   mu-mimo/core/datatypes.rst
+   mu_mimo/core/base_station.rst
+   mu_mimo/core/channel.rst
+   mu_mimo/core/user_terminal.rst
+   mu_mimo/core/mu_mimo_system.rst
 
-   mu-mimo/core/mu_mimo_system.rst
-   mu-mimo/core/base_station.rst
-   mu-mimo/core/user_terminal.rst
-   mu-mimo/core/channel.rst
+   mu_mimo/core/simulation_runner.rst
+   mu_mimo/core/datatypes.rst
 
 
 Processing Components
@@ -80,7 +78,7 @@ Processing Components
 .. toctree::
    :maxdepth: 1
    
-   mu-mimo/processing/precoding_and_combining.rst
-   mu-mimo/processing/resource_allocation.rst
-   mu-mimo/processing/channel.rst
-   mu-mimo/processing/modulation_and_detection.rst
+   mu_mimo/processing/precoding_and_combining.rst
+   mu_mimo/processing/modulation_and_detection.rst
+   mu_mimo/processing/channel.rst
+   mu_mimo/processing/bit_loading.rst

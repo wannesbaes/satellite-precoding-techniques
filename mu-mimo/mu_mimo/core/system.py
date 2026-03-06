@@ -575,6 +575,7 @@ class BaseStation:
         Simulate the transmit processing chain of the BS to obtain the transmitted signal x.
 
         The processing chain consists of the following steps:
+
         1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted M.
         2. Mapping - convert the bitstreams b_s to the corresponding data symbol streams a_s based on the modulation scheme (determined by the information bit rates ibr).
         3. Precoding - apply the precoding matrix F to the symbol streams a_s to obtain the transmitted signal x.
@@ -758,6 +759,7 @@ class Channel:
         Simulate the signal propagation through the channel of the transmitted signal x to obtain the received signal y.
 
         The channel propagation consists of the following steps:
+        
         1. Apply the channel matrix H to the transmitted signal x to obtain the noiseless received signal y_noiseless.
         2. Generate the noise samples according to the specified noise model.
         3. Add the noise to the noiseless received signal y_noiseless to obtain the actual received signal y.
@@ -895,6 +897,7 @@ class UserTerminal:
         Simulate the receive processing chain of the UT on the received signal y_k to obtain the estimated bitstreams b_k_s_hat. 
         
         The processing chain consists of the following steps:
+        
         1. Combining - apply the combining matrix G_k to the received signal y_k to obtain the scaled decision variables z_k_s
         2. Equalization - apply the equalization coefficients C_eq_k to the scaled decision variables z_k_s to obtain the decision variables u_k_s
         3. Detection - estimate the transmitted symbol streams a_k_s based on the decision variables u_k_s

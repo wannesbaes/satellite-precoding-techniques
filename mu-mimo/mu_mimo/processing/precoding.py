@@ -129,7 +129,7 @@ class ZFPrecoder(Precoder):
     
     @staticmethod
     def _equalization_coefficients(H_eff: ComplexArray, F: ComplexArray, P: ComplexArray) -> ComplexArray:
-        """
+        r"""
         Compute the equalization coefficients for each data stream.
 
         .. math::
@@ -154,7 +154,7 @@ class ZFPrecoder(Precoder):
     
     @staticmethod
     def _waterfilling_v1(gamma, pt):
-        """
+        r"""
         Waterfilling algorithm.
 
         This function implements the waterfilling algorithm to find the optimal power allocation across N transmission streams, given the channel-to-noise ratio (CNR) coefficients `gamma` and the total available transmit power `pt`.

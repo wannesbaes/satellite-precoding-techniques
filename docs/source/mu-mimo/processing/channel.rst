@@ -1,2 +1,0 @@
-Channel Processing Components
-=============================

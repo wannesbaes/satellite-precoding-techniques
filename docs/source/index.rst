@@ -8,5 +8,5 @@ Welcome to the code documentation of my thesis about Satellite Precoding Techniq
    :caption: Modules
    :titlesonly:
 
-   su-mimo
-   mu-mimo
+   su_mimo
+   mu_mimo

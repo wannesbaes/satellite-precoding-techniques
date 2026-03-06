@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from datetime import datetime
 
-import transmitter as tx
-import channel as ch
-import receiver as rx
+from . import transmitter as tx
+from . import channel as ch
+from . import receiver as rx
 
 
 class SuMimoSVD:

@@ -25,7 +25,7 @@ When the receiver is called and given a received input signal y, it performs the
 Documentation
 -------------
 
-.. autoclass:: receiver.Receiver
+.. autoclass:: su_mimo.receiver.Receiver
    :members:
    :undoc-members:
    :show-inheritance:

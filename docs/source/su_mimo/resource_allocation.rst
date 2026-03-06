@@ -13,11 +13,11 @@ Documentation
    :toctree: ../_autosummary/resource_allocation/
    :nosignatures:
 
-   ~resource_allocation.resource_allocation.waterfilling_v1
-   ~resource_allocation.resource_allocation.equal_power_allocation
-   ~resource_allocation.resource_allocation.eigenbeamforming
-   ~resource_allocation.resource_allocation.plot_waterfilling
-   ~resource_allocation.resource_allocation.demo_waterfilling
-   ~resource_allocation.resource_allocation.adaptive_bit_allocation
-   ~resource_allocation.resource_allocation.plot_adaptive_bit_allocation
-   ~resource_allocation.resource_allocation.demo_adaptive_bit_allocation
+   ~su_mimo.resource_allocation.resource_allocation.waterfilling_v1
+   ~su_mimo.resource_allocation.resource_allocation.equal_power_allocation
+   ~su_mimo.resource_allocation.resource_allocation.eigenbeamforming
+   ~su_mimo.resource_allocation.resource_allocation.plot_waterfilling
+   ~su_mimo.resource_allocation.resource_allocation.demo_waterfilling
+   ~su_mimo.resource_allocation.resource_allocation.adaptive_bit_allocation
+   ~su_mimo.resource_allocation.resource_allocation.plot_adaptive_bit_allocation
+   ~su_mimo.resource_allocation.resource_allocation.demo_adaptive_bit_allocation

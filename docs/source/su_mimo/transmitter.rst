@@ -24,7 +24,7 @@ When the transmitter is called and given an input bit sequence, it performs the 
 Documentation
 -------------
 
-.. autoclass:: transmitter.Transmitter
+.. autoclass:: su_mimo.transmitter.Transmitter
    :members:
    :undoc-members:
    :show-inheritance:

@@ -9,5 +9,6 @@ from .su_mimo_svd import SuMimoSVD
 from .transmitter import Transmitter
 from .channel import Channel
 from .receiver import Receiver
+from .resource_allocation import resource_allocation
 
-__all__ = [ "Transmitter", "Receiver", "Channel", "SuMimoSVD" ]
+__all__ = [ "Transmitter", "Receiver", "Channel", "SuMimoSVD", "resource_allocation" ]

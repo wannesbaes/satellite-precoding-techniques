@@ -10,8 +10,8 @@ The implementation is designed to simulate the performance for different system 
    :maxdepth: 1
    :caption: Components:
    
-   su-mimo/transmitter
-   su-mimo/channel
-   su-mimo/receiver
-   su-mimo/resource_allocation
-   su-mimo/su_mimo_system
+   su_mimo/su_mimo_system
+   su_mimo/transmitter
+   su_mimo/channel
+   su_mimo/receiver
+   su_mimo/resource_allocation

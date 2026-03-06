@@ -24,7 +24,7 @@ When the channel is called and given a transmitted signal, it performs the follo
 Documentation
 -------------
 
-.. autoclass:: channel.Channel
+.. autoclass:: su_mimo.channel.Channel
    :members:
    :undoc-members:
    :show-inheritance:

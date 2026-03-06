@@ -1,5 +1,5 @@
 """
-Resource allocation package for SU-MIMO.
+resource_allocation package.
 """
 
 from . import resource_allocation as resource_allocation

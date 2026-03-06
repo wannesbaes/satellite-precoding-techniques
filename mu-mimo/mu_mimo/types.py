@@ -5,6 +5,12 @@ import numpy as np
 from numpy.typing import NDArray
 from pathlib import Path
 from typing import Literal, Type, TYPE_CHECKING
+
+# from .base_types import (
+#     RealArray, ComplexArray, IntArray, BitArray, ConstType,
+#     ChannelStateInformation, ConstConfig,
+# )
+
 if TYPE_CHECKING:
     from .processing import (
         BitLoader, Mapper, Precoder,
@@ -12,12 +18,11 @@ if TYPE_CHECKING:
         Combiner, Equalizer, Detector, Demapper
     )
 
-
-RealArray = NDArray[np.floating]
+RealArray    = NDArray[np.floating]
 ComplexArray = NDArray[np.complexfloating]
-IntArray = NDArray[np.integer]
-BitArray = NDArray[np.integer]
-ConstType = Literal["PAM", "PSK", "QAM"]
+IntArray     = NDArray[np.integer]
+BitArray     = NDArray[np.integer]
+ConstType    = Literal["PAM", "PSK", "QAM"]
 
 
 @dataclass()
@@ -528,9 +533,6 @@ class SimResult:
 __all__ = [
     "RealArray", "ComplexArray", "IntArray", "BitArray", "ConstType",
     "ChannelStateInformation", "ConstConfig",
-    "BitLoader", "Mapper", "Precoder",
-    "ChannelModel", "NoiseModel",
-    "Combiner", "Equalizer", "Detector", "Demapper",
     "BaseStationState", "UserTerminalState",
     "TransmitPilotMessage", "ReceivePilotMessage",
     "TransmitFeedbackMessage", "ReceiveFeedbackMessage",
