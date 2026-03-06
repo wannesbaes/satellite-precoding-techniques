@@ -1,4 +1,4 @@
-# mu-mimo/src/processing/combining.py
+# mu-mimo/mu_mimo/processing/combining.py
 
 from __future__ import annotations
 from abc import ABC, abstractmethod

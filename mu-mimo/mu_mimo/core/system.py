@@ -1,4 +1,4 @@
-# mu-mimo/src/core/system.py
+# mu-mimo/mu_mimo/core/system.py
 
 from __future__ import annotations
 import numpy as np

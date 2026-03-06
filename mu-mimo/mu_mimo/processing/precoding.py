@@ -1,4 +1,4 @@
-# mu-mimo/src/processing/precoding.py
+# mu-mimo/mu_mimo/processing/precoding.py
 
 from __future__ import annotations
 from abc import ABC, abstractmethod

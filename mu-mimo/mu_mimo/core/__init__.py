@@ -1,5 +1,5 @@
 """
-core package
+mu_mimo.core package
 
 @author Wannes Baes
 @date 2026

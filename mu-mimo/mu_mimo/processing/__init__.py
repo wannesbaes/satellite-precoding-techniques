@@ -1,5 +1,5 @@
 """
-processing package
+mu_mimo.processing package
 
 @author Wannes Baes
 @date 2026

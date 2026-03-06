@@ -37,7 +37,7 @@ from matplotlib.collections import LineCollection
 import itertools
 import datetime
 
-from src import *
+from su_mimo import *
 
 
 ### HELPER FUNCTIONS ###

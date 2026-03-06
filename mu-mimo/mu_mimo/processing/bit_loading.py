@@ -1,4 +1,4 @@
-# mu-mimo/src/processing/bit_loading.py
+# mu-mimo/mu_mimo/processing/bit_loading.py
 
 from __future__ import annotations
 from abc import ABC, abstractmethod

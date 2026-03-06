@@ -28,4 +28,4 @@ docs/build/
 # Simulation results: data folders.
 su-mimo/report/plots/simulation_results/
 su-mimo/report/plots/analytical_results/
-su-mimo/src/resource_allocation/eigenchannel_gains/stats/
+su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/

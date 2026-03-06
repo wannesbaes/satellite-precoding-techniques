@@ -1,4 +1,4 @@
-# mu-mimo/src/processing/channel.py
+# mu-mimo/mu_mimo/processing/channel.py
 
 from __future__ import annotations
 from abc import ABC, abstractmethod

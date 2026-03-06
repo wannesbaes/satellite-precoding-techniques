@@ -1,4 +1,4 @@
-# mu-mimo/src/types.py
+# mu-mimo/mu_mimo/types.py
 
 from dataclasses import dataclass, field
 import numpy as np
