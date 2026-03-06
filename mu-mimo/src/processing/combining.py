@@ -6,29 +6,79 @@ import numpy as np
 from ..types import (ComplexArray, RealArray, IntArray, BitArray)
 
 
-
 class Combiner(ABC):
+    """
+    The Combiner Abstract Base Class (ABC).
 
+    This class is responsible for implementing a combining strategy and effectively combining the received signals in each user terminal.
+    """
+
+    @staticmethod 
     @abstractmethod
-    def compute(self, H_k: ComplexArray, Ns: int, Nr: int) -> ComplexArray:
+    def compute(H_k: ComplexArray) -> ComplexArray:
+        """
+        Compute the combining matrix for a given user terminal.
+
+        In case of coordinated beamforming, the combiner matrix is computed in the BS and sent to the user terminal. Then, the identity matrix is returned by this method. 
+
+        Parameters
+        ----------
+        H_k : ComplexArray, shape (Nr, Nt)
+            The channel matrix for the this UT.
+
+        Returns
+        -------
+        G_k : ComplexArray, shape (Nr, Nr)
+            The computed combining matrix for the this UT.
+        """
         raise NotImplementedError
 
-    def execute(self, G_k: ComplexArray, y_k: ComplexArray) -> ComplexArray:
-        z_k = G_k @ y_k
+    @staticmethod
+    def apply(y_k: ComplexArray, G_k: ComplexArray,  Ns_k: int) -> ComplexArray:
+        """
+        Apply the combining matrix to the received signal.
+
+        Parameters
+        ----------
+        y_k : ComplexArray, shape (Nr, M)
+            The received signal for the this UT.
+        G_k : ComplexArray, shape (Nr, Nr)
+            The combining matrix for the this UT.
+        Ns_k : int
+            The number of data streams for the this UT.
+
+        Returns
+        -------
+        z_k : ComplexArray, shape (Ns_k, M)
+            The combined signal for the this UT.
+        """
+        z_k = G_k[:Ns_k, :] @ y_k
         return z_k
 
-
-
 class NeutralCombiner(Combiner):
+    """
+    Neutral Combiner.
 
-    def compute(self, H_k: ComplexArray, Ns: int, Nr: int) -> ComplexArray:
-        G_k = np.eye(Ns, Nr)
+    This combiner acts as a 'neutral element' for combining.\\
+    It does not perform any combining and simply passes the received signal through without any modification. 
+    """
+
+    @staticmethod
+    def compute(H_k: ComplexArray) -> ComplexArray:
+        Nr = H_k.shape[0]
+        G_k = np.eye(Nr, Nr)
         return G_k
 
+class LSVCombiner(Combiner):
+    """
+    Left Singular Vector (LSV) Combiner.
 
-class RSVCombiner(Combiner):
-    pass
+    The rows of the combining matrix are computed as the conjugate-transposed left singular vectors of the channel matrix H_k. The order of the singular vectors is determined by the descending order of the corresponding singular values. In that way, the strongest singular modes of the channel are used when effectively applying the combining matrix to the Ns_k data streams.
+    """
+    
+    @staticmethod
+    def compute(H_k: ComplexArray) -> ComplexArray:
+        U, _, _ = np.linalg.svd(H_k)
+        G_k = U.conj().T
+        return G_k
 
-
-class WMMSECombiner(Combiner):
-    pass

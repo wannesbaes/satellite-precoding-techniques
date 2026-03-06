@@ -37,10 +37,7 @@ from matplotlib.collections import LineCollection
 import itertools
 import datetime
 
-from src.su_mimo import SuMimoSVD
-from src.transmitter import Transmitter
-from src.channel import Channel
-from src.receiver import Receiver
+from src import *
 
 
 ### HELPER FUNCTIONS ###

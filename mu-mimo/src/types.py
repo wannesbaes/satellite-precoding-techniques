@@ -4,14 +4,13 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 from pathlib import Path
-from typing import Literal
-from .processing import (
-    Precoder, Combiner,
-    PowerAllocator, PowerDeallocator,
-    BitAllocator, BitDeallocator,
-    Mapper, Demapper,
-    Detector,
-    ChannelModel, NoiseModel )
+from typing import Literal, Type, TYPE_CHECKING
+if TYPE_CHECKING:
+    from .processing import (
+        BitLoader, Mapper, Precoder,
+        ChannelModel, NoiseModel,
+        Combiner, Equalizer, Detector, Demapper
+    )
 
 
 RealArray = NDArray[np.floating]
@@ -46,19 +45,19 @@ class BaseStationState:
 
     Parameters
     ----------
-    F : ComplexArray, shape (Nt, Ns_total) (Ns_total = sum of the number of data streams across all UTs)
+    F : ComplexArray, shape (Nt, K*Nr)
         The compound precoding matrix.
-    P : RealArray, shape (Ns_total,)
-        The power allocation vector. It contains the power allocated to each data stream of each UT.
-    ibr : IntArray, shape (K, Nr)
+    C_eq : ComplexArray, shape (K*Nr,)
+        The equalization coefficients for each data stream.
+    ibr : IntArray, shape (K*Nr,)
         The information bit rates for each data stream of each UT.
     Ns : IntArray, shape (K,)
         The number of data streams for each UT.
-    G : ComplexArray, shape (Ns_total, K * Nr)
+    G : ComplexArray, shape (K*Nr, K*Nr)
         The compound combining matrix.
     """
     F: ComplexArray
-    P: RealArray
+    C_eq: ComplexArray
     ibr: IntArray
     Ns: IntArray
     G: ComplexArray
@@ -72,13 +71,13 @@ class UserTerminalState:
     ----------
     H_k : ComplexArray, shape (Nr, Nt)
         The channel matrix of this UT.
-    G_k : ComplexArray, shape (Ns_k, Nr)
+    G_k : ComplexArray, shape (Nr, Nr)
         The combining matrix of this UT.
     c_type_k : ConstType
         The constellation type for the data streams to this UT.
-    P_k : RealArray, shape (Ns_k,)
-        The power allocation vector of this UT.
-    ibr_k : IntArray, shape (Ns_k,)
+    C_eq_k : ComplexArray, shape (Nr,)
+        The equalization coefficients for each data stream of this UT.
+    ibr_k : IntArray, shape (Nr,)
         The information bit rates for each data stream of this UT.
     Ns_k : int
         The number of data streams for this UT.
@@ -86,7 +85,7 @@ class UserTerminalState:
     H_k: ComplexArray
     G_k: ComplexArray
     c_type_k: ConstType | None
-    P_k: RealArray | None
+    C_eq_k: ComplexArray | None
     ibr_k: IntArray | None
     Ns_k: int | None
 
@@ -118,7 +117,7 @@ class TransmitFeedbackMessage:
     ----------
     ut_id : int
         The ID of the UT that transmits this feedback message.
-    H_eff_k : ComplexArray, shape (Nr, Nt) or (Ns_k, Nt)
+    H_eff_k : ComplexArray, shape (Nr, Nt)
         The effective channel matrix of this UT.
     """
     ut_id: int
@@ -145,17 +144,17 @@ class TransmitFeedforwardMessage:
     ----------
     c_type : list[ConstType]
         The constellation types for the data streams to each UT.
-    P : RealArray, shape (Ns_total,)
-        The power allocation vector. It contains the power allocated to each data stream of each UT.
-    ibr : IntArray, shape (Ns_total,)
+    C_eq : ComplexArray, shape (K*Nr,)
+        The equalization coefficients for each data stream of each UT.
+    ibr : IntArray, shape (K*Nr,)
         The information bit rates for each data stream of each UT.
     Ns : IntArray, shape (K,)
         The number of data streams for each UT.
-    G : ComplexArray, shape (Ns_total, K * Nr)
+    G : ComplexArray, shape (K*Nr, K*Nr)
         The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
     c_type: list[ConstType]
-    P: RealArray
+    C_eq: ComplexArray
     ibr: IntArray
     Ns: IntArray
     G: ComplexArray | None
@@ -171,18 +170,18 @@ class ReceiveFeedforwardMessage:
         The ID of the UT that receives this feedforward message.
     c_type_k : ConstType
         The constellation type for the data streams to this UT.
-    P_k : RealArray, shape (Ns_k,)
-        The power allocation vector of this UT.
-    ibr_k : IntArray, shape (Ns_k,)
+    C_eq_k : ComplexArray, shape (Nr,)
+        The equalization coefficients for each data stream of this UT.
+    ibr_k : IntArray, shape (Nr,)
         The information bit rates for each data stream of this UT.
     Ns_k : int
         The number of data streams for this UT.
-    G_k : ComplexArray, shape (Ns_k, Nr)
+    G_k : ComplexArray, shape (Nr, Nr)
         The combining matrix of this UT. It is None in case of non-coordinated beamforming.
     """
     ut_id: int
     c_type_k: ConstType
-    P_k: RealArray
+    C_eq_k: ComplexArray
     ibr_k: IntArray
     Ns_k: int
     G_k: ComplexArray | None
@@ -212,6 +211,17 @@ class ConstConfig:
     sizes: int | IntArray | None = None
     capacity_fractions: float | RealArray | None = None
 
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, ConstConfig):
+            return NotImplemented
+        
+        return (
+            self.types == other.types and
+            np.array_equal(self.sizes, other.sizes) and
+            np.array_equal(self.capacity_fractions, other.capacity_fractions)
+        )
+
 
 @dataclass()
 class BaseStationConfig:
@@ -220,19 +230,16 @@ class BaseStationConfig:
 
     Parameters
     ----------
-    bit_allocator : type[BitAllocator]
-        The type of the bit allocator (the concrete bit allocator class).
+    bit_loader : type[BitLoader]
+        The type of the bit loader (the concrete bit loader class).
     mapper : type[Mapper]
         The type of the mapper (the concrete mapper class).
-    power_allocator : type[PowerAllocator]
-        The type of the power allocator (the concrete power allocator class).
     precoder : type[Precoder]
         The type of the precoder (the concrete precoder class).
     """
-    bit_allocator: type[BitAllocator]
-    mapper: type[Mapper]
-    power_allocator: type[PowerAllocator]
-    precoder: type[Precoder]
+    bit_loader: type["BitLoader"]
+    mapper: type["Mapper"]
+    precoder: type["Precoder"]
 
 @dataclass()
 class UserTerminalConfig:
@@ -243,20 +250,17 @@ class UserTerminalConfig:
     ----------
     combiner : type[Combiner]
         The type of the combiner (the concrete combiner class).
-    power_deallocator : type[PowerDeallocator]
-        The type of the power deallocator (the concrete power deallocator class).
+    equalizer : type[Equalizer]
+        The type of the equalizer (the concrete equalizer class).
     detector : type[Detector]
         The type of the detector (the concrete detector class).
     demapper : type[Demapper]
         The type of the demapper (the concrete demapper class).
-    bit_deallocator : type[BitDeallocator]
-        The type of the bit deallocator (the concrete bit deallocator class).
     """
-    combiner: type[Combiner]
-    power_deallocator: type[PowerDeallocator]
-    detector: type[Detector]
-    demapper: type[Demapper]
-    bit_deallocator: type[BitDeallocator]
+    combiner: type["Combiner"]
+    equalizer: type["Equalizer"]
+    detector: type["Detector"]
+    demapper: type["Demapper"]
 
 @dataclass()
 class ChannelConfig:
@@ -270,8 +274,8 @@ class ChannelConfig:
     noise_model : type[NoiseModel]
         The type of the noise model (the concrete noise model class).
     """
-    channel_model: type[ChannelModel]
-    noise_model: type[NoiseModel]
+    channel_model: type["ChannelModel"]
+    noise_model: type["NoiseModel"]
 
 @dataclass()
 class SystemConfig:
@@ -319,48 +323,45 @@ class SystemConfig:
 
     def __post_init__(self):
 
-        # Validate the number of user terminals, transmit antennas, receive antennas, and data streams.
+        # Validate dimensions.
         if self.K <= 0: raise ValueError("The number of UTs must be a positive integer.")
         if self.Nt <= 0: raise ValueError("The number of transmit antennas must be a positive integer.")
         if self.Nr <= 0: raise ValueError("The number of receive antennas per UT must be a positive integer.")
-        if self.K * self.Nr > self.Nt: raise ValueError("We assume that the base station has at least as many transmit antennas as the total number of receive antennas across all UTs.")
-        
-        # Validate the types of the processing components in the BS and UT configurations.
-        for k in range(self.K):
-            if self.user_terminal_configs[k].demapper is not self.base_station_configs.mapper.demapper_class: raise ValueError("Mapper and demapper do not match.")
-            if self.user_terminal_configs[k].combiner is not self.base_station_configs.precoder.combiner_class: raise ValueError("Precoder and combiner do not match.")
-            if self.base_station_configs.power_allocator is not self.base_station_configs.precoder.power_allocator_class: raise ValueError("This power allocator is not compatible with the precoder.")
-        
-        # Validate the constellation configuration settings.
-        if isinstance(self.c_configs.types, ConstType):
-            self.c_configs.types = [self.c_configs.types] * self.K
-        else:
-            if len(self.c_configs.types) != self.K:
-                raise ValueError("The number of different constellation types must match the number of user terminals.")
+        if self.K * self.Nr > self.Nt: raise ValueError("The BS must have at least as many transmit antennas as the total number of receive antennas across all UTs.")
 
+        # Validate constellation types.
+        if isinstance(self.c_configs.types, str):
+            self.c_configs.types = [self.c_configs.types] * self.K
+        elif len(self.c_configs.types) != self.K:
+            raise ValueError("The number of constellation types must match K.")
+
+        # Validate constellation sizes.
         if isinstance(self.c_configs.sizes, int):
             self.c_configs.sizes = np.array([self.c_configs.sizes] * self.K, dtype=int)
-        elif isinstance(self.c_configs.sizes, IntArray):
-            if len(self.c_configs.sizes) != self.K:
-                raise ValueError("The number of different constellation sizes must match the number of user terminals.")
-        
-        if isinstance(self.c_configs.capacity_fractions, float):
+        elif isinstance(self.c_configs.sizes, np.ndarray) and len(self.c_configs.sizes) != self.K:
+            raise ValueError("The number of constellation sizes must match K.")
+
+        # Validate capacity fractions.
+        if isinstance(self.c_configs.capacity_fractions, (int, float)):
             self.c_configs.capacity_fractions = np.array([self.c_configs.capacity_fractions] * self.K, dtype=float)
-        elif isinstance(self.c_configs.capacity_fractions, RealArray):
+        elif isinstance(self.c_configs.capacity_fractions, np.ndarray):
             if len(self.c_configs.capacity_fractions) != self.K:
-                raise ValueError("The number of different capacity fractions must match the number of user terminals.")
-            if np.all(self.c_configs.capacity_fractions >= 0) and np.all(self.c_configs.capacity_fractions <= 1):
-                raise ValueError("The capacity fractions must be between 0 and 1.")
+                raise ValueError("The number of capacity fractions must match K.")
+            if not (np.all(self.c_configs.capacity_fractions >= 0) and np.all(self.c_configs.capacity_fractions <= 1)):
+                raise ValueError("Capacity fractions must be between 0 and 1.")
         
     def __eq__(self, other: object) -> bool:
-        
+    
         if not isinstance(other, SystemConfig):
             return NotImplemented
         
         return (
+            self.Pt == other.Pt and
+            self.B == other.B and
             self.K == other.K and
             self.Nt == other.Nt and
             self.Nr == other.Nr and
+            self.c_configs == other.c_configs and
             self.base_station_configs == other.base_station_configs and
             self.user_terminal_configs == other.user_terminal_configs and
             self.channel_configs == other.channel_configs
@@ -384,15 +385,15 @@ class SimConfig:
         The minimum number of bit errors per SNR value.
     num_bit_errors_scope : Literal["system-wide", "uts", "streams"]
         The scope over which the minimum number of bit errors are considered.
-    num_symbols : int
-        The number of symbol vectors that are sent at once (per channel realization).
+    M : int
+        The number of symbol vector transmissions for each channel realization.
     """
 
     snr_dB_values: RealArray = field(default_factory=lambda: np.arange(-5, 31, 2.5))
     num_channel_realizations: int = 200
     num_bit_errors: int = 250
     num_bit_errors_scope: Literal["system-wide", "uts", "streams"] = "uts"
-    num_symbols: int = 4800
+    M: int = 4800
 
     @property
     def snr_values(self) -> RealArray:
@@ -401,7 +402,7 @@ class SimConfig:
     def __post_init__(self):
         if self.num_channel_realizations <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
         if self.num_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
-        if self.num_symbols <= 0: raise ValueError("The minimum number of symbol vectors that are sent per channel realization must be a positive integer.")
+        if self.M <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization must be a positive integer.")
 
     def __eq__(self, other: object) -> bool:
         
@@ -413,7 +414,7 @@ class SimConfig:
             self.num_channel_realizations == other.num_channel_realizations and
             self.num_bit_errors == other.num_bit_errors and
             self.num_bit_errors_scope == other.num_bit_errors_scope and
-            self.num_symbols == other.num_symbols
+            self.M == other.M
         )
 
 @dataclass
@@ -430,11 +431,11 @@ class SingleSnrSimResult:
     stream_ars : list[BitArray] (list of K arrays, each shape (Nr,))
         Per-UT per-stream stream activation rates (1 if the stream is active, 0 otherwise).
     
-    ut_ibrs : IntArray (array of shape (K,))
+    ut_ibrs : IntArray, shape (K,)
         Per-UT information bit rates.
-    ut_becs : RealArray (array of shape (K,))
+    ut_becs : RealArray, shape (K,)
         Per-UT bit error counts.
-    ut_ars : BitArray (array of shape (K,))
+    ut_ars : BitArray, shape (K,)
         Per-UT UT activation rates (1 if the UT is active, 0 otherwise).
     
     ibr : float
@@ -447,14 +448,14 @@ class SingleSnrSimResult:
     ut_ars_avg : float
         Average UT activation rate.
     
-    num_symbols : int
-        The number of symbol vectors that were sent per channel realization.
+    M : int
+        The number of symbol vector transmissions for each channel realization.
     num_channel_realizations : int
         The number of channel realizations that were simulated.
     
-    stream_bers : list[RealArray] | None
+    stream_bers : list[RealArray] (list of K arrays, each shape (Nr,)) | None
         Per-UT per-stream bit error rates. None if num_channel_realizations == 1.
-    ut_bers : RealArray | None
+    ut_bers : RealArray, shape (K,) | None
         Per-UT bit error rates. None if num_channel_realizations == 1.
     ber : float | None
         System-wide bit error rate. None if num_channel_realizations == 1.
@@ -474,7 +475,7 @@ class SingleSnrSimResult:
     stream_ars_avg : float
     ut_ars_avg : float
 
-    num_symbols : int
+    M : int
     num_channel_realizations : int
 
 
@@ -487,9 +488,18 @@ class SingleSnrSimResult:
         if self.num_channel_realizations > 1:
 
             K = len(self.stream_ibrs)
-            self.stream_bers = [ self.stream_becs[k] / (self.stream_ibrs[k] * self.num_symbols * self.num_channel_realizations) for k in range(K) ]
-            self.ut_bers = self.ut_becs / ( self.ut_ibrs * self.num_symbols * self.num_channel_realizations)
-            self.ber = self.bec / (self.ibr * self.num_symbols * self.num_channel_realizations)
+
+            self.stream_bers = []
+            for k in range(K):
+                denom = self.stream_ibrs[k] * self.M * self.num_channel_realizations
+                ber_k = np.where(denom > 0, self.stream_becs[k] / denom, np.nan)
+                self.stream_bers.append(ber_k)
+            
+            ut_denom = self.ut_ibrs * self.M * self.num_channel_realizations
+            self.ut_bers = np.where(ut_denom > 0, self.ut_becs / ut_denom, np.nan)
+            
+            total_denom = self.ibr * self.M * self.num_channel_realizations
+            self.ber = self.bec / total_denom if total_denom > 0 else np.nan
 
 @dataclass
 class SimResult:
@@ -513,3 +523,18 @@ class SimResult:
 
     snr_dB_values: RealArray
     simulation_results: list[SingleSnrSimResult]
+
+
+__all__ = [
+    "RealArray", "ComplexArray", "IntArray", "BitArray", "ConstType",
+    "ChannelStateInformation", "ConstConfig",
+    "BitLoader", "Mapper", "Precoder",
+    "ChannelModel", "NoiseModel",
+    "Combiner", "Equalizer", "Detector", "Demapper",
+    "BaseStationState", "UserTerminalState",
+    "TransmitPilotMessage", "ReceivePilotMessage",
+    "TransmitFeedbackMessage", "ReceiveFeedbackMessage",
+    "TransmitFeedforwardMessage", "ReceiveFeedforwardMessage",
+    "BaseStationConfig", "UserTerminalConfig", "ChannelConfig",
+    "SystemConfig", "SimConfig", "SingleSnrSimResult", "SimResult",
+]

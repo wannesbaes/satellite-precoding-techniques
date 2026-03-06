@@ -30,8 +30,8 @@ PROJECT_ROOT = os.path.abspath('../..')
 # - PROJECT_ROOT: for top-level imports (if any)
 # - su-mimo/src and mu-mimo/src: where the actual Python packages live
 sys.path.insert(0, os.path.join(PROJECT_ROOT))
-sys.path.insert(0, os.path.join(PROJECT_ROOT, 'su-mimo', 'src'))
-sys.path.insert(0, os.path.join(PROJECT_ROOT, 'mu-mimo', 'src'))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'su-mimo'))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'mu-mimo'))
 
 
 # -- General configuration ---------------------------------------------------

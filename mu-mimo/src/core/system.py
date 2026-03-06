@@ -4,18 +4,8 @@ from __future__ import annotations
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from ..types import (
-    RealArray, ComplexArray, IntArray, BitArray,
-    ChannelStateInformation, BaseStationState, UserTerminalState,
-    TransmitPilotMessage, ReceivePilotMessage, TransmitFeedbackMessage, ReceiveFeedbackMessage, TransmitFeedforwardMessage, ReceiveFeedforwardMessage,
-    ConstConfig, SystemConfig, BaseStationConfig, UserTerminalConfig, ChannelConfig,
-    SimConfig, SimResult, SingleSnrSimResult )
-from ..processing import (
-    Precoder, Combiner,
-    PowerAllocator, PowerDeallocator,
-    BitAllocator, BitDeallocator,
-    Mapper, Demapper, Detector,
-    ChannelModel, NoiseModel )
+from ..types import *
+from ..processing import *
 
 class SimulationRunner:
     """
@@ -81,7 +71,7 @@ class SimulationRunner:
                 self.mu_mimo_system.configure()
 
                 # Communication.
-                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.num_symbols)
+                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.M)
 
                 # Store inner loop results.
                 inner_loop_result = self._calculate_inner_loop_result(tx_bits_list, rx_bits_list)
@@ -130,18 +120,16 @@ class SimulationRunner:
             f"K_{self.system_config.K}",
             f"Nt_{self.system_config.Nt}",
             f"Nr_{self.system_config.Nr}",
-            f"Ns_{self.system_config.Ns}",
             f"snr_min_{snr_dB_values.min()}",
             f"snr_max_{snr_dB_values.max()}",
             f"snr_step_{(snr_dB_values[-1] - snr_dB_values[-2]):.1f}" if len(snr_dB_values) > 1 else "0",
             f"ncr_{self.sim_config.num_channel_realizations}",
             f"nbe_{self.sim_config.num_bit_errors}",
             f"nbe_scope_{self.sim_config.num_bit_errors_scope}",
-            f"ns_{self.sim_config.num_symbols}",
+            f"ns_{self.sim_config.M}",
             f"prec_{bs_cfg.precoder.__name__}",
             f"comb_{ut_cfg.combiner.__name__}",
-            f"pa_{bs_cfg.power_allocator.__name__}",
-            f"ba_{bs_cfg.bit_allocator.__name__}",
+            f"ba_{bs_cfg.bit_loader.__name__}",
             f"cm_{ch_cfg.channel_model.__name__}",
             f"nm_{ch_cfg.noise_model.__name__}",
         ]
@@ -187,9 +175,9 @@ class SimulationRunner:
 
         Parameters
         ----------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * num_symbols)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * num_symbols)
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were reconstructed by the UTs.
         
         Returns
@@ -215,7 +203,7 @@ class SimulationRunner:
         for k in range(K):
 
             for s in range(Ns[k]):
-                stream_ibrs[k][s] = len(tx_bits_list[k][s]) // self.sim_config.num_symbols
+                stream_ibrs[k][s] = len(tx_bits_list[k][s]) // self.sim_config.M
                 stream_becs[k][s] = np.sum(tx_bits_list[k][s] != rx_bits_list[k][s])
                 stream_ars[k][s] = 1
             
@@ -232,7 +220,7 @@ class SimulationRunner:
         # Termination.
         inner_loop_result = SingleSnrSimResult(
             stream_ibrs = stream_ibrs,
-            stream_bers = stream_becs,
+            stream_becs = stream_becs,
             stream_ars = stream_ars,
             ut_ibrs = ut_ibrs,
             ut_becs = ut_becs,
@@ -241,7 +229,7 @@ class SimulationRunner:
             bec = bec,
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
-            num_symbols = self.sim_config.num_symbols,
+            M = self.sim_config.M,
             num_channel_realizations = 1,)
         return inner_loop_result
 
@@ -319,7 +307,7 @@ class SimulationRunner:
             bec = bec,
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
-            num_symbols = self.sim_config.num_symbols,
+            M = self.sim_config.M,
             num_channel_realizations = len(inner_loop_results))
         return outer_loop_result
 
@@ -449,7 +437,7 @@ class MuMimoSystem:
 
         return
 
-    def communicate(self, num_symbols: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
+    def communicate(self, M: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
         """
         Communication of the MU-MIMO system.
 
@@ -458,19 +446,19 @@ class MuMimoSystem:
 
         Parameters
         ----------
-        num_symbols : int
-            The number of symbols to be transmitted for this channel realization and SNR at once.
+        M : int
+            The number of symbol vector transmissions for this channel realization and SNR.
         
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * num_symbols)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * num_symbols)
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were received by the UTs.
         """
 
         # Transmit from the BS.
-        tx_bits_list, x = self.bs.transmit(num_symbols)
+        tx_bits_list, x = self.bs.transmit(M)
 
         # Propagate through the channel.
         y_k_list = self.channel.propagate(x)
@@ -514,10 +502,9 @@ class BaseStation:
         self.Nt = Nt
 
         # Processing Components.
-        self.bit_allocator: BitAllocator = configs.bit_allocator()
-        self.mapper: Mapper = configs.mapper()
-        self.power_allocator: PowerAllocator = configs.power_allocator()
-        self.precoder: Precoder = configs.precoder()
+        self.bit_loader: type[BitLoader] = configs.bit_loader
+        self.mapper: type[Mapper] = configs.mapper
+        self.precoder: type[Precoder] = configs.precoder
 
         # State.
         self.c_configs: ConstConfig = c_configs
@@ -560,12 +547,11 @@ class BaseStation:
         """
 
         # Compute the precoder matrix, the power allocation, and the information bit rate for the current channel realization and SNR. In case of coordinated beamforming, also compute the combining matrices.
-        F, G = self.precoder.compute(rx_fb_msg.csi)
-        P = self.power_allocator.compute(rx_fb_msg.csi, F, G, self.Pt, B=self.B)
-        ibr, Ns = self.bit_allocator.compute(rx_fb_msg.csi, F, G, P, self.c_configs, Pt=self.Pt, B=self.B)
+        F, G, C_eq = self.precoder.compute(rx_fb_msg.csi, self.Pt, self.K)
+        ibr, Ns = self.bit_loader.compute(rx_fb_msg.csi, F, G, self.c_configs, Pt=self.Pt, B=self.B)
 
         # Update the state of the BS to the current channel realization and SNR.
-        self.state = BaseStationState(F=F, P=P, ibr=ibr, Ns=Ns, G=G)
+        self.state = BaseStationState(F=F, C_eq=C_eq, ibr=ibr, Ns=Ns, G=G)
 
         return
 
@@ -581,36 +567,34 @@ class BaseStation:
             The feedforward messages.
         """
 
-        tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, P=self.state.P, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
+        tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, C_eq=self.state.C_eq, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
         return tx_ff_msg
 
-    def transmit(self, num_symbols: int) -> tuple[list[list[BitArray]], ComplexArray]:
+    def transmit(self, M: int) -> tuple[list[list[BitArray]], ComplexArray]:
         """
         Simulate the transmit processing chain of the BS to obtain the transmitted signal x.
 
         The processing chain consists of the following steps:
-        1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted num_symbols.
+        1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted M.
         2. Mapping - convert the bitstreams b_s to the corresponding data symbol streams a_s based on the modulation scheme (determined by the information bit rates ibr).
-        3. Power Allocation - allocate power to the symbol streams a_s based on the power allocation P to obtain the power-scaled symbol streams a_p_s.
-        4. Precoding - apply the precoding matrix F to the power-scaled symbol streams a_p_s to obtain the transmitted signal x.
+        3. Precoding - apply the precoding matrix F to the symbol streams a_s to obtain the transmitted signal x.
 
         Parameters
         ----------
-        num_symbols : int
-            The number of symbols to be transmitted for this channel realization and SNR at once.
+        M : int
+            The number of symbol vector transmissions for this channel realization and SNR.
 
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * num_symbols)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s.
-        x : ComplexArray, shape (Nt, num_symbols)
+        x : ComplexArray, shape (Nt, M)
             The transmitted signal.
         """
 
-        tx_bits_list, b = self.bit_allocator.apply(self.state.ibr, num_symbols, self.state.Ns)
+        tx_bits_list, b = self.bit_loader.apply(self.state.ibr, M, self.state.Ns)
         a = self.mapper.apply(b, self.state.ibr, self.c_configs.types, self.state.Ns)
-        a_p = self.power_allocator.apply(a, self.state.P)
-        x = self.precoder.apply(a_p, self.state.F)
+        x = self.precoder.apply(a, self.state.F, self.state.Ns)
 
         return tx_bits_list, x
 
@@ -640,11 +624,11 @@ class Channel:
         self.Nt = Nt
 
         # Channel model and noise model.
-        self.channel_model = configs.channel_model()
-        self.noise_model = configs.noise_model()
+        self.channel_model: type[ChannelModel] = configs.channel_model
+        self.noise_model: type[NoiseModel] = configs.noise_model
 
         # State.
-        self.state: ChannelStateInformation | None = None
+        self.state = ChannelStateInformation()
 
     def set(self, csi: ChannelStateInformation) -> None:
         """
@@ -731,7 +715,7 @@ class Channel:
             H_eff[tx_fb_msg_k.ut_id*self.Nr : (tx_fb_msg_k.ut_id+1)*self.Nr, : ] = tx_fb_msg_k.H_eff_k
         
         # Generate the feedback message that will be received by the BS.
-        rx_fb_msg = ReceiveFeedbackMessage(snr=self.state.snr, H_eff=H_eff)
+        rx_fb_msg = ReceiveFeedbackMessage(csi=ChannelStateInformation(snr=self.state.snr, H_eff=H_eff))
 
         return rx_fb_msg
 
@@ -739,7 +723,7 @@ class Channel:
         """
         Propagates the feedforward messages from the BS to the UTs.
 
-        The feedforward message transmitted by the BS is split into K different feedforward messages, one for each UT. Each feedforward message contains the constellation type, the power allocation, the information bit rates, the number of data streams for each UT and, in case of coordinated beamforming, the combining matrices for each UT for the current channel realization and SNR.
+        The feedforward message transmitted by the BS is split into K different feedforward messages, one for each UT. Each feedforward message contains the constellation type, the equalization coefficients, the information bit rates, the number of data streams for each UT and, in case of coordinated beamforming, the combining matrices for each UT for the current channel realization and SNR.
 
         Parameters
         ----------
@@ -754,19 +738,18 @@ class Channel:
         
         # Retrieve the transmitted feedforward message elements.
         c_type = tx_ff_msg.c_type
-        P = tx_ff_msg.P
+        C_eq = tx_ff_msg.C_eq
         ibr = tx_ff_msg.ibr
         Ns = tx_ff_msg.Ns
         G = tx_ff_msg.G
 
         # Split the transmitted feedforward message elemtens into K different elements for each UT.
-        Ns_cumulative = np.concatenate(([0], np.cumsum(Ns)))
-        P_k_list = [ P[ Ns_cumulative[k] : Ns_cumulative[k+1] ] for k in range(self.K)]
-        ibr_k_list = [ ibr[ Ns_cumulative[k] : Ns_cumulative[k+1] ] for k in range(self.K)]
-        G_k_list = [ G[ Ns_cumulative[k] : Ns_cumulative[k+1], k*self.Nr : (k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
+        C_eq_k_list = [ C_eq[k*self.Nr : (k+1)*self.Nr] for k in range(self.K)]
+        ibr_k_list  = [ ibr[k*self.Nr : (k+1)*self.Nr] for k in range(self.K)]
+        G_k_list    = [ G[k*self.Nr:(k+1)*self.Nr, k*self.Nr:(k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
 
         # Generate the feedforward messages that will be received by the UTs.
-        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, c_type_k=c_type[k], P_k=P_k, ibr_k=ibr_k, Ns_k=Ns[k], G_k=G_k) for k, (P_k, ibr_k, G_k) in enumerate(zip(P_k_list, ibr_k_list, G_k_list))]
+        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, c_type_k=c_type[k], C_eq_k=C_eq_k_list[k], ibr_k=ibr_k_list[k], Ns_k=Ns[k], G_k=G_k_list[k]) for k in range(self.K) ]
 
         return rx_ff_msgs
 
@@ -781,21 +764,21 @@ class Channel:
 
         Parameters
         ----------
-        x : ComplexArray, shape (Nt, num_symbols)
+        x : ComplexArray, shape (Nt, M)
             The transmitted signal.
         
         Returns
         -------
-        y_k_list : list[ComplexArray], shape (K, Nr, num_symbols)
+        y_k_list : list[ComplexArray], shape (K, Nr, M)
             The list of received signals for each UT k.
         """
 
         # Generate the noise samples according to the specified noise model.
-        noise = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
+        n = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
         y_noiseless = self.channel_model.apply(x, self.state.H_eff)
-        y = self.noise_model.apply(y_noiseless, noise)
+        y = self.noise_model.apply(y_noiseless, n)
 
         # Split the received signal y into K different signals y_k, one for each UT.
         y_k_list = [ y[k*self.Nr:(k+1)*self.Nr, :] for k in range(self.K) ]
@@ -824,11 +807,10 @@ class UserTerminal:
         self.Nr = Nr
 
         # Processing Components.
-        self.power_deallocator = configs.power_deallocator()
-        self.combiner = configs.combiner()
-        self.detector = configs.detector()
-        self.demapper = configs.demapper()
-        self.bit_deallocator = configs.bit_deallocator()
+        self.combiner: type[Combiner] = configs.combiner
+        self.equalizer: type[Equalizer] = configs.equalizer
+        self.detector: type[Detector] = configs.detector
+        self.demapper: type[Demapper] = configs.demapper
 
         # State.
         self.state: UserTerminalState | None = None
@@ -840,7 +822,7 @@ class UserTerminal:
         """
         Reset the state of the user terminal.
 
-        It clears the channel matrix H_k, the combining matrix G_k, the power allocation P_k, the information bit rates ibr_k and the number of data streams Ns_k for the previous channel realization and SNR.
+        It clears the channel matrix H_k, the combining matrix G_k, the equalization coefficients C_eq_k, the information bit rates ibr_k and the number of data streams Ns_k for the previous channel realization and SNR.
         """
         
         self.state = None
@@ -867,7 +849,7 @@ class UserTerminal:
         G_k = self.combiner.compute(H_k)
 
         # Update the state of the UT to the current channel realization.
-        self.state = UserTerminalState(H_k=H_k, G_k=G_k, c_type_k=None, P_k=None, ibr_k=None, Ns_k=None)
+        self.state = UserTerminalState(H_k=H_k, G_k=G_k, c_type_k=None, C_eq_k=None, ibr_k=None, Ns_k=None)
         
         return
     
@@ -902,7 +884,7 @@ class UserTerminal:
         # Update the state of the UT to the current channel realization.
         if rx_ff_msg.G_k is not None: self.state.G_k = rx_ff_msg.G_k
         self.state.c_type_k = rx_ff_msg.c_type_k
-        self.state.P_k = rx_ff_msg.P_k
+        self.state.C_eq_k = rx_ff_msg.C_eq_k
         self.state.ibr_k = rx_ff_msg.ibr_k
         self.state.Ns_k = rx_ff_msg.Ns_k
 
@@ -914,26 +896,26 @@ class UserTerminal:
         
         The processing chain consists of the following steps:
         1. Combining - apply the combining matrix G_k to the received signal y_k to obtain the scaled decision variables z_k_s
-        2. Power Deallocation - invert the power allocation applied by the base station to obtain the decision variables u_k_s
+        2. Equalization - apply the equalization coefficients C_eq_k to the scaled decision variables z_k_s to obtain the decision variables u_k_s
         3. Detection - estimate the transmitted symbol streams a_k_s based on the decision variables u_k_s
         4. Demapping - convert the estimated symbol streams a_k_s_hat to the corresponding estimated bit streams b_k_s_hat
         5. Bit Deallocation - reconstruct the estimated bitstream from the estimated bit streams b_k_s_hat
 
         Parameters
         ----------
-        y_k : ComplexArray, shape (Nr, num_symbols)
+        y_k : ComplexArray, shape (Nr, M)
             The received signal at this UT.
         
         Returns
         -------
-        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * num_symbols)
+        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * M)
             The list of estimated bitstreams for each data stream s of this UT.
         """
+
+        u_k = self.combiner.apply(y_k, self.state.G_k, self.state.Ns_k)
+        u_k = self.equalizer.apply(u_k, self.state.C_eq_k, self.state.Ns_k)
+        cpi_k_hat = self.detector.apply(u_k, self.state.ibr_k, self.state.c_type_k, self.state.Ns_k)
+        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k, self.state.c_type_k, self.state.Ns_k)
+        rx_bits = b_k_hat
         
-        z_k = self.combiner.apply(y_k, self.state.G_k)
-        u_k = self.power_deallocator.apply(z_k, self.state.P_k)
-        cpi_k_hat = self.detector.apply(u_k, self.state.ibr_k, self.state.c_type_k)
-        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k, self.state.c_type_k)
-        rx_bits_list = self.bit_deallocator.apply(b_k_hat, self.state.ibr_k)
-        
-        return rx_bits_list
+        return rx_bits
