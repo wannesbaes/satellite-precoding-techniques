@@ -49,6 +49,8 @@ class SimulationRunner:
         if filepath.exists():
             sim_result = self._load_results(filepath)
             return sim_result
+        else:
+            print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + "="*60 + "\n" + self.system_config.display() + "\n" + self.sim_config.display() + "\n")
         
         # Run the simulation.
         simulation_results: list[SingleSnrSimResult] = []
@@ -111,6 +113,7 @@ class SimulationRunner:
 
         # Generate the filename based on the system and simulation configurations.
         snr_dB_values = self.sim_config.snr_dB_values
+        c_cfg = self.system_config.c_configs
         bs_cfg = self.system_config.base_station_configs
         ut_cfg = self.system_config.user_terminal_configs
         ch_cfg = self.system_config.channel_configs
@@ -122,14 +125,15 @@ class SimulationRunner:
             f"Nr_{self.system_config.Nr}",
             f"snr_min_{snr_dB_values.min()}",
             f"snr_max_{snr_dB_values.max()}",
-            f"snr_step_{(snr_dB_values[-1] - snr_dB_values[-2]):.1f}" if len(snr_dB_values) > 1 else "0",
+            f"snr_step_{int(snr_dB_values[-1] - snr_dB_values[-2])}" if len(snr_dB_values) > 1 else "0",
             f"ncr_{self.sim_config.num_channel_realizations}",
             f"nbe_{self.sim_config.num_bit_errors}",
             f"nbe_scope_{self.sim_config.num_bit_errors_scope}",
             f"ns_{self.sim_config.M}",
             f"prec_{bs_cfg.precoder.__name__}",
             f"comb_{ut_cfg.combiner.__name__}",
-            f"ba_{bs_cfg.bit_loader.__name__}",
+            f"bl_{bs_cfg.bit_loader.__name__}",
+            f"c_cfg_{str(c_cfg).replace(': ', '_').replace('\n', '_')}",
             f"cm_{ch_cfg.channel_model.__name__}",
             f"nm_{ch_cfg.noise_model.__name__}",
         ]
@@ -359,6 +363,7 @@ class SimulationRunner:
             snr_dB_values = simulation_result.snr_dB_values,
             simulation_results = np.array(simulation_result.simulation_results, dtype=object))
         
+        print(f"\n Simulation results saved to:\n {simulation_result.filename}")
         return
 
 class MuMimoSystem:

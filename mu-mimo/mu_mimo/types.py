@@ -211,6 +211,32 @@ class ConstConfig:
     sizes: int | IntArray | None = None
     capacity_fractions: float | RealArray | None = None
 
+    def __str__(self) -> str:
+        
+        lines = []
+
+        if len(set(self.types)) == 1:
+            lines.append(f"type: {self.types[0]}")
+        else:
+            for i, c_type in enumerate(self.types):
+                lines.append(f"type_{i}: {c_type}")
+        
+        if self.sizes is not None:
+            if np.all(self.sizes == self.sizes[0]):
+                lines.append(f"size: {self.sizes[0]}")
+            else:
+                for i, size in enumerate(self.sizes):
+                    lines.append(f"size_{i}: {size}")
+
+        if self.capacity_fractions is not None:
+            if np.all(self.capacity_fractions == self.capacity_fractions[0]):
+                lines.append(f"capacity_fraction: {self.capacity_fractions[0]}")
+            else:
+                for i, fraction in enumerate(self.capacity_fractions):
+                    lines.append(f"capacity_fraction_{i}: {fraction}")
+
+        return "\n".join(lines)
+
     def __eq__(self, other: object) -> bool:
         
         if not isinstance(other, ConstConfig):
@@ -288,14 +314,14 @@ class SystemConfig:
         The total available transmit power (in Watt).
     B : float
         The system frequency bandwidth (in Hertz).
-
+    
     K : int
         The number of user terminals.
-    Nt : int
-        The number of transmit antennas at the base station.
     Nr : int
         The number of receive antennas per user terminal.
-    
+    Nt : int
+        The number of transmit antennas at the base station.
+
     c_configs : ConstConfig
         The constellation configuration settings for each UT.
     
@@ -311,8 +337,8 @@ class SystemConfig:
     B: float
 
     K: int
-    Nt: int
     Nr: int
+    Nt: int
 
     c_configs: ConstConfig
 
@@ -320,6 +346,30 @@ class SystemConfig:
     user_terminal_configs: UserTerminalConfig
     channel_configs: ChannelConfig
 
+    def display(self):
+        """
+        Display system configuration settings in a readable format.
+
+        Returns
+        -------
+        str_display : str
+            A formatted string summarizing the system configuration settings.
+        """
+
+        lines: list[str] = []
+        
+        lines.append(f"  System configuration settings:\n")
+        lines.append(f"  K  = {self.K} UTs, Nr = {self.Nr}, Nt = {self.Nt}")
+        lines.append(f"  Pt = {self.Pt} W, B = {self.B} Hz")
+        lines.append(f"  Precoder  : {self.base_station_configs.precoder.__name__}")
+        lines.append(f"  Combiner  : {self.user_terminal_configs.combiner.__name__}")
+        lines.append(f"  BitLoader : {self.base_station_configs.bit_loader.__name__}")
+        lines.append(f"  Channel   : {self.channel_configs.channel_model.__name__}")
+        lines.append(f"  Noise     : {self.channel_configs.noise_model.__name__}")
+        lines.append("-" * 60)
+
+        str_display = "\n".join(lines)
+        return str_display
 
     def __post_init__(self):
 
@@ -398,6 +448,28 @@ class SimConfig:
     @property
     def snr_values(self) -> RealArray:
         return 10 ** (self.snr_dB_values / 10)
+
+    def display(self):
+        """
+        Display simulation configuration settings in a readable format.
+
+        Returns
+        -------
+        str_display : str
+            A formatted string summarizing the simulation configuration settings.
+        """
+
+        lines: list[str] = []
+
+        lines.append(f"  Simulation configuration settings:\n")
+        lines.append(f"  SNR range                  : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
+        lines.append(f"  Min channel realizations   : {self.num_channel_realizations}")
+        lines.append(f"  Min bit errors             : {self.num_bit_errors} ({self.num_bit_errors_scope})")
+        lines.append(f"  M                          : {self.M} transmissions per channel")
+        lines.append("-" * 60)
+
+        str_display = "\n".join(lines)
+        return str_display
 
     def __post_init__(self):
         if self.num_channel_realizations <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
@@ -524,12 +596,14 @@ class SimResult:
     snr_dB_values: RealArray
     simulation_results: list[SingleSnrSimResult]
 
-    def display(self, detailed: bool = False, precision: int = 3) -> str:
+    def display(self, configs: bool = False, detailed: bool = True, precision: int = 3) -> str:
         """
         Display simulation results in a readable table format.
 
         Parameters
         ----------
+        configs : bool
+            If True, also prints the system and simulation configuration settings in the header.
         detailed : bool
             If True, also prints per-UT metrics for each SNR point.
         precision : int
@@ -548,28 +622,13 @@ class SimResult:
         lines.append(f"=" * 60)
 
         # System configuration summary.
-        sys_config = self.system_configs
-        lines.append(f"  System configuration settings:\n")
-        lines.append(f"  K  = {sys_config.K} UTs, Nr = {sys_config.Nr}, Nt = {sys_config.Nt}")
-        lines.append(f"  Pt = {sys_config.Pt} W, B = {sys_config.B} Hz")
-        lines.append(f"  Precoder  : {sys_config.base_station_configs.precoder.__name__}")
-        lines.append(f"  Combiner  : {sys_config.user_terminal_configs.combiner.__name__}")
-        lines.append(f"  BitLoader : {sys_config.base_station_configs.bit_loader.__name__}")
-        lines.append(f"  Channel   : {sys_config.channel_configs.channel_model.__name__}")
-        lines.append(f"  Noise     : {sys_config.channel_configs.noise_model.__name__}")
-        lines.append("-" * 60)
+        if configs: lines.append(f"\n{self.system_configs.display()}")
 
         # Simulation configuration summary.
-        sim_config = self.sim_configs
-        lines.append(f"  Simulation configuration settings:\n")
-        lines.append(f"  SNR range                  : {sim_config.snr_dB_values[0]} - {sim_config.snr_dB_values[-1]} dB")
-        lines.append(f"  Min channel realizations   : {sim_config.num_channel_realizations}")
-        lines.append(f"  Min bit errors             : {sim_config.num_bit_errors} ({sim_config.num_bit_errors_scope})")
-        lines.append(f"  M                          : {sim_config.M} transmissions per channel")
-        lines.append("=" * 60)
+        if configs: lines.append(f"\n{self.sim_configs.display()}")
 
         # Results table.
-        lines.append(f"\n  Simulation results:\n")
+        lines.append(f"\n\n  Simulation results:\n")
         
         header = " " + f"{'SNR [dB]':>10} | {'BER':>10} | {'IBR':>10} | " + (f"{'UT AR avg':>12} | {'Stream AR avg':>12}" if detailed else "")
         lines.append( " " + "-" * len(header))
@@ -589,8 +648,9 @@ class SimResult:
 
         # Return the formatted string.
         str_display = "\n".join(lines)
-        print(str_display)
         return str_display
+
+
 
 
 __all__ = [
