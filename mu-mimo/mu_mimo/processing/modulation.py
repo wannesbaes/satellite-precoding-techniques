@@ -439,7 +439,7 @@ class NeutralDetector(Detector):
         if not np.all(ibr_k == 1):
             raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDetector.")
         
-        cpi_k_hat = np.array(u_k, dtype=int)
+        cpi_k_hat = np.array(u_k.real, dtype=int)
         return cpi_k_hat
 
 class MDDetector(Detector):

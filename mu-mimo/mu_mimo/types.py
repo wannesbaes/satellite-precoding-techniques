@@ -1,22 +1,17 @@
 # mu-mimo/mu_mimo/types.py
 
 from dataclasses import dataclass, field
+from email import header
 import numpy as np
 from numpy.typing import NDArray
 from pathlib import Path
 from typing import Literal, Type, TYPE_CHECKING
 
-# from .base_types import (
-#     RealArray, ComplexArray, IntArray, BitArray, ConstType,
-#     ChannelStateInformation, ConstConfig,
-# )
-
 if TYPE_CHECKING:
     from .processing import (
         BitLoader, Mapper, Precoder,
         ChannelModel, NoiseModel,
-        Combiner, Equalizer, Detector, Demapper
-    )
+        Combiner, Equalizer, Detector, Demapper )
 
 RealArray    = NDArray[np.floating]
 ComplexArray = NDArray[np.complexfloating]
@@ -528,6 +523,74 @@ class SimResult:
 
     snr_dB_values: RealArray
     simulation_results: list[SingleSnrSimResult]
+
+    def display(self, detailed: bool = False, precision: int = 3) -> str:
+        """
+        Display simulation results in a readable table format.
+
+        Parameters
+        ----------
+        detailed : bool
+            If True, also prints per-UT metrics for each SNR point.
+        precision : int
+            Number of decimal digits for floating-point formatting.
+        """
+
+
+        if len(self.snr_dB_values) != len(self.simulation_results):
+            raise ValueError( "Length mismatch: snr_dB_values and simulation_results must have the same length." )
+
+        lines: list[str] = []
+
+        # Title.
+        lines.append(f"=" * 60)
+        lines.append(f"  MU-MIMO Downlink Simulation Results")
+        lines.append(f"=" * 60)
+
+        # System configuration summary.
+        sys_config = self.system_configs
+        lines.append(f"  System configuration settings:\n")
+        lines.append(f"  K  = {sys_config.K} UTs, Nr = {sys_config.Nr}, Nt = {sys_config.Nt}")
+        lines.append(f"  Pt = {sys_config.Pt} W, B = {sys_config.B} Hz")
+        lines.append(f"  Precoder  : {sys_config.base_station_configs.precoder.__name__}")
+        lines.append(f"  Combiner  : {sys_config.user_terminal_configs.combiner.__name__}")
+        lines.append(f"  BitLoader : {sys_config.base_station_configs.bit_loader.__name__}")
+        lines.append(f"  Channel   : {sys_config.channel_configs.channel_model.__name__}")
+        lines.append(f"  Noise     : {sys_config.channel_configs.noise_model.__name__}")
+        lines.append("-" * 60)
+
+        # Simulation configuration summary.
+        sim_config = self.sim_configs
+        lines.append(f"  Simulation configuration settings:\n")
+        lines.append(f"  SNR range                  : {sim_config.snr_dB_values[0]} - {sim_config.snr_dB_values[-1]} dB")
+        lines.append(f"  Min channel realizations   : {sim_config.num_channel_realizations}")
+        lines.append(f"  Min bit errors             : {sim_config.num_bit_errors} ({sim_config.num_bit_errors_scope})")
+        lines.append(f"  M                          : {sim_config.M} transmissions per channel")
+        lines.append("=" * 60)
+
+        # Results table.
+        lines.append(f"\n  Simulation results:\n")
+        
+        header = " " + f"{'SNR [dB]':>10} | {'BER':>10} | {'IBR':>10} | " + (f"{'UT AR avg':>12} | {'Stream AR avg':>12}" if detailed else "")
+        lines.append( " " + "-" * len(header))
+        lines.append(header)
+        lines.append( " " + "-" * len(header))
+
+        for snr_db, res in zip(self.snr_dB_values, self.simulation_results):
+            ber_str = f"{res.ber:.{precision}e}" if not np.isnan(res.ber) else "N/A"
+            lines.append(" " + f"{int(snr_db):>10} | " + f"{ber_str:>10} | " + f"{int(res.ibr):>10} | " + (f"{res.ut_ars_avg:>12.1%} | " + f"{res.stream_ars_avg:>12.1%}" if detailed else "") )
+
+            if detailed:
+                lines.append("")
+                for k in range(self.system_configs.K):
+                    ut_ber_str = f"{res.ut_bers[k]:.{precision}e}" if not np.isnan(res.ut_bers[k]) else "N/A"
+                    lines.append( f"        UT {k}: " + f"{ut_ber_str:>10} | " + f"{int(res.ut_ibrs[k]):>10} | " + f"{res.ut_ars[k]:>12.1%} | " + (f"{res.stream_ars[k].mean():>12.1%}" if res.stream_ars[k].size > 0 else "N/A"))
+                lines.append(" " + "-" * len(header))
+
+        # Return the formatted string.
+        str_display = "\n".join(lines)
+        print(str_display)
+        return str_display
 
 
 __all__ = [

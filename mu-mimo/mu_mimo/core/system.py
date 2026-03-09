@@ -64,7 +64,7 @@ class SimulationRunner:
             while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors):
 
                 # Reset.
-                csi = ChannelStateInformation(snr=snr, H=None)
+                csi = ChannelStateInformation(snr=snr, H_eff=None)
                 self.mu_mimo_system.reset(csi)
 
                 # Configuration.
@@ -106,7 +106,7 @@ class SimulationRunner:
         """
 
         # Create the results directory if it does not exist.
-        results_dir = Path(__file__).resolve().parents[2] / "results"
+        results_dir = Path(__file__).resolve().parents[2] / "report" / "simulation_results"
         results_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate the filename based on the system and simulation configurations.
@@ -116,7 +116,7 @@ class SimulationRunner:
         ch_cfg = self.system_config.channel_configs
 
         name_parts = [
-            "mu_mimo_downlink_sim",
+            "sim_mu_mimo_downlink",
             f"K_{self.system_config.K}",
             f"Nt_{self.system_config.Nt}",
             f"Nr_{self.system_config.Nr}",
@@ -918,7 +918,7 @@ class UserTerminal:
         u_k = self.combiner.apply(y_k, self.state.G_k, self.state.Ns_k)
         u_k = self.equalizer.apply(u_k, self.state.C_eq_k, self.state.Ns_k)
         cpi_k_hat = self.detector.apply(u_k, self.state.ibr_k, self.state.c_type_k, self.state.Ns_k)
-        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k, self.state.c_type_k, self.state.Ns_k)
+        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k, self.state.Ns_k)
         rx_bits = b_k_hat
         
         return rx_bits
