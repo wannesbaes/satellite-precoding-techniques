@@ -4,8 +4,12 @@ from __future__ import annotations
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+
 from ..types import *
+from ..configs import *
+from .results import *
 from ..processing import *
+
 
 class SimulationRunner:
     """
@@ -119,7 +123,6 @@ class SimulationRunner:
         ch_cfg = self.system_config.channel_configs
 
         name_parts = [
-            "sim_mu_mimo_downlink",
             f"K_{self.system_config.K}",
             f"Nt_{self.system_config.Nt}",
             f"Nr_{self.system_config.Nr}",
@@ -347,7 +350,7 @@ class SimulationRunner:
 
     def _save_results(self, simulation_result: SimResult) -> None:
         """
-        Save the simulation results to a .npz file.
+        Save the simulation results to a .npz file. 
 
         Parameters
         ----------

@@ -133,4 +133,4 @@ def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
 
 
 if __name__ == "__main__":
-    main(sim_config_indices = [3], sys_config_indices = [1])
+    main(sim_config_indices = [3], sys_config_indices = [17])

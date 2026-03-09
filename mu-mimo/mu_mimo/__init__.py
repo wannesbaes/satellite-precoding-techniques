@@ -8,7 +8,9 @@ mu_mimo package
 from . import core
 from . import processing
 from . import types
+from . import configs
 
 from .core import *
 from .processing import *
 from .types import *
+from .configs import *

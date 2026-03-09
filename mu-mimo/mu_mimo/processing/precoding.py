@@ -3,7 +3,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import numpy as np
-from ..types import (ComplexArray, RealArray, IntArray, BitArray, ChannelStateInformation)
+from ..types import ComplexArray, RealArray, IntArray, BitArray, ChannelStateInformation
 
 
 class Precoder(ABC):
