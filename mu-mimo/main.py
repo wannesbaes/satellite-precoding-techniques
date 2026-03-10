@@ -7,14 +7,14 @@ from mu_mimo import *
 simulation_configuration_settings = [
 
     # Standard Simulation Configution Settings.
-    {'number': 0,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 2048,    'name': "Standard Simulation Configution Settings"},
+    {'number': 0,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 2048,    'name': 'Sim Config 0',    'description': "Standard Simulation Configution Settings"},
 
     # Standard Simulation Configution Settings, bit errors per UT and per stream.
-    {'number': 1,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'uts',            'Transmission per channel realization': 2048,    'name': "Standard Simulation Configution Settings"},
-    {'number': 2,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'streams',        'Transmission per channel realization': 2048,    'name': "Standard Simulation Configution Settings"},
+    {'number': 1,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'uts',            'Transmission per channel realization': 2048,    'name': 'Sim Config 1',    'description': "Standard Simulation Configution Settings (UT-level bit errors counting)"},
+    {'number': 2,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'streams',        'Transmission per channel realization': 2048,    'name': 'Sim Config 2',    'description': "Standard Simulation Configution Settings (Stream-level bit errors counting)"},
 
     # Test Simulation Configution Settings for code validation and debugging purposes only.
-    {'number': 3,    'SNR values (in dB)': np.arange(-10, 31, 10),    'channel realizations per SNR value': 10,       'bit errors per SNR value': 10,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 256,     'name': "Test Simulation Configution Settings"},
+    {'number': 3,    'SNR values (in dB)': np.arange(-10, 31, 10),    'channel realizations per SNR value': 10,       'bit errors per SNR value': 10,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 256,     'name': 'Sim Config 3',    'description': "Test Simulation Configution Settings"},
 ]
 
 system_configuration_settings = [
@@ -64,6 +64,7 @@ def _setup_settings(sim_config_idx, sys_config_idx):
         num_bit_errors           = sim_config_settings['bit errors per SNR value'],
         num_bit_errors_scope     = sim_config_settings['Scope of bit errors'],
         M                        = sim_config_settings['Transmission per channel realization'],
+        name                     = sim_config_settings['name'],
     )
 
 
@@ -109,6 +110,7 @@ def _setup_settings(sim_config_idx, sys_config_idx):
         base_station_configs  = base_station_configs,
         channel_configs       = channel_configs,
         user_terminal_configs = user_terminal_configs,
+        name                  = sys_config_settings['name'],
     )
 
     return sim_config, system_config
@@ -126,8 +128,10 @@ def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
             result = runner.run()
 
             # 3. RESULT.
-            print(result.display())
-            #result.plot()
+            ResultManager.display(result)
+            ResultManager.plot_system_performance(result)
+            ResultManager.plot_ut_performance(result)
+            ResultManager.plot_stream_performance(result)
 
     return
 

@@ -2,6 +2,10 @@
 
 from dataclasses import dataclass, field
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from matplotlib.collections import LineCollection
+from matplotlib.colors import to_rgba
 from pathlib import Path
 
 from ..types import BitArray, IntArray, RealArray
@@ -15,19 +19,22 @@ class SingleSnrSimResult:
     
     Attributes
     ----------
+    snr_dB : float
+        The SNR value in dB for which the simulation results are reported.
+
     stream_ibrs : list[IntArray] (list of K arrays, each shape (Nr,))
         Per-UT per-stream information bit rates.
     stream_becs : list[RealArray] (list of K arrays, each shape (Nr,))
         Per-UT per-stream bit error counts.
     stream_ars : list[BitArray] (list of K arrays, each shape (Nr,))
-        Per-UT per-stream stream activation rates (1 if the stream is active, 0 otherwise).
+        Per-UT per-stream stream activation rates.
     
     ut_ibrs : IntArray, shape (K,)
         Per-UT information bit rates.
     ut_becs : RealArray, shape (K,)
         Per-UT bit error counts.
     ut_ars : BitArray, shape (K,)
-        Per-UT UT activation rates (1 if the UT is active, 0 otherwise).
+        Per-UT activation rates.
     
     ibr : float
         System-wide information bit rate.
@@ -51,6 +58,8 @@ class SingleSnrSimResult:
     ber : float | None
         System-wide bit error rate. None if num_channel_realizations == 1.
     """
+    
+    snr_dB: float
     
     stream_ibrs : list[IntArray]
     stream_becs : list[RealArray]
@@ -99,23 +108,139 @@ class SimResult:
     
     Attributes
     ----------
-    filename : Path
-        The path to the file where the simulation results are stored.
     sim_configs : SimConfig
         The configuration settings of the simulation.
     system_configs : SystemConfig
         The configuration settings of the system.
+    simulation_results : list[SingleSnrSimResult]
+        The list of simulation results for each SNR point.
     """
-
-    filename: Path
     
     sim_configs: SimConfig
     system_configs: SystemConfig
-
-    snr_dB_values: RealArray
     simulation_results: list[SingleSnrSimResult]
 
-    def display(self, configs: bool = False, detailed: bool = True, precision: int = 3) -> str:
+
+class ResultManager:
+    """
+    The Result Manager.
+
+    This class is responsible for managing the simulation results.
+    This includes saving, loading, displaying, plotting, etc.
+    """
+
+    # LOAD & SAVE.
+
+    @staticmethod
+    def _filepath(sim_configs: SimConfig, system_configs: SystemConfig) -> Path:
+        """
+        Generate the file path where the simulation results should be saved.
+        The filename is generated based on the name of the simulation configuration and the name of the system configuration.
+
+        Parameters
+        ----------
+        sim_configs : SimConfig
+            The configuration settings of the simulation.
+        system_configs : SystemConfig
+            The configuration settings of the system.
+        
+        Returns
+        -------
+        filepath : Path
+            The filepath for the simulation results. 
+        """
+
+        # Create the results directory if it does not exist.
+        results_dir = Path(__file__).resolve().parents[2] / "report" / "simulation_results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate the filename based on the system and simulation configurations.
+        filename = f"{sim_configs.name} - {system_configs.name}.npz"
+
+        # Return the full file path.
+        filepath = results_dir / filename
+        return filepath
+    
+    @staticmethod
+    def search_results(sim_configs: SimConfig, system_configs: SystemConfig) -> bool:
+        """
+        Search for previously executed simulation results with the same simulation and system configuration.
+        If they exist, return True. Otherwise, return False.
+
+        Parameters
+        ----------
+        sim_configs : SimConfig
+            The configuration settings of the simulation.
+        system_configs : SystemConfig
+            The configuration settings of the system.
+        
+        Returns
+        -------
+        exists : bool
+            True if the simulation results exist already, False otherwise.
+        """
+        filepath = ResultManager._filepath(sim_configs, system_configs)
+        return filepath.exists()
+    
+    @staticmethod
+    def load_results(sim_configs: SimConfig, system_configs: SystemConfig) -> SimResult:
+        """
+        Load simulation results from a previously executed simulation with the same simulation and system configuration.
+
+        Parameters
+        ----------
+        sim_configs : SimConfig
+            The configuration settings of the simulation.
+        system_configs : SystemConfig
+            The configuration settings of the system.
+        
+        Returns
+        -------
+        sim_result : SimResult
+            The loaded simulation results.
+        """
+        
+        # Generate the appropiate file path.
+        filepath = ResultManager._filepath(sim_configs, system_configs)
+
+        # Load the simulation results from the .npz file.
+        loaded_data = np.load(filepath, allow_pickle=True)
+        sim_result = SimResult(
+            sim_configs = loaded_data["sim_configs"].item(),
+            system_configs = loaded_data["system_configs"].item(),
+            simulation_results = loaded_data["simulation_results"].tolist()
+        )
+        
+        # Validate that the loaded simulation results match the current simulation and system configuration.
+        if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
+            raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
+        
+        return sim_result
+
+    @staticmethod
+    def save_results(sim_result: SimResult) -> None:
+        """
+        Save the simulation results to a .npz file. 
+
+        Parameters
+        ----------
+        sim_result : SimResult
+            The simulation results to save.
+        """
+
+        filepath = ResultManager._filepath(sim_result.sim_configs, sim_result.system_configs)
+        np.savez(filepath,
+            sim_configs = sim_result.sim_configs,
+            system_configs = sim_result.system_configs,
+            simulation_results = np.array(sim_result.simulation_results, dtype=object))
+        
+        print(f"\n Simulation results saved to:\n {filepath}")
+        return
+    
+    # DISPLAY.
+
+    @staticmethod
+    def display(sim_result: SimResult, configs: bool = False, detailed: bool = True, precision: int = 3) -> str:
         """
         Display simulation results in a readable table format.
 
@@ -130,9 +255,6 @@ class SimResult:
         """
 
 
-        if len(self.snr_dB_values) != len(self.simulation_results):
-            raise ValueError( "Length mismatch: snr_dB_values and simulation_results must have the same length." )
-
         lines: list[str] = []
 
         # Title.
@@ -142,10 +264,10 @@ class SimResult:
         lines.append(f"=" * 60)
 
         # System configuration summary.
-        if configs: lines.append(f"\n{self.system_configs.display()}")
+        if configs: lines.append(f"\n{sim_result.system_configs.display()}")
 
         # Simulation configuration summary.
-        if configs: lines.append(f"\n{self.sim_configs.display()}")
+        if configs: lines.append(f"\n{sim_result.sim_configs.display()}")
 
         # Results table.
         lines.append(f"\n\n  Simulation results:\n")
@@ -155,31 +277,266 @@ class SimResult:
         lines.append(header)
         lines.append( " " + "-" * len(header))
 
-        for snr_db, res in zip(self.snr_dB_values, self.simulation_results):
-            ber_str = f"{res.ber:.{precision}e}" if not np.isnan(res.ber) else "N/A"
-            lines.append(" " + f"{int(snr_db):>10} | " + f"{ber_str:>10} | " + f"{int(res.ibr):>10} | " + (f"{res.ut_ars_avg:>12.1%} | " + f"{res.stream_ars_avg:>12.1%}" if detailed else "") )
+        for sim_res in sim_result.simulation_results:
+            ber_str = f"{sim_res.ber:.{precision}e}" if not np.isnan(sim_res.ber) else "N/A"
+            lines.append(" " + f"{int(sim_res.snr_dB):>10} | " + f"{ber_str:>10} | " + f"{int(sim_res.ibr):>10} | " + (f"{sim_res.ut_ars_avg:>12.1%} | " + f"{sim_res.stream_ars_avg:>12.1%}" if detailed else "") )
 
             if detailed:
                 lines.append("")
-                for k in range(self.system_configs.K):
-                    ut_ber_str = f"{res.ut_bers[k]:.{precision}e}" if not np.isnan(res.ut_bers[k]) else "N/A"
-                    lines.append( f"        UT {k}: " + f"{ut_ber_str:>10} | " + f"{int(res.ut_ibrs[k]):>10} | " + f"{res.ut_ars[k]:>12.1%} | " + (f"{res.stream_ars[k].mean():>12.1%}" if res.stream_ars[k].size > 0 else "N/A"))
+                for k in range(sim_result.system_configs.K):
+                    ut_ber_str = f"{sim_res.ut_bers[k]:.{precision}e}" if not np.isnan(sim_res.ut_bers[k]) else "N/A"
+                    lines.append( f"        UT {k}: " + f"{ut_ber_str:>10} | " + f"{int(sim_res.ut_ibrs[k]):>10} | " + f"{sim_res.ut_ars[k]:>12.1%} | " + (f"{sim_res.stream_ars[k].mean():>12.1%}" if sim_res.stream_ars[k].size > 0 else "N/A"))
                 lines.append(" " + "-" * len(header))
 
         # Return the formatted string.
         str_display = "\n".join(lines)
         return str_display
 
-    def plot_performance_system(self):
-        pass
+    # PLOT.
 
-    def plot_performance_uts(self):
-        pass
+    @staticmethod
+    def _plot_filename(sim_result: SimResult, plot_type: str) -> Path:
+        """
+        Generate the file path where the plot should be saved.
+        The filename is generated based on the name of the simulation configuration and the name of the system configuration, and the type of plot.
 
-    def plot_performance_streams(self):
+        Parameters
+        ----------
+        sim_result : SimResult
+            The simulation results for which the plot is generated.
+        plot_type : str
+            A string indicating the type of plot.
+        
+        Returns
+        -------
+        filepath : Path
+            The filepath for the plot.
+        """
+        
+        # Create the plots directory if it does not exist.
+        plots_dir = Path(__file__).resolve().parents[2] / "report" / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate the filename based on the system and simulation configurations, and the type of plot.
+        filename = f"{sim_result.sim_configs.name} - {sim_result.system_configs.name}" + f" - {plot_type}.png"
+
+        # Return the full file path.
+        filepath = plots_dir / filename
+        return filepath
+
+    @staticmethod
+    def _plot_curve(ax, x, y, ar, color, marker, label):
+
+        x_v, y_v, ar_v = x[~np.isnan(y)], y[~np.isnan(y)], ar[~np.isnan(y)]
+        if len(x_v) == 0: return
+
+        if np.allclose(ar_v, 1.0):
+            
+            ax.plot(x_v, y_v, color=color, marker=marker, markeredgecolor=color, markerfacecolor='none', label=label)
+        
+        else:
+
+            points = np.column_stack([x_v, y_v]).reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            seg_colors = np.tile(to_rgba(color), (len(segments), 1))
+            seg_colors[:, 3] = (ar_v[:-1] + ar_v[1:]) / 2
+
+            lc = LineCollection(segments, colors=seg_colors, linewidth=1.5)
+            ax.add_collection(lc)
+
+            for j in range(len(x_v)):
+                ax.scatter(x_v[j], y_v[j], marker=marker, color=color, alpha=ar_v[j], s=36, zorder=3)
+
+            ax.plot([], [], color=color, marker=marker, label=label)
+        
+        return ax
+    
+    @staticmethod
+    def plot_system_performance(sim_result: SimResult):
+        """
+        Plot the system performance.
+
+        A first plot shows the system-wide BER as a function of the SNR. A second plot shows the system-wide IBR as a function of the SNR.
+        The opacity of the points in the plots is proportional to the average data stream activation rate (only needed if not all stream AR are 100%).
+
+        Parameters
+        ----------
+        sim_result : SimResult
+            The simulation results to plot.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plots.
+        axes : tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]
+            A tuple containing the axes objects for the BER and IBR plots, respectively.
+        """
+
+        # Extract data arrays.
+        snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
+        bers = np.array([sim_res.ber for sim_res in sim_result.simulation_results], dtype=float)
+        ibrs = np.array([sim_res.ibr for sim_res in sim_result.simulation_results], dtype=float)
+        stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
+
+        # Create the figure and axes.
+        fig, (ax_ber, ax_ibr) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # BER vs SNR: curve and plot settings.
+        ResultManager._plot_curve(ax_ber, snr_dB, bers, stream_ars, color="tab:blue", marker="o", label="")
+        ax_ber.set_xlabel("SNR [dB]")
+        ax_ber.set_ylabel("BER")
+        ax_ber.set_yscale("log")
+        ax_ber.set_ylim(0.5e-4, 1)
+        ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
+
+        # IBR vs SNR: curve and plot settings.
+        ResultManager._plot_curve(ax_ibr, snr_dB, ibrs, stream_ars, color="tab:blue", marker="o", label="")
+        ax_ibr.set_xlabel("SNR [dB]")
+        ax_ibr.set_ylabel("IBR")
+        ax_ibr.set_ylim(0, None)
+        ax_ibr.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax_ibr.grid(True, which="both", linestyle="--", alpha=0.6)
+
+        # Figure settings.
+        fig.suptitle(f"System Performance\n{sim_result.system_configs.name}")
+        fig.tight_layout()
+
+        # Save the figure.
+        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "system performance")
+        fig.savefig(plot_filename, dpi=300)
+        print(f"\n Saved system performance plot to:\n {plot_filename}")
+
+        return fig, (ax_ber, ax_ibr)
+
+    @staticmethod
+    def plot_ut_performance(sim_result: SimResult):
+        """
+        Plot the performance of each UT in the system.
+
+        A first plot shows the BER of each UT as a function of the SNR. A second plot shows the IBR of each UT as a function of the SNR.
+        The opacity of the points in the plots is proportional to the average UT activation rate (only needed if not all UT ARs are 100%).
+        Different UTs are plotted in different colors.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plots.
+        axes : tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]
+            A tuple containing the axes objects for the BER and IBR plots, respectively.
+        """
+
+        # Extract data arrays.
+        K = sim_result.system_configs.K
+        colors = [f"C{k}" for k in range(K)]
+        
+        snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
+        bers = np.transpose(np.array([sim_res.ut_bers for sim_res in sim_result.simulation_results], dtype=float))
+        ibrs = np.transpose(np.array([sim_res.ut_ibrs for sim_res in sim_result.simulation_results], dtype=float))
+        ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
+
+        # Create the figure and axes.
+        fig, (ax_ber, ax_ibr) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # BER vs SNR: curve plot and plot settings.
+        for k in range(K):
+            ResultManager._plot_curve(ax_ber, snr_dB, bers[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k}")
+        ax_ber.set_xlabel("SNR [dB]")
+        ax_ber.set_ylabel("BER")
+        ax_ber.set_yscale("log")
+        ax_ber.set_ylim(0.5e-4, 1)
+        ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ber.legend()
+
+        # IBR vs SNR: curve plot and plot settings.
+        for k in range(K):
+            ResultManager._plot_curve(ax_ibr, snr_dB, ibrs[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k}")
+        ax_ibr.set_xlabel("SNR [dB]")
+        ax_ibr.set_ylabel("IBR")
+        ax_ibr.set_ylim(0, None)
+        ax_ibr.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax_ibr.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ibr.legend()
+
+        # Figure settings.
+        fig.suptitle(f"System Performance (per UT)\n{sim_result.system_configs.name}")
+        fig.tight_layout()
+
+        # Save the figure.
+        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "UT performance")
+        fig.savefig(plot_filename, dpi=300)
+        print(f"\n Saved per-UT performance plot to:\n {plot_filename}")
+
+        return fig, (ax_ber, ax_ibr)
+
+    @staticmethod
+    def plot_stream_performance(sim_result: SimResult):
+        """
+        Plot the performance of each stream in the system.
+
+        A first plot shows the BER of each stream of each UT as a function of the SNR. A second plot shows the IBR of each stream of each UT as a function of the SNR.
+        The opacity of the points in the plots is proportional to the average stream activation rate (only needed if not all stream ARs are 100%).
+        Different UTs are plotted in different colors. Different streams are plotted with different markers.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plots.
+        axes : tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]
+            A tuple containing the axes objects for the BER and IBR plots, respectively.
+        """
+
+        # Extract data arrays.
+        K = sim_result.system_configs.K
+        Nr = sim_result.system_configs.Nr
+        colors = [f"C{k}" for k in range(K)]
+        markers = ['o', 's', 'd', '*', '+', 'p', 'v', '^', '<', '>']
+        
+        snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
+        stream_bers = np.array([np.transpose(np.array([sim_res.stream_bers[k] for sim_res in sim_result.simulation_results], dtype=float)) for k in range(K)])
+        stream_ibrs = np.array([np.transpose(np.array([sim_res.stream_ibrs[k] for sim_res in sim_result.simulation_results], dtype=float)) for k in range(K)])
+        stream_ars = np.array([np.transpose(np.array([sim_res.stream_ars[k] for sim_res in sim_result.simulation_results], dtype=float)) for k in range(K)])
+
+        # Create the figure and axes.
+        fig, (ax_ber, ax_ibr) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # BER vs SNR: curve plot and plot settings.
+        for k in range(K):
+            for nr in range(Nr):
+                ResultManager._plot_curve(ax_ber, snr_dB, stream_bers[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k}, Stream {nr}")
+        ax_ber.set_xlabel("SNR [dB]")
+        ax_ber.set_ylabel("BER")
+        ax_ber.set_yscale("log")
+        ax_ber.set_ylim(0.5e-4, 1)
+        ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ber.legend()
+
+        # IBR vs SNR: curve plot and plot settings.
+        for k in range(K):
+            for nr in range(Nr):
+                ResultManager._plot_curve(ax_ibr, snr_dB, stream_ibrs[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k}, Stream {nr}")
+        ax_ibr.set_xlabel("SNR [dB]")
+        ax_ibr.set_ylabel("IBR")
+        ax_ibr.set_ylim(0, None)
+        ax_ibr.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax_ibr.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ibr.legend()
+
+        # Figure settings.
+        fig.suptitle(f"System Performance (per stream)\n{sim_result.system_configs.name}")
+        fig.tight_layout()
+
+        # Save the figure.
+        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "stream performance")
+        fig.savefig(plot_filename, dpi=300)
+        print(f"\n Saved per-stream performance plot to:\n {plot_filename}")
+
+        return fig, (ax_ber, ax_ibr)
+
+    @staticmethod
+    def plot_compare_system_performance(sim_results: list[SimResult]):
         pass
 
 
 __all__ = [
-    "SingleSnrSimResult", "SimResult",
+    "SingleSnrSimResult", "SimResult", "ResultManager"
 ]

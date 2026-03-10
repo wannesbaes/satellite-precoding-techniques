@@ -151,6 +151,9 @@ class SystemConfig:
         The configuration settings of the user terminals.
     channel_configs : ChannelConfig
         The configuration settings of the channel.
+    
+    name : str
+        The name of the system configuration.
     """
 
     Pt: float
@@ -166,6 +169,8 @@ class SystemConfig:
     user_terminal_configs: UserTerminalConfig
     channel_configs: ChannelConfig
 
+    name: str
+
     def display(self):
         """
         Display system configuration settings in a readable format.
@@ -178,7 +183,7 @@ class SystemConfig:
 
         lines: list[str] = []
         
-        lines.append(f"  System configuration settings:\n")
+        lines.append(f"  {self.name}:\n")
         lines.append(f"  K  = {self.K} UTs, Nr = {self.Nr}, Nt = {self.Nt}")
         lines.append(f"  Pt = {self.Pt} W, B = {self.B} Hz")
         lines.append(f"  Precoder  : {self.base_station_configs.precoder.__name__}")
@@ -256,13 +261,17 @@ class SimConfig:
         The scope over which the minimum number of bit errors are considered.
     M : int
         The number of symbol vector transmissions for each channel realization.
+    name : str
+        The name of the simulation configuration.
     """
 
-    snr_dB_values: RealArray = field(default_factory=lambda: np.arange(-5, 31, 2.5))
-    num_channel_realizations: int = 200
-    num_bit_errors: int = 250
-    num_bit_errors_scope: Literal["system-wide", "uts", "streams"] = "uts"
-    M: int = 4800
+    snr_dB_values: RealArray
+    num_channel_realizations: int
+    num_bit_errors: int
+    num_bit_errors_scope: Literal["system-wide", "uts", "streams"]
+    M: int
+
+    name: str
 
     @property
     def snr_values(self) -> RealArray:
@@ -280,7 +289,7 @@ class SimConfig:
 
         lines: list[str] = []
 
-        lines.append(f"  Simulation configuration settings:\n")
+        lines.append(f"  {self.name}:\n")
         lines.append(f"  SNR range                  : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
         lines.append(f"  Min channel realizations   : {self.num_channel_realizations}")
         lines.append(f"  Min bit errors             : {self.num_bit_errors} ({self.num_bit_errors_scope})")

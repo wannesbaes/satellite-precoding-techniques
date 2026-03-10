@@ -46,13 +46,10 @@ class SimulationRunner:
             The simulation results.
         """
         
-        # Generate the filepath for this simulation.
-        filepath: Path = self._generate_filepath()
-
+        
         # Check if this simulation has already been executed. If so, load the results and return them.
-        if filepath.exists():
-            sim_result = self._load_results(filepath)
-            return sim_result
+        if ResultManager.search_results(self.sim_config, self.system_config):
+            return ResultManager.load_results(self.sim_config, self.system_config)
         else:
             print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + "="*60 + "\n" + self.system_config.display() + "\n" + self.sim_config.display() + "\n")
         
@@ -80,7 +77,7 @@ class SimulationRunner:
                 tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.M)
 
                 # Store inner loop results.
-                inner_loop_result = self._calculate_inner_loop_result(tx_bits_list, rx_bits_list)
+                inner_loop_result = self._calculate_inner_loop_result(snr, tx_bits_list, rx_bits_list)
                 inner_loop_results.append(inner_loop_result)
 
                 # Stopping criterion.
@@ -92,59 +89,12 @@ class SimulationRunner:
 
         # Save simulation results.
         simulation_result = SimResult(
-            filename = filepath,
             sim_configs = self.sim_config,
             system_configs = self.system_config,
-            snr_dB_values = self.sim_config.snr_dB_values,
             simulation_results = simulation_results)
-        self._save_results(simulation_result)
+        ResultManager.save_results(simulation_result)
 
         return simulation_result
-        
-    def _generate_filepath(self) -> Path:
-        """
-        Generate a unique filepath for each distinct simulation and system configuration.
-
-        Returns
-        -------
-        filepath : Path
-            The generated filepath for the simulation results. 
-        """
-
-        # Create the results directory if it does not exist.
-        results_dir = Path(__file__).resolve().parents[2] / "report" / "simulation_results"
-        results_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate the filename based on the system and simulation configurations.
-        snr_dB_values = self.sim_config.snr_dB_values
-        c_cfg = self.system_config.c_configs
-        bs_cfg = self.system_config.base_station_configs
-        ut_cfg = self.system_config.user_terminal_configs
-        ch_cfg = self.system_config.channel_configs
-
-        name_parts = [
-            f"K_{self.system_config.K}",
-            f"Nt_{self.system_config.Nt}",
-            f"Nr_{self.system_config.Nr}",
-            f"snr_min_{snr_dB_values.min()}",
-            f"snr_max_{snr_dB_values.max()}",
-            f"snr_step_{int(snr_dB_values[-1] - snr_dB_values[-2])}" if len(snr_dB_values) > 1 else "0",
-            f"ncr_{self.sim_config.num_channel_realizations}",
-            f"nbe_{self.sim_config.num_bit_errors}",
-            f"nbe_scope_{self.sim_config.num_bit_errors_scope}",
-            f"ns_{self.sim_config.M}",
-            f"prec_{bs_cfg.precoder.__name__}",
-            f"comb_{ut_cfg.combiner.__name__}",
-            f"bl_{bs_cfg.bit_loader.__name__}",
-            f"c_cfg_{str(c_cfg).replace(': ', '_').replace('\n', '_')}",
-            f"cm_{ch_cfg.channel_model.__name__}",
-            f"nm_{ch_cfg.noise_model.__name__}",
-        ]
-        filename = "__".join(name_parts) + ".npz"
-
-        # Generate the full file path.
-        filepath = results_dir / filename
-        return filepath
 
     def _calculate_bit_error_count_update(self, inner_loop_result: SingleSnrSimResult) -> int:
         """
@@ -176,12 +126,14 @@ class SimulationRunner:
         becu = int(becu) if not np.isnan(becu) else 0
         return becu
 
-    def _calculate_inner_loop_result(self, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]]) -> SingleSnrSimResult:
+    def _calculate_inner_loop_result(self, snr: float, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]]) -> SingleSnrSimResult:
         """
         Calculate the performance metrics for a simulation corresponding to a single channel realization and SNR value.
 
         Parameters
         ----------
+        snr : float
+            The SNR value for this simulation.
         tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
         rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
@@ -197,6 +149,8 @@ class SimulationRunner:
         K = self.system_config.K
         Nr = self.system_config.Nr
         Ns = [len(tx_bits_list[k]) for k in range(K)]
+
+        snr_dB = 10 * np.log10(snr)
         
         stream_ibrs = [np.zeros((Nr,), dtype=int) for k in range(K)]
         stream_becs = [np.full((Nr,), np.nan, dtype=float) for k in range(K)]
@@ -226,6 +180,7 @@ class SimulationRunner:
 
         # Termination.
         inner_loop_result = SingleSnrSimResult(
+            snr_dB = snr_dB,
             stream_ibrs = stream_ibrs,
             stream_becs = stream_becs,
             stream_ars = stream_ars,
@@ -257,6 +212,10 @@ class SimulationRunner:
 
 
         # Initialization.
+        snr_dB = inner_loop_results[0].snr_dB
+        if not all(snr_dB == ilr.snr_dB for ilr in inner_loop_results):
+            raise ValueError("The SNR values of the inner loop results are not all the same. Please check the inner loop results to resolve this issue.")
+        
         K = len(inner_loop_results[0].stream_ibrs)
         
 
@@ -304,6 +263,7 @@ class SimulationRunner:
 
         # Termination.
         outer_loop_result = SingleSnrSimResult(
+            snr_dB = snr_dB,
             stream_ibrs = stream_ibrs,
             stream_becs = stream_becs,
             stream_ars = stream_ars,
@@ -317,57 +277,6 @@ class SimulationRunner:
             M = self.sim_config.M,
             num_channel_realizations = len(inner_loop_results))
         return outer_loop_result
-
-    def _load_results(self, filepath: Path) -> SimResult:
-        """
-        Load simulation results from a previously executed simulation with the same simulation and system configuration.
-
-        Parameters
-        ----------
-        filepath : Path
-            The path to the .npz file containing the simulation results.
-        
-        Returns
-        -------
-        sim_result : SimResult
-            The loaded simulation results.
-        """
-        
-        # Load the simulation results from the .npz file.
-        loaded_data = np.load(filepath, allow_pickle=True)
-        sim_result = SimResult(
-            filename = Path(str(loaded_data["filename"])),
-            sim_configs = loaded_data["sim_configs"].item(),
-            system_configs = loaded_data["system_configs"].item(),
-            snr_dB_values = loaded_data["snr_dB_values"],
-            simulation_results = loaded_data["simulation_results"].tolist())
-        
-        # Validate that the loaded simulation results match the current simulation and system configuration.
-        if self.sim_config != sim_result.sim_configs or self.system_config != sim_result.system_configs:
-            raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
-        
-        return sim_result
-
-    def _save_results(self, simulation_result: SimResult) -> None:
-        """
-        Save the simulation results to a .npz file. 
-
-        Parameters
-        ----------
-        simulation_result : SimResult
-            The simulation results to save.
-        """
-
-        # Save the simulation results to a .npz file.
-        np.savez(simulation_result.filename,
-            filename = simulation_result.filename,
-            sim_configs = simulation_result.sim_configs,
-            system_configs = simulation_result.system_configs,
-            snr_dB_values = simulation_result.snr_dB_values,
-            simulation_results = np.array(simulation_result.simulation_results, dtype=object))
-        
-        print(f"\n Simulation results saved to:\n {simulation_result.filename}")
-        return
 
 class MuMimoSystem:
     """

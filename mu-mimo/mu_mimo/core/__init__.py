@@ -6,9 +6,9 @@ mu_mimo.core package
 """
 
 from .system import SimulationRunner, MuMimoSystem, BaseStation, Channel, UserTerminal
-from .results import SingleSnrSimResult, SimResult
+from .results import SingleSnrSimResult, SimResult, ResultManager
 
 __all__ = [ 
     "SimulationRunner", "MuMimoSystem", "BaseStation", "Channel", "UserTerminal",
-    "SingleSnrSimResult", "SimResult",
+    "SingleSnrSimResult", "SimResult", "ResultManager",
 ]
