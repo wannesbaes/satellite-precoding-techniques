@@ -3,7 +3,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import numpy as np
-from ..types import ComplexArray
+from ..types import ComplexArray, IntArray
 
 
 class Combiner(ABC):
@@ -34,7 +34,7 @@ class Combiner(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def apply(y_k: ComplexArray, G_k: ComplexArray,  Ns_k: int) -> ComplexArray:
+    def apply(y_k: ComplexArray, G_k: ComplexArray,  ibr_k: IntArray) -> ComplexArray:
         """
         Apply the combining matrix to the received signal.
 
@@ -44,15 +44,15 @@ class Combiner(ABC):
             The received signal for the this UT.
         G_k : ComplexArray, shape (Nr, Nr)
             The combining matrix for the this UT.
-        Ns_k : int
-            The number of data streams for the this UT.
+        ibr_k : IntArray, shape (Nr,)
+            The information bit rate for each data stream of the this UT.
 
         Returns
         -------
         z_k : ComplexArray, shape (Ns_k, M)
             The combined signal for the this UT.
         """
-        z_k = G_k[:Ns_k, :] @ y_k
+        z_k = G_k[ibr_k > 0, :] @ y_k
         return z_k
 
 class NeutralCombiner(Combiner):

@@ -7,14 +7,15 @@ from mu_mimo import *
 simulation_configuration_settings = [
 
     # Standard Simulation Configution Settings.
-    {'number': 0,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 2048,    'name': 'Sim Config 0',    'description': "Standard Simulation Configution Settings"},
+    {'number': 0,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 512,    'name': 'Sim Config 0',    'description': "Standard Simulation Configution Settings"},
 
     # Standard Simulation Configution Settings, bit errors per UT and per stream.
-    {'number': 1,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'uts',            'Transmission per channel realization': 2048,    'name': 'Sim Config 1',    'description': "Standard Simulation Configution Settings (UT-level bit errors counting)"},
-    {'number': 2,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'streams',        'Transmission per channel realization': 2048,    'name': 'Sim Config 2',    'description': "Standard Simulation Configution Settings (Stream-level bit errors counting)"},
+    {'number': 1,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'uts',            'Transmission per channel realization': 1024,    'name': 'Sim Config 1',    'description': "Standard Simulation Configution Settings (UT-level bit errors counting)"},
+    {'number': 2,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'streams',        'Transmission per channel realization': 1024,    'name': 'Sim Config 2',    'description': "Standard Simulation Configution Settings (Stream-level bit errors counting)"},
 
     # Test Simulation Configution Settings for code validation and debugging purposes only.
-    {'number': 3,    'SNR values (in dB)': np.arange(-10, 31, 10),    'channel realizations per SNR value': 10,       'bit errors per SNR value': 10,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 256,     'name': 'Sim Config 3',    'description': "Test Simulation Configution Settings"},
+    {'number': 3,    'SNR values (in dB)': np.arange(-10, 31, 10),    'channel realizations per SNR value': 10,       'bit errors per SNR value': 10,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 1,     'name': 'Sim Config 3',    'description': "First Test Simulation Configution Settings"},
+    {'number': 4,    'SNR values (in dB)': np.arange(-10, 31, 5),     'channel realizations per SNR value': 100,       'bit errors per SNR value': 50,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 512,     'name': 'Sim Config 4',    'description': "Second Test Simulation Configution Settings"},
 ]
 
 system_configuration_settings = [
@@ -137,4 +138,4 @@ def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
 
 
 if __name__ == "__main__":
-    main(sim_config_indices = [3], sys_config_indices = [17])
+    main(sim_config_indices = [4], sys_config_indices = np.arange(1, 19))

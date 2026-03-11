@@ -78,7 +78,6 @@ class UserTerminalState:
     c_type_k: ConstType | None
     C_eq_k: ComplexArray | None
     ibr_k: IntArray | None
-    Ns_k: int | None
 
 
 @dataclass()
@@ -139,15 +138,12 @@ class TransmitFeedforwardMessage:
         The equalization coefficients for each data stream of each UT.
     ibr : IntArray, shape (K*Nr,)
         The information bit rates for each data stream of each UT.
-    Ns : IntArray, shape (K,)
-        The number of data streams for each UT.
     G : ComplexArray, shape (K*Nr, K*Nr)
         The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
     c_type: list[ConstType]
     C_eq: ComplexArray
     ibr: IntArray
-    Ns: IntArray
     G: ComplexArray | None
 
 @dataclass()
@@ -165,8 +161,6 @@ class ReceiveFeedforwardMessage:
         The equalization coefficients for each data stream of this UT.
     ibr_k : IntArray, shape (Nr,)
         The information bit rates for each data stream of this UT.
-    Ns_k : int
-        The number of data streams for this UT.
     G_k : ComplexArray, shape (Nr, Nr)
         The combining matrix of this UT. It is None in case of non-coordinated beamforming.
     """
@@ -174,7 +168,6 @@ class ReceiveFeedforwardMessage:
     c_type_k: ConstType
     C_eq_k: ComplexArray
     ibr_k: IntArray
-    Ns_k: int
     G_k: ComplexArray | None
 
 

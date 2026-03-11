@@ -54,7 +54,8 @@ class BitLoader(ABC):
         """
         Apply the bit loader.
 
-        The bit loader allocates the right number of bits for each data stream for each UT.
+        The bit loader allocates the right number of bits for each active data stream for each UT.
+        Non-active data streams (i.e., data streams with ibr = 0) are not allocated any bits.
 
         Parameters
         ----------

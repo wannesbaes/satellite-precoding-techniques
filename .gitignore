@@ -24,8 +24,8 @@ docs/build/
 # Reports: data folders.
 */report/LaTeX/src/
 */report/figures/src/
+*/report/plots/
+*/report/simulation_results/
 
-# Simulation results: data folders.
-su-mimo/report/plots/simulation_results/
-su-mimo/report/plots/analytical_results/
+# Simulation results channel gains.
 su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/

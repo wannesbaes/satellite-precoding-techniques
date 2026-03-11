@@ -217,7 +217,7 @@ class Mapper(ABC):
         """
         Apply the mapper operation to the bitstreams.
 
-        For each data stream of each user terminal, the mapper converts the bitstream into a data symbol stream according to the information bit rate (number of bits per symbol or thus the constellation size in bits).
+        For each active data stream of each user terminal, the mapper converts the bitstream into a data symbol stream according to the information bit rate (number of bits per symbol or thus the constellation size in bits).
 
         Parameters
         ----------
@@ -264,26 +264,24 @@ class GrayCodeMapper(Mapper):
 
         # Initialization.
         K    = len(c_types)
-        Nr   = ibr.size // K
-        mask = np.arange(Nr) < Ns[:, None]
-        ibr  = ibr.reshape(K, Nr)[mask]         # Only keep the ibr values of the active data streams, shape (Ns_total,)
+        ibr  = ibr[ibr > 0]
+
+        Ns_total = np.sum(Ns)
+        M = len(b[np.argmax(ibr)]) // np.max(ibr) if len(ibr) > 0 else 0
 
         c_types = [c_types[k] for k in range(K) for _ in range(Ns[k])]
         
-        Ns_total = np.sum(Ns)
-        M        = len(b[np.argmax(ibr)]) // np.max(ibr)  
-        
         # Convert the binary bitstreams, interpret as Gray code numbers, to their corresponding decimal representations.
         d = np.empty((Ns_total, M), dtype=int)
-        for s in range(Ns_total):
+        for a_s in range(Ns_total):
             for m in range(M):
-                d[s, m] = NumberRepresentation.gray_to_decimal(b[s][m*ibr[s] : (m+1)*ibr[s]])
+                d[a_s, m] = NumberRepresentation.gray_to_decimal(b[a_s][m*ibr[a_s] : (m+1)*ibr[a_s]])
 
         # Map the decimal numbers to their corresponding constellation points.
         a = np.empty((Ns_total, M), dtype=complex)
-        for s in range(Ns_total):
-            constellation_points = Constellation(type=c_types[s], size=2**ibr[s]).points
-            a[s] = constellation_points[d[s]]
+        for a_s in range(Ns_total):
+            constellation_points = Constellation(type=c_types[a_s], size=2**ibr[a_s]).points
+            a[a_s] = constellation_points[d[a_s]]
 
         return a
 
@@ -295,7 +293,7 @@ class Demapper(ABC):
 
     @staticmethod
     @abstractmethod
-    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, Ns_k: int) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray) -> list[BitArray]:
         """
         Apply the demapper operation to the reconstructed symbol streams.
 
@@ -307,8 +305,6 @@ class Demapper(ABC):
             The indices of the constellation points (decimal integers) corresponding to the reconstructed data symbols, for each data stream of this user terminal.
         ibr_k : IntArray, shape (Nr,)
             The information bit rate for each data stream of this user terminal.
-        Ns_k : int
-            The number of active data streams for this user terminal.
         
         Returns
         -------
@@ -326,15 +322,15 @@ class NeutralDemapper(Demapper):
     """
 
     @staticmethod
-    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, Ns_k: int) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray) -> list[BitArray]:
 
-        if not np.all(ibr_k[:Ns_k] == 1):
+        if not np.all(ibr_k[ibr_k > 0] == 1):
             raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDemapper.")
         
         if not np.all(np.isin(cpi_k_hat, [0, 1])):
             raise ValueError("The reconstructed data symbol stream must consist of symbols that are either 0 or 1 when using the NeutralDemapper.")
         
-        b_k_hat = [cpi_k_hat[s] for s in range(Ns_k)]
+        b_k_hat = [cpi_k_hat[s] for s in range(np.sum(ibr_k > 0))]
         return b_k_hat
 
 class GrayCodeDemapper(Demapper):
@@ -343,17 +339,18 @@ class GrayCodeDemapper(Demapper):
     """
 
     @staticmethod
-    def apply(cpi_k_hat: IntArray, ibr_k: IntArray, Ns_k: int) -> list[BitArray]:
+    def apply(cpi_k_hat: IntArray, ibr_k: IntArray) -> list[BitArray]:
 
         # Determine the number of data streams and the number of symbol vectors.
         M = cpi_k_hat.shape[1]
-        ibr_k = ibr_k[:Ns_k]
+        ibr_k = ibr_k[ibr_k > 0]
+        Ns_k = np.sum(ibr_k > 0)
         
         # Convert the decimal index numbers to their Gray code representations.
-        b_k_hat = [np.empty(ibr_k[s]*M) for s in range(Ns_k)]
-        for s in range(Ns_k):
+        b_k_hat = [np.empty(ibr_k[a_s]*M) for a_s in range(Ns_k)]
+        for a_s in range(Ns_k):
             for m in range(M):
-                b_k_hat[s][m*ibr_k[s] : (m+1)*ibr_k[s]] = NumberRepresentation.decimal_to_gray(cpi_k_hat[s, m], length=ibr_k[s])
+                b_k_hat[a_s][m*ibr_k[a_s] : (m+1)*ibr_k[a_s]] = NumberRepresentation.decimal_to_gray(cpi_k_hat[a_s, m], length=ibr_k[a_s])
         
         return b_k_hat
 
@@ -366,7 +363,7 @@ class Equalizer():
     """
 
     @staticmethod
-    def apply(z_k: ComplexArray, C_eq_k: ComplexArray, Ns_k: int) -> ComplexArray:
+    def apply(z_k: ComplexArray, C_eq_k: ComplexArray, ibr_k: IntArray) -> ComplexArray:
         """
         Apply the equalization operation to the combined signal.
 
@@ -378,15 +375,16 @@ class Equalizer():
             The combined signal for this UT.
         C_eq_k : ComplexArray, shape (Nr,)
             The equalization coefficients for each data stream of this UT.
-        Ns_k : int
-            The number of active data streams for this UT.
+        ibr_k : IntArray, shape (Nr,)
+            The information bit rate for each data stream of this UT.
+            
         
         Returns
         -------
         u_k : ComplexArray, shape (Ns_k, M)
             The decision variable streams for this UT.
         """
-        u_k = z_k / C_eq_k[:Ns_k, np.newaxis]
+        u_k = z_k / C_eq_k[ibr_k > 0][:, np.newaxis]
         return u_k
 
 
@@ -399,7 +397,7 @@ class Detector(ABC):
 
     @staticmethod
     @abstractmethod
-    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType, Ns_k: int) -> IntArray:
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType) -> IntArray:
         """
         Apply the detector operation to the decision variable streams.
 
@@ -415,8 +413,6 @@ class Detector(ABC):
             The information bit rate for each data stream of this user terminal.
         c_type_k : ConstType
             The constellation type for the data streams to this user terminal.
-        Ns_k : int
-            The number of active data streams for this user terminal.
         
         Returns
         -------
@@ -434,9 +430,9 @@ class NeutralDetector(Detector):
     """
 
     @staticmethod
-    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType, Ns_k: int) -> IntArray:
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType) -> IntArray:
 
-        if not np.all(ibr_k == 1):
+        if not np.all(ibr_k[ibr_k > 0] == 1):
             raise ValueError("The information bit rate must be equal to one bit per symbol for each data stream when using the NeutralDetector.")
         
         cpi_k_hat = np.array(u_k.real, dtype=int)
@@ -448,16 +444,17 @@ class MDDetector(Detector):
     """
     
     @staticmethod
-    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType, Ns_k: int) -> IntArray:
+    def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType) -> IntArray:
 
         # Determine the number of symbol vectors.
         M = u_k.shape[1]
-        ibr_k = ibr_k[:Ns_k]
+        ibr_k = ibr_k[ibr_k > 0]
+        Ns_k = np.sum(ibr_k > 0)
 
         # Decide the constellation points that are most likely transmitted by finding the constellation points that are closest to the decision variables. Then, retrieve the corresponding constellation point indices (decimal integers) of the decided constellation points.
         cpi_k_hat = np.empty((Ns_k, M), dtype=int)
-        for s in range(Ns_k):
-            constellation_points = Constellation(type=c_type_k, size=2**ibr_k[s]).points
-            cpi_k_hat[s] = np.argmin( np.abs(np.tile(constellation_points, (M, 1)) - u_k[s][:, np.newaxis]), axis=1)
+        for a_s in range(Ns_k):
+            constellation_points = Constellation(type=c_type_k, size=2**ibr_k[a_s]).points
+            cpi_k_hat[a_s] = np.argmin( np.abs(np.tile(constellation_points, (M, 1)) - u_k[a_s][:, np.newaxis]), axis=1)
 
         return cpi_k_hat

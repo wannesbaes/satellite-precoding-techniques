@@ -46,7 +46,7 @@ class Precoder(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def apply(a: ComplexArray, F: ComplexArray, Ns: IntArray) -> ComplexArray:
+    def apply(a: ComplexArray, F: ComplexArray, ibr: IntArray) -> ComplexArray:
         """
         Apply the precoding matrix to the data symbols.
 
@@ -56,23 +56,16 @@ class Precoder(ABC):
             The data symbol streams for all UTs.
         F : ComplexArray, shape (Nt, K*Nr)
             The compound precoding matrix for all UTs.
-        Ns : IntArray, shape (K,)
-            The number of data streams for each UT.
+        ibr : IntArray, shape (K*Nr,)
+            The number of bits per symbol for each data stream (active and inactve).
 
         Returns
         -------
-        x : ComplexArray, shape (Nt,)
+        x : ComplexArray, shape (Nt, M)
             The precoded signal to be transmitted by the BS.
         """
-        
-        K = len(Ns)
-        Nt = F.shape[0]
-        Nr = F.shape[1] // K
 
-        mask = np.arange(Nr) < Ns[:, None]
-        F = F.reshape(Nt, K, Nr)[:, mask].reshape(Nt, np.sum(Ns))
-
-        x = F @ a
+        x = F[:, ibr > 0] @ a
         return x
 
 class NeutralPrecoder(Precoder):

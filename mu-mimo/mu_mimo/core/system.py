@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import numpy as np
-from pathlib import Path
 from tqdm import tqdm
 
 from ..types import *
@@ -62,9 +61,10 @@ class SimulationRunner:
             inner_loop_results: list[SingleSnrSimResult] = []
             bit_error_count = 0
             channel_realization_count = 0
+            hard_stop = 0
 
             # Inner loop: Iterate over the channel realizations.
-            while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors):
+            while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.num_channel_realizations):
 
                 # Reset.
                 csi = ChannelStateInformation(snr=snr, H_eff=None)
@@ -83,6 +83,7 @@ class SimulationRunner:
                 # Stopping criterion.
                 channel_realization_count += 1
                 bit_error_count += self._calculate_bit_error_count_update(inner_loop_result)
+                hard_stop += 1
 
             # Store outer loop results.
             simulation_results.append(self._calculate_outer_loop_result(inner_loop_results))
@@ -148,7 +149,8 @@ class SimulationRunner:
         # Initialization.
         K = self.system_config.K
         Nr = self.system_config.Nr
-        Ns = [len(tx_bits_list[k]) for k in range(K)]
+        ibr = self.mu_mimo_system.bs.state.ibr
+        Ns = self.mu_mimo_system.bs.state.Ns
 
         snr_dB = 10 * np.log10(snr)
         
@@ -163,10 +165,11 @@ class SimulationRunner:
         # Iteration.
         for k in range(K):
 
-            for s in range(Ns[k]):
-                stream_ibrs[k][s] = len(tx_bits_list[k][s]) // self.sim_config.M
-                stream_becs[k][s] = np.sum(tx_bits_list[k][s] != rx_bits_list[k][s])
-                stream_ars[k][s] = 1
+            for a_s in range(Ns[k]):
+                active_streams = np.where(ibr[k*Nr : (k+1)*Nr] > 0)[0]
+                stream_ibrs[k][active_streams[a_s]] = len(tx_bits_list[k][a_s]) // self.sim_config.M
+                stream_becs[k][active_streams[a_s]] = np.sum(tx_bits_list[k][a_s] != rx_bits_list[k][a_s])
+                stream_ars[k][active_streams[a_s]] = 1
             
             ut_ibrs[k] = np.sum(stream_ibrs[k])
             ut_becs[k] = np.nansum(stream_becs[k]) if not np.all(np.isnan(stream_becs[k])) else np.nan
@@ -216,7 +219,7 @@ class SimulationRunner:
         if not all(snr_dB == ilr.snr_dB for ilr in inner_loop_results):
             raise ValueError("The SNR values of the inner loop results are not all the same. Please check the inner loop results to resolve this issue.")
         
-        K = len(inner_loop_results[0].stream_ibrs)
+        K = self.system_config.K
         
 
         # Iteration.
@@ -512,7 +515,7 @@ class BaseStation:
 
         tx_bits_list, b = self.bit_loader.apply(self.state.ibr, M, self.state.Ns)
         a = self.mapper.apply(b, self.state.ibr, self.c_configs.types, self.state.Ns)
-        x = self.precoder.apply(a, self.state.F, self.state.Ns)
+        x = self.precoder.apply(a, self.state.F, self.state.ibr)
 
         return tx_bits_list, x
 
@@ -658,7 +661,6 @@ class Channel:
         c_type = tx_ff_msg.c_type
         C_eq = tx_ff_msg.C_eq
         ibr = tx_ff_msg.ibr
-        Ns = tx_ff_msg.Ns
         G = tx_ff_msg.G
 
         # Split the transmitted feedforward message elemtens into K different elements for each UT.
@@ -667,7 +669,7 @@ class Channel:
         G_k_list    = [ G[k*self.Nr:(k+1)*self.Nr, k*self.Nr:(k+1)*self.Nr] for k in range(self.K)] if G is not None else [None]*self.K
 
         # Generate the feedforward messages that will be received by the UTs.
-        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, c_type_k=c_type[k], C_eq_k=C_eq_k_list[k], ibr_k=ibr_k_list[k], Ns_k=Ns[k], G_k=G_k_list[k]) for k in range(self.K) ]
+        rx_ff_msgs = [ReceiveFeedforwardMessage(ut_id=k, c_type_k=c_type[k], C_eq_k=C_eq_k_list[k], ibr_k=ibr_k_list[k], G_k=G_k_list[k]) for k in range(self.K) ]
 
         return rx_ff_msgs
 
@@ -768,7 +770,7 @@ class UserTerminal:
         G_k = self.combiner.compute(H_k)
 
         # Update the state of the UT to the current channel realization.
-        self.state = UserTerminalState(H_k=H_k, G_k=G_k, c_type_k=None, C_eq_k=None, ibr_k=None, Ns_k=None)
+        self.state = UserTerminalState(H_k=H_k, G_k=G_k, c_type_k=None, C_eq_k=None, ibr_k=None)
         
         return
     
@@ -805,7 +807,6 @@ class UserTerminal:
         self.state.c_type_k = rx_ff_msg.c_type_k
         self.state.C_eq_k = rx_ff_msg.C_eq_k
         self.state.ibr_k = rx_ff_msg.ibr_k
-        self.state.Ns_k = rx_ff_msg.Ns_k
 
         return
 
@@ -832,10 +833,10 @@ class UserTerminal:
             The list of estimated bitstreams for each data stream s of this UT.
         """
 
-        u_k = self.combiner.apply(y_k, self.state.G_k, self.state.Ns_k)
-        u_k = self.equalizer.apply(u_k, self.state.C_eq_k, self.state.Ns_k)
-        cpi_k_hat = self.detector.apply(u_k, self.state.ibr_k, self.state.c_type_k, self.state.Ns_k)
-        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k, self.state.Ns_k)
+        z_k = self.combiner.apply(y_k, self.state.G_k, self.state.ibr_k)
+        u_k = self.equalizer.apply(z_k, self.state.C_eq_k, self.state.ibr_k)
+        cpi_k_hat = self.detector.apply(u_k, self.state.ibr_k, self.state.c_type_k)
+        b_k_hat = self.demapper.apply(cpi_k_hat, self.state.ibr_k)
         rx_bits = b_k_hat
         
         return rx_bits
