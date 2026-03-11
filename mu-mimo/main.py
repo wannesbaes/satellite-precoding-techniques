@@ -118,6 +118,8 @@ def _setup_settings(sim_config_idx, sys_config_idx):
 
 def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
 
+    results = []
+
     for sim_config_idx in sim_config_indices:
         for sys_config_idx in sys_config_indices:
 
@@ -129,13 +131,14 @@ def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
             result = runner.run()
 
             # 3. RESULT.
+            results.append(result)
             ResultManager.display(result)
             ResultManager.plot_system_performance(result)
             ResultManager.plot_ut_performance(result)
             ResultManager.plot_stream_performance(result)
 
-    return
+    return results
 
 
 if __name__ == "__main__":
-    main(sim_config_indices = [4], sys_config_indices = np.arange(1, 19))
+    results = main(sim_config_indices = [4], sys_config_indices = [2])

@@ -295,15 +295,15 @@ class ResultManager:
     # PLOT.
 
     @staticmethod
-    def _plot_filename(sim_result: SimResult, plot_type: str) -> Path:
+    def _plot_filename(sim_results: list[SimResult], plot_type: str) -> Path:
         """
         Generate the file path where the plot should be saved.
         The filename is generated based on the name of the simulation configuration and the name of the system configuration, and the type of plot.
 
         Parameters
         ----------
-        sim_result : SimResult
-            The simulation results for which the plot is generated.
+        sim_results : list[SimResult]
+            A list of simulation results for which the plot is generated.
         plot_type : str
             A string indicating the type of plot.
         
@@ -318,7 +318,8 @@ class ResultManager:
         plots_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate the filename based on the system and simulation configurations, and the type of plot.
-        filename = f"{sim_result.sim_configs.name} - {sim_result.system_configs.name}" + f" - {plot_type}.png"
+        system_names = [f"{sim_result.system_configs.name}" for sim_result in sim_results]
+        filename = f"{sim_results[0].sim_configs.name}" + f" -- {' - '.join(system_names)}" + f" -- {plot_type}.png"
 
         # Return the full file path.
         filepath = plots_dir / filename
@@ -402,7 +403,7 @@ class ResultManager:
         fig.tight_layout()
 
         # Save the figure.
-        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "system performance")
+        plot_filename = ResultManager._plot_filename([sim_result], plot_type = "system performance")
         fig.savefig(plot_filename, dpi=300)
         print(f"\n Saved system performance plot to:\n {plot_filename}")
 
@@ -462,7 +463,7 @@ class ResultManager:
         fig.tight_layout()
 
         # Save the figure.
-        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "UT performance")
+        plot_filename = ResultManager._plot_filename([sim_result], plot_type = "UT performance")
         fig.savefig(plot_filename, dpi=300)
         print(f"\n Saved per-UT performance plot to:\n {plot_filename}")
 
@@ -526,17 +527,153 @@ class ResultManager:
         fig.tight_layout()
 
         # Save the figure.
-        plot_filename = ResultManager._plot_filename(sim_result, plot_type = "stream performance")
+        plot_filename = ResultManager._plot_filename([sim_result], plot_type = "stream performance")
         fig.savefig(plot_filename, dpi=300)
         print(f"\n Saved per-stream performance plot to:\n {plot_filename}")
 
         return fig, (ax_ber, ax_ibr)
 
     @staticmethod
-    def plot_compare_system_performance(sim_results: list[SimResult]):
-        pass
+    def plot_system_performance_comparison(sim_results: list[SimResult]):
+        """
+        Plot the system performance of multiple systems in a single plot for comparison.
+
+        A first plot shows the system-wide BER as a function of the SNR. A second plot shows the system-wide IBR as a function of the SNR.
+        The opacity of the points in the plots is proportional to the average data stream activation rate (only needed if not all stream AR are 100%).
+        Different systems are plotted in different colors.
+
+        Parameters
+        ----------
+        sim_results : list[SimResult]
+            A list of simulation results to plot.
+        
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plots.
+        axes : tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]
+            A tuple containing the axes objects for the BER and IBR plots, respectively.
+        """
+        
+        # Validate the simulation configuration settings.
+        if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
+            raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
+        
+        # Create the figure and axes.
+        fig, (ax_ber, ax_ibr) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Plot each system result.
+        for i, sim_result in enumerate(sim_results):
+            
+            snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
+            bers = np.array([sim_res.ber for sim_res in sim_result.simulation_results], dtype=float)
+            ibrs = np.array([sim_res.ibr for sim_res in sim_result.simulation_results], dtype=float)
+            stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
+
+            ResultManager._plot_curve(ax_ber, snr_dB, bers, stream_ars, color=f"C{i}", marker="o", label=sim_result.system_configs.name)
+            ResultManager._plot_curve(ax_ibr, snr_dB, ibrs, stream_ars, color=f"C{i}", marker="o", label=sim_result.system_configs.name)
+
+        # BER plot settings.
+        ax_ber.set_xlabel("SNR [dB]")
+        ax_ber.set_ylabel("BER")
+        ax_ber.set_yscale("log")
+        ax_ber.set_ylim(0.5e-4, 1)
+        ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ber.legend()
+
+        # IBR plot settings.
+        ax_ibr.set_xlabel("SNR [dB]")
+        ax_ibr.set_ylabel("IBR")
+        ax_ibr.set_ylim(0, None)
+        ax_ibr.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax_ibr.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ibr.legend()
+
+        # Figure title.
+        fig.suptitle(f"System Performance Comparison")
+        fig.tight_layout()
+
+        # Save the figure.
+        plot_filename = ResultManager._plot_filename(sim_results, plot_type = "system performance comparison")
+        fig.savefig(plot_filename, dpi=300)
+        print(f"\n Saved system performance comparison plot to:\n {plot_filename}")
+
+        return fig, (ax_ber, ax_ibr)
+
+    @staticmethod
+    def plot_ut_performance_comparison(sim_results: list[SimResult]):
+        """
+        Plot the user terminal performance of multiple systems in a single plot for comparison.
+
+        A first plot shows the BER of each UT as a function of the SNR. A second plot shows the IBR of each UT as a function of the SNR.
+        The opacity of the points in the plots is proportional to the average UT activation rate (only needed if not all UT ARs are 100%).
+        Different systems are plotted in different colors. Different UTs are plotted with different markers.
+
+        Parameters
+        ----------
+        sim_results : list[SimResult]
+            A list of simulation results to plot.
+        
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object containing the plots.
+        axes : tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]
+            A tuple containing the axes objects for the BER and IBR plots, respectively.
+        """
+
+        # Validate the simulation configuration settings.
+        if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
+            raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
+
+        # Marker per UT (constant across systems), color per system.
+        markers = ["o", "s", "d", "*", "+", "p", "v", "^", "<", ">"]
 
 
+        # Create the figure and axes.
+        fig, (ax_ber, ax_ibr) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Plot each system and each UT.
+        for i, sim_result in enumerate(sim_results):
+            
+            snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
+            ut_bers = np.transpose(np.array([sim_res.ut_bers for sim_res in sim_result.simulation_results], dtype=float))
+            ut_ibrs = np.transpose(np.array([sim_res.ut_ibrs for sim_res in sim_result.simulation_results], dtype=float))
+            ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
+
+            for k in range(sim_result.system_configs.K):
+
+                ResultManager._plot_curve(ax_ber, snr_dB, ut_bers[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k}")
+                ResultManager._plot_curve(ax_ibr, snr_dB, ut_ibrs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k}")
+
+        # BER plot settings.
+        ax_ber.set_xlabel("SNR [dB]")
+        ax_ber.set_ylabel("BER")
+        ax_ber.set_yscale("log")
+        ax_ber.set_ylim(0.5e-4, 1)
+        ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ber.legend()
+
+        # IBR plot settings.
+        ax_ibr.set_xlabel("SNR [dB]")
+        ax_ibr.set_ylabel("IBR")
+        ax_ibr.set_ylim(0, None)
+        ax_ibr.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax_ibr.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_ibr.legend()
+
+        # Figure title.
+        fig.suptitle("UT Performance Comparison")
+        fig.tight_layout()
+
+        # Save the figure.
+        plot_filename = ResultManager._plot_filename(sim_results, plot_type="UT performance comparison")
+        fig.savefig(plot_filename, dpi=300)
+        print(f"\n Saved UT performance comparison plot to:\n {plot_filename}")
+
+        return fig, (ax_ber, ax_ibr)
+
+        
 __all__ = [
     "SingleSnrSimResult", "SimResult", "ResultManager"
 ]
