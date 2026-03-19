@@ -5,7 +5,7 @@ mu_mimo.processing package
 @date 2026
 """
 
-from .precoding import Precoder, NeutralPrecoder, ZFPrecoder
+from .precoding import Precoder, NeutralPrecoder, SVDPrecoder, ZFPrecoder, BDPrecoder, WMMSEPrecoder
 
 from .combining import Combiner, NeutralCombiner, LSVCombiner
 
@@ -26,7 +26,7 @@ from .channel import (
 
 
 __all__ = [
-    "Precoder", "NeutralPrecoder", "ZFPrecoder",
+    "Precoder", "NeutralPrecoder", "SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder",
     "Combiner", "NeutralCombiner", "LSVCombiner",
     "BitLoader", "NeutralBitLoader", "FixedBitLoader", "AdaptiveBitLoader",
     "Constellation", "NumberRepresentation",

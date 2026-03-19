@@ -67,17 +67,16 @@ class SimulationRunner:
             while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.num_channel_realizations):
 
                 # Reset.
-                csi = ChannelStateInformation(snr=snr, H_eff=None)
-                self.mu_mimo_system.reset(csi)
+                csi = self.mu_mimo_system.reset(ChannelStateInformation(snr=snr, H_eff=None))
 
                 # Configuration.
-                self.mu_mimo_system.configure()
+                stream_Rs = self.mu_mimo_system.configure()
 
                 # Communication.
                 tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.M)
 
                 # Store inner loop results.
-                inner_loop_result = self._calculate_inner_loop_result(snr, tx_bits_list, rx_bits_list)
+                inner_loop_result = self._calculate_inner_loop_result(snr, stream_Rs, tx_bits_list, rx_bits_list)
                 inner_loop_results.append(inner_loop_result)
 
                 # Stopping criterion.
@@ -127,7 +126,7 @@ class SimulationRunner:
         becu = int(becu) if not np.isnan(becu) else 0
         return becu
 
-    def _calculate_inner_loop_result(self, snr: float, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]]) -> SingleSnrSimResult:
+    def _calculate_inner_loop_result(self, snr: float, stream_Rs: RealArray, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]]) -> SingleSnrSimResult:
         """
         Calculate the performance metrics for a simulation corresponding to a single channel realization and SNR value.
 
@@ -135,6 +134,8 @@ class SimulationRunner:
         ----------
         snr : float
             The SNR value for this simulation.
+        stream_Rs : RealArray, shape (K, Nr)
+            The achievable rates of each UT and each stream for this channel realization (and SNR value and system configuration).
         tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
         rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
@@ -161,6 +162,7 @@ class SimulationRunner:
         ut_ibrs = np.empty((K,), dtype=int)
         ut_becs = np.empty((K,), dtype=float)
         ut_ars = np.empty((K,), dtype=float)
+        ut_Rs = np.empty((K,), dtype=float)
 
         # Iteration.
         for k in range(K):
@@ -174,28 +176,40 @@ class SimulationRunner:
             ut_ibrs[k] = np.sum(stream_ibrs[k])
             ut_becs[k] = np.nansum(stream_becs[k]) if not np.all(np.isnan(stream_becs[k])) else np.nan
             ut_ars[k] = 1 if ut_ibrs[k] > 0 else 0
+            ut_Rs[k] = np.sum(stream_Rs[k])
         
         ibr = np.sum(ut_ibrs)
         bec = np.nansum(ut_becs) if not np.all(np.isnan(ut_becs)) else np.nan
+        R = np.sum(ut_Rs)
 
         stream_ars_avg = np.sum([np.sum(stream_ars[k]) for k in range(K)]) / (K*Nr)
         ut_ars_avg = np.mean(ut_ars)
 
         # Termination.
         inner_loop_result = SingleSnrSimResult(
+            
             snr_dB = snr_dB,
+
             stream_ibrs = stream_ibrs,
             stream_becs = stream_becs,
             stream_ars = stream_ars,
+            stream_Rs = stream_Rs,
+
             ut_ibrs = ut_ibrs,
             ut_becs = ut_becs,
             ut_ars = ut_ars,
+            ut_Rs = ut_Rs,
+            
             ibr = ibr,
             bec = bec,
+            R = R,
+            
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
+
             M = self.sim_config.M,
-            num_channel_realizations = 1,)
+            num_channel_realizations = 1
+        )
         return inner_loop_result
 
     def _calculate_outer_loop_result(self, inner_loop_results: list[SingleSnrSimResult]) -> SingleSnrSimResult:
@@ -228,6 +242,7 @@ class SimulationRunner:
         stream_ibrs: list[IntArray] = []
         stream_becs: list[RealArray] = []
         stream_ars: list[BitArray] = []
+        stream_Rs: list[RealArray] = []
 
         for k in range(K):
 
@@ -243,6 +258,11 @@ class SimulationRunner:
             stream_ars_outer_loop = np.mean(stream_ars_inner_loops, axis=0)
             stream_ars.append(stream_ars_outer_loop)
 
+            stream_Rs_inner_loops = np.stack([ilr.stream_Rs[k] for ilr in inner_loop_results], axis=0)
+            stream_Rs_outer_loop = np.mean(stream_Rs_inner_loops, axis=0)
+            stream_Rs.append(stream_Rs_outer_loop)
+
+
         # Result per UT (for single SNR value, averaged over channel realizations).
         ut_ibrs_inner_loops = np.stack([ilr.ut_ibrs for ilr in inner_loop_results], axis=0)
         ut_ibrs = np.mean(ut_ibrs_inner_loops, axis=0)
@@ -253,6 +273,9 @@ class SimulationRunner:
         ut_ars_inner_loops = np.stack([ilr.ut_ars for ilr in inner_loop_results], axis=0)
         ut_ars = np.mean(ut_ars_inner_loops, axis=0)
 
+        ut_Rs_inner_loops = np.stack([ilr.ut_Rs for ilr in inner_loop_results], axis=0)
+        ut_Rs = np.mean(ut_Rs_inner_loops, axis=0)
+
         # Result system-wide (for single SNR value, averaged over channel realizations).
         ibrs_inner_loops = np.array([ilr.ibr for ilr in inner_loop_results])
         ibr = float(np.mean(ibrs_inner_loops))
@@ -260,25 +283,39 @@ class SimulationRunner:
         becs_inner_loops = np.array([ilr.bec for ilr in inner_loop_results])
         bec = float(np.nansum(becs_inner_loops))
 
+        Rs_inner_loops = np.array([ilr.R for ilr in inner_loop_results])
+        R = float(np.mean(Rs_inner_loops))
+
+
         stream_ars_avg = float(np.mean([np.mean(stream_ars[k]) for k in range(K)]))
         ut_ars_avg = float(np.mean(ut_ars))
 
 
         # Termination.
         outer_loop_result = SingleSnrSimResult(
+            
             snr_dB = snr_dB,
+
             stream_ibrs = stream_ibrs,
             stream_becs = stream_becs,
             stream_ars = stream_ars,
+            stream_Rs = stream_Rs,
+
             ut_ibrs = ut_ibrs,
             ut_becs = ut_becs,
             ut_ars = ut_ars,
+            ut_Rs = ut_Rs,
+
             ibr = ibr,
             bec = bec,
+            R = R,
+
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
+
             M = self.sim_config.M,
-            num_channel_realizations = len(inner_loop_results))
+            num_channel_realizations = len(inner_loop_results)
+        )
         return outer_loop_result
 
 class MuMimoSystem:
@@ -304,6 +341,7 @@ class MuMimoSystem:
         Nt = system_config.Nt
         Nr = system_config.Nr
 
+        self.system_config = system_config
         self.bs = BaseStation(Pt, B, K, Nt, system_config.base_station_configs, system_config.c_configs)
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
@@ -338,6 +376,11 @@ class MuMimoSystem:
         
         Make sure the system has been reset first. After configuration, the system is ready for communication.
         For more datails on the configuration phase, we refer to the receive, propagate and transmit methods of the pilot signals, feedback messages and feedforward messages of the BS, UTs and channel.
+
+        Returns
+        -------
+        capacity : RealArray, shape (K, Nr)
+            The capacity of each stream of each UT for the current channel realization, SNR value and system configurations.
         """
 
         # Pilot Phase.
@@ -355,7 +398,7 @@ class MuMimoSystem:
         rx_ff_msgs = self.channel.propagate_feedforward(tx_ff_msg)
         for ut, rx_ff_msg in zip(self.uts, rx_ff_msgs): ut.receive_feedforward(rx_ff_msg)
 
-        return
+        return self._compute_capacity()
 
     def communicate(self, M: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
         """
@@ -387,6 +430,55 @@ class MuMimoSystem:
         rx_bits_list = [ut.receive(y_k) for ut, y_k in zip(self.uts, y_k_list)]
 
         return tx_bits_list, rx_bits_list
+
+    def _compute_capacity(self) -> RealArray:
+        r"""
+        Compute the capacity of the MU-MIMO system for the current system cofiguration, channel realization and SNR value.
+
+        .. math::
+            
+            R_{k, s} = 2 B \cdot \log_2 \left( 1 + \text{SINR}_{k, s} \right)
+
+            \mathrm{SINR}_{k, s} = \frac
+            {
+                p_{k, s} \, \left| \left( \mathbf{W}_k \mathbf{H}_k \mathbf{F}_k \right)_{(s, s)} \right|^2
+            }
+            { 
+                \displaystyle \sum_{\substack{s' = 1 \\ s' \neq s}}^{N_s} \; p_{k, s'} \, \left| \left( \mathbf{W}_k \mathbf{H}_k \mathbf{F}_k \right)_{(s, s')} \right|^2 \; + \; \sum_{\substack{k' = 1 \\ k' \neq k}}^{K}  \sum_{s'=1}^{N_s} \; p_{k', s'} \, \left| \left( \mathbf{W}_k \mathbf{H}_k \mathbf{F}_{k'} \right)_{(s, s')} \right|^2 \; + \; N_0 \, \left\| \left( \mathbf{W}_k \right)_{(s, s)} \right\|^2
+            }
+
+        Returns
+        -------
+        capacity : RealArray, shape (K, Nr)
+            The capacity of each stream of each UT.
+        """
+
+        # Initialization.
+        Pt = self.system_config.Pt
+        B = self.system_config.B
+
+        snr = self.channel.state.snr
+        H_eff = self.channel.state.H_eff
+
+        F = self.bs.state.F
+        G = self.bs.state.G
+        
+        # Compute the transfer matrix T = G @ H @ F = H_eff @ F.
+        H_eff = H_eff if G is None else (G @ H_eff)
+        T = H_eff @ F
+        
+        # Compute the power of the noise, the interference, and the useful signal for each data stream.
+        p_noise = Pt / snr
+        p_interference = np.sum( np.abs( T - np.diag(np.diagonal(T)) )**2, axis=1 )
+        p_useful = np.abs( np.diagonal(T) )**2
+
+        # Compute the SINR for each data stream.
+        sinr = p_useful / (p_interference + p_noise)
+
+        # Compute the achievable bit rates.
+        capacity = 2*B * np.log2(1 + sinr)
+
+        return capacity
 
 class BaseStation:
     """
@@ -487,7 +579,7 @@ class BaseStation:
             The feedforward messages.
         """
 
-        tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, C_eq=self.state.C_eq, ibr=self.state.ibr, Ns=self.state.Ns, G=self.state.G)
+        tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, C_eq=self.state.C_eq, ibr=self.state.ibr, G=self.state.G)
         return tx_ff_msg
 
     def transmit(self, M: int) -> tuple[list[list[BitArray]], ComplexArray]:

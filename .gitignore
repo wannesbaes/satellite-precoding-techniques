@@ -26,6 +26,7 @@ docs/build/
 */report/figures/src/
 */report/plots/
 */report/simulation_results/
+*/report/channel_statistics/
 
 # Simulation results channel gains.
 su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/

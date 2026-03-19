@@ -91,6 +91,9 @@ class NeutralPrecoder(Precoder):
         C_eq = np.ones(K*Nr)
         return F, G, C_eq
 
+class SVDPrecoder(Precoder):
+    pass
+
 class ZFPrecoder(Precoder):
     """
     Zero-Forcing (ZF) Precoder.
@@ -108,7 +111,7 @@ class ZFPrecoder(Precoder):
         G = None
 
         # The power allocation across the data streams is computed using the waterfilling algorithm to maximize the sum rate under the total power constraint Pt.
-        gamma = np.real(np.diag(np.linalg.inv(csi.H_eff @ csi.H_eff.conj().T))) * (csi.snr / Pt)
+        gamma = (1 / np.real(np.diag(np.linalg.inv(csi.H_eff @ csi.H_eff.conj().T)))) * (csi.snr / Pt)
         P = ZFPrecoder._waterfilling_v1(gamma=gamma, pt=Pt)
 
         # The precoding matrix is computed as the pseudo-inverse of the effective channel matrix.
@@ -205,3 +208,9 @@ class ZFPrecoder(Precoder):
         p[sorted_indices] = p_sorted
 
         return p
+
+class BDPrecoder(Precoder):
+    pass
+
+class WMMSEPrecoder(Precoder):
+    pass

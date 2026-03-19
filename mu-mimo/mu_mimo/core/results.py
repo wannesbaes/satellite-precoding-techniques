@@ -28,6 +28,8 @@ class SingleSnrSimResult:
         Per-UT per-stream bit error counts.
     stream_ars : list[BitArray] (list of K arrays, each shape (Nr,))
         Per-UT per-stream stream activation rates.
+    stream_Rs : list[RealArray] (list of K arrays, each shape (Nr,))
+        Per-UT per-stream achievable rates.
     
     ut_ibrs : IntArray, shape (K,)
         Per-UT information bit rates.
@@ -35,11 +37,15 @@ class SingleSnrSimResult:
         Per-UT bit error counts.
     ut_ars : BitArray, shape (K,)
         Per-UT activation rates.
+    ut_Rs : RealArray, shape (K,)
+        Per-UT achievable rates.
     
     ibr : float
         System-wide information bit rate.
     bec : float
         System-wide bit error count.
+    R : float
+        System-wide achievable rate.
     
     stream_ars_avg : float
         Average stream activation rate.
@@ -64,13 +70,16 @@ class SingleSnrSimResult:
     stream_ibrs : list[IntArray]
     stream_becs : list[RealArray]
     stream_ars : list[BitArray]
+    stream_Rs : list[RealArray]
     
     ut_ibrs : IntArray
     ut_becs : RealArray
     ut_ars : BitArray
+    ut_Rs : RealArray
     
     ibr : float
     bec : float
+    R : float
 
     stream_ars_avg : float
     ut_ars_avg : float

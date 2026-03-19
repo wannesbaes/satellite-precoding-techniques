@@ -52,6 +52,30 @@ system_configuration_settings = [
 
     # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
     {'number': 18,    'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",         'constellation sizes': None,     'capacity fractions': [1.0, 0.75],      'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 18",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
+
+    # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
+    {'number': 19,    'Pt': 1.0,    'B': 0.5,    'K': 3,    'Nr': 2,    'Nt': 6,    'constellation types': "QAM",         'constellation sizes': 4,     'capacity fractions': None,      'bit loader': FixedBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 19",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 6 transmit antennas, 3 UTs with 2 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
+
+    # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
+    {'number': 20,    'Pt': 1.0,    'B': 0.5,    'K': 3,    'Nr': 2,    'Nt': 6,    'constellation types': "QAM",         'constellation sizes': 4,     'capacity fractions': None,      'bit loader': FixedBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 20",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 6 transmit antennas, 3 UTs with 2 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
+
+
+    # Presentation Reference Systems.
+
+    {'number': 101,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "4-QAM",     'description': ""},
+    {'number': 102,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "PSK",    'constellation sizes': 3,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "8-PSK",     'description': ""},
+    {'number': 103,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "16-QAM",     'description': ""},
+    {'number': 104,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "PSK",    'constellation sizes': 5,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "32-PSK",     'description': ""},
+    {'number': 105,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 6,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "64-QAM",     'description': ""},
+    
+
+    {'number': 206,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,       'capacity fractions': 1.0,    'bit loader': AdaptiveBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "100%%",     'description': ""},
+    {'number': 207,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,       'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "75%%",     'description': ""},
+    
+    {'number': 101,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "4-QAM ",     'description': ""},
+    {'number': 103,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "16-QAM ",     'description': ""},
+    {'number': 105,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 6,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "64-QAM ",     'description': ""},
+    
 ]
 
 
@@ -132,13 +156,14 @@ def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
 
             # 3. RESULT.
             results.append(result)
-            ResultManager.display(result)
-            ResultManager.plot_system_performance(result)
-            ResultManager.plot_ut_performance(result)
-            ResultManager.plot_stream_performance(result)
+            # ResultManager.display(result)
+            # ResultManager.plot_system_performance(result)
+            # ResultManager.plot_ut_performance(result)
+            # ResultManager.plot_stream_performance(result)
 
     return results
 
 
 if __name__ == "__main__":
-    results = main(sim_config_indices = [4], sys_config_indices = [2])
+    results = main(sim_config_indices = [4], sys_config_indices = [28, 29, 30])
+    ResultManager.plot_system_performance_comparison(results)
