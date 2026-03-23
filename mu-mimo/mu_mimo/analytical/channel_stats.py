@@ -5,15 +5,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-#from ..types import ComplexArray, RealArray
 from tqdm import tqdm
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-import os
 
-ComplexArray = np.ndarray
-RealArray = np.ndarray
+from ..types import ComplexArray, RealArray
+from ..configs import SimConfig, SystemConfig
 
 # CHANNEL MODELS
 
@@ -143,7 +141,7 @@ class ChannelStatisticsData:
     # Channel statistics.
     mean: RealArray
     var: RealArray
-    
+     
     histograms: RealArray
     bin_edges: RealArray
     
@@ -183,7 +181,7 @@ class ChannelStatistics:
         # 0. Try to load the channel statistics from an existing .npz file. If the file does not yet exist, compute the channel statistics.
         self.channel_statistics_data = self._load_channel_statistics()
         if self.channel_statistics_data is not None:
-            print(f"Channel statistics loaded successfully from: {self._generate_file_name().with_suffix('.npz')}")
+            print(f"Channel statistics loaded successfully from: {self._generate_filepath().with_suffix('.npz')}")
             return self
 
         # 1. Compute the corresponding channel gains statistics of the virtual independent parallel streamchannels.
@@ -197,17 +195,17 @@ class ChannelStatistics:
 
         # 3. Store the computed channel statistics.
         self._store_channel_statistics()
-        print(f"Channel statistics computed successfully and stored to: {self._generate_file_name().with_suffix('.npz')}")
+        print(f"Channel statistics computed successfully and stored to: {self._generate_filepath().with_suffix('.npz')}")
 
         # 4. Plot the channel statistics.
         print("Plotting channel statistics...")
         self._plot_streamchannel_pdf(num_uts=min(self.K, 2), seperate_plots=True)
         self._plot_streamchannel_ecdf(num_uts=min(self.K, 2), seperate_plots=True)
-        print(f"Channel statistics plots generated successfully and stored to: {self._generate_file_name().with_suffix('.png')}\n")
+        print(f"Channel statistics plots generated successfully and stored to: {self._generate_filepath().with_suffix('.png')}\n")
 
         return self
 
-    def _generate_file_name(self) -> Path:
+    def _generate_filepath(self) -> Path:
         """
         Generate the file name for storing the channel statistics and plots.
 
@@ -243,7 +241,7 @@ class ChannelStatistics:
             raise ValueError("No channel statistics available. Compute them before storing.")
         
         # Generate the file name.
-        filename = self._generate_file_name().with_suffix(".npz")
+        filename = self._generate_filepath().with_suffix(".npz")
         dirname = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
 
         # Store the channel statistics data in a .npz file.
@@ -279,7 +277,7 @@ class ChannelStatistics:
             The loaded channel statistics data. If the file does not yet exist, return None.
         """
         
-        filename = self._generate_file_name().with_suffix(".npz")
+        filename = self._generate_filepath().with_suffix(".npz")
         dirname = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
         pathname = dirname / filename
 
@@ -498,7 +496,7 @@ class ChannelStatistics:
             ax.legend()
 
         # 3. Save the plot.
-        plot_pdf_filename = Path(str(self._generate_file_name()) + f"__UTs_{num_uts}__pdf").with_suffix(".png")
+        plot_pdf_filename = Path(str(self._generate_filepath()) + f"__UTs_{num_uts}__pdf").with_suffix(".png")
         plot_pdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots"
         plot_pdf.savefig(plot_pdf_dir / plot_pdf_filename, dpi=300, bbox_inches="tight")
         return
@@ -556,10 +554,117 @@ class ChannelStatistics:
             ax.legend()
 
         # 3. Save the plot.
-        plot_ecdf_filename = Path(str(self._generate_file_name()) + f"__UTs_{num_uts}__ecdf").with_suffix(".png")
+        plot_ecdf_filename = Path(str(self._generate_filepath()) + f"__UTs_{num_uts}__ecdf").with_suffix(".png")
         plot_ecdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots"
         plot_ecdf.savefig(plot_ecdf_dir / plot_ecdf_filename, dpi=300, bbox_inches="tight")
         return
+
+
+# EXPECTED ACHIEVABLE RATES
+
+@dataclass
+class ExpectedAchievableRateData:
+    """
+    TO DO: add docstring.
+    """
+
+    # System parameters.
+    Nt: int
+    Nr: int
+    channel_model: type[ChannelModel]
+    precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"]
+    combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"]
+
+    # Computation parameters.
+    num_channel_realizations: int
+    num_bins: int
+
+    # Data.
+    snr_dB_values: RealArray
+    expected_achievable_rate: RealArray
+    expected_achievable_rate_ub: RealArray
+
+
+class ExpectedAchievableRate:
+
+    def __init__(self, channel_statistics: ChannelStatisticsData) -> None:
+        pass
+
+    def _generate_filepath(self) -> Path:
+        pass
+
+    def _store_expected_achievable_rate(self) -> None:
+        pass
+
+    def _load_expected_achievable_rate(self) -> ExpectedAchievableRateData | None:
+        pass
+
+    def evaluate(self) -> None:
+        pass
+    
+    @staticmethod
+    def _waterfilling_v1(gamma, pt):
+        r"""
+        Waterfilling algorithm.
+
+        This function implements the waterfilling algorithm to find the optimal power allocation across N transmission streams, given the channel-to-noise ratio (CNR) coefficients `gamma` and the total available transmit power `pt`.
+
+        In particular, it solves the following constraint optimization problem:
+
+        .. math::
+
+            \begin{aligned}
+                & \underset{\{p_n\}}{\text{max}}
+                & & \sum_{n=1}^{N} \log_2 \left( 1 + \gamma_n \, p_n \right) \\
+                & \text{s. t.}
+                & & \sum_{n=1}^{N} p_n = p_t \\
+                & & & \forall n \in \{1, \ldots, N\} : \, p_n \geq 0
+            \end{aligned}
+
+        Parameters
+        ----------
+        gamma : RealArray, shape (N,)
+            Channel-to-Noise Ratio (CNR) coefficients for each eigenchannel.
+        pt : float
+            Total available transmit power.
+
+        Returns
+        -------
+        p : RealArray, shape (N,)
+            Optimal power allocation across the eigenchannels.
+        """
+
+        # STEP 0: Sort the CNR coefficients in descending order.
+        sorted_indices = np.argsort(gamma)[::-1]
+        gamma = gamma[sorted_indices]
+
+        # STEP 1: Determine the number of active streams.
+        pt_iter = lambda as_iter: np.sum( (1 / gamma[as_iter]) - (1 / gamma[:as_iter]) )
+        as_UB = len(gamma)
+        as_LB = 0
+
+        while as_UB - as_LB > 1:
+            as_iter = (as_UB + as_LB) // 2
+            if pt > pt_iter(as_iter): as_LB = as_iter
+            elif pt < pt_iter(as_iter): as_UB = as_iter
+        
+        # STEP 2: Compute the optimal power allocation for each active stream.
+        p_step1 = ( (1 / gamma[as_LB]) - (1 / gamma[:as_LB]) )
+        p_step1 = np.concatenate( (p_step1, np.zeros(as_UB - as_LB)) )
+
+        power_remaining = pt - np.sum(p_step1)
+        p_step2 = (1 / as_UB) * power_remaining
+
+        p_sorted = np.concatenate( (p_step1 + p_step2, np.zeros(len(gamma) - as_UB)) )
+
+        # STEP 3: Reorder the power allocation to match the original order of the streams.
+        p = np.empty_like(p_sorted)
+        p[sorted_indices] = p_sorted
+
+        return p
+
+
+
 
 
 if __name__ == "__main__":

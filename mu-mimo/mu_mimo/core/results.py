@@ -224,8 +224,8 @@ class ResultManager:
         )
         
         # Validate that the loaded simulation results match the current simulation and system configuration.
-        # if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
-        #    raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
+        if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
+            raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
         
         return sim_result
 
