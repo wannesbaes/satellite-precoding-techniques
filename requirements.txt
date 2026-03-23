@@ -1,0 +1,11 @@
+numpy
+scipy
+matplotlib
+pathlib
+json
+dataclasses
+tdqm
+typing
+os
+abc
+__future__

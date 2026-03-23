@@ -164,7 +164,7 @@ class ResultManager:
         results_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate the filename based on the system and simulation configurations.
-        filename = f"{sim_configs.name} - {system_configs.name}.npz"
+        filename = f"{system_configs.name} - {sim_configs.name}.npz"
 
         # Return the full file path.
         filepath = results_dir / filename
@@ -328,7 +328,7 @@ class ResultManager:
 
         # Generate the filename based on the system and simulation configurations, and the type of plot.
         system_names = [f"{sim_result.system_configs.name}" for sim_result in sim_results]
-        filename = f"{sim_results[0].sim_configs.name}" + f" -- {' - '.join(system_names)}" + f" -- {plot_type}.png"
+        filename = f"{' - '.join(system_names)}" + f" -- {plot_type}" + f" -- {sim_results[0].sim_configs.name}" + ".png"
 
         # Return the full file path.
         filepath = plots_dir / filename

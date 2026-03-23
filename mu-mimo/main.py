@@ -1,169 +1,276 @@
 # mu-mimo/main.py
 
+import json
+from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
 from mu_mimo import *
 
-simulation_configuration_settings = [
+SIM_CONFIG_PATH = Path(__file__).parent / 'sim_configs.json'
+SYSTEM_CONFIG_PATH = Path(__file__).parent / 'system_configs.json'
 
-    # Standard Simulation Configution Settings.
-    {'number': 0,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 512,    'name': 'Sim Config 0',    'description': "Standard Simulation Configution Settings"},
 
-    # Standard Simulation Configution Settings, bit errors per UT and per stream.
-    {'number': 1,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'uts',            'Transmission per channel realization': 1024,    'name': 'Sim Config 1',    'description': "Standard Simulation Configution Settings (UT-level bit errors counting)"},
-    {'number': 2,    'SNR values (in dB)': np.arange(-10, 31, 2.5),    'channel realizations per SNR value': 1000,    'bit errors per SNR value': 250,    'Scope of bit errors': 'streams',        'Transmission per channel realization': 1024,    'name': 'Sim Config 2',    'description': "Standard Simulation Configution Settings (Stream-level bit errors counting)"},
+def _setup_sim_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SimConfig]:
+    """
+    Set up the simulation configurations for the given reference numbers.
 
-    # Test Simulation Configution Settings for code validation and debugging purposes only.
-    {'number': 3,    'SNR values (in dB)': np.arange(-10, 31, 10),    'channel realizations per SNR value': 10,       'bit errors per SNR value': 10,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 1,     'name': 'Sim Config 3',    'description': "First Test Simulation Configution Settings"},
-    {'number': 4,    'SNR values (in dB)': np.arange(-10, 31, 5),     'channel realizations per SNR value': 100,       'bit errors per SNR value': 50,     'Scope of bit errors': 'system-wide',    'Transmission per channel realization': 512,     'name': 'Sim Config 4',    'description': "Second Test Simulation Configution Settings"},
-]
-
-system_configuration_settings = [
-
-    # Reference System 0: SISO reference system for code validation and debugging purposes only.
-    {'number': 0,     'Pt': 1.0,    'B': 0.5,    'K': 1,    'Nr': 1,    'Nt': 1,    'constellation types': "PAM",    'constellation sizes': 1,       'capacity fractions': None,    'bit loader': NeutralBitLoader,     'mapper': NeutralMapper,    'precoder': NeutralPrecoder,    'channel model': NeutralChannelModel,        'noise model': NeutralNoiseModel,    'combiner': NeutralCombiner,    'equalizer': Equalizer,    'detector': NeutralDetector,    'demapper': NeutralDemapper,    'name': "Reference System 0",     'description': "SISO system with neutral components only. For code validation and debugging purposes only."},
+    Parameters
+    ----------
+    ref_numbers : list[str]
+        A list of reference numbers for which to set up the simulation configurations.
+    filepath : Path
+        The path to the JSON file containing the simulation configurations.
     
-    # Reference Systems 1-4: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Fixed bit loading with 4-QAM constellation for each UT.
-    {'number': 1,     'Pt': 1.0,    'B': 0.5,    'K': 1,    'Nr': 8,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 1",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 1 UT with 8 receive antennas.\n Fixed bit loading with 4-QAM constellation."},
-    {'number': 2,     'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 2",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Fixed bit loading with 4-QAM constellation."},
-    {'number': 3,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 3",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 4 UTs with 2 receive antennas each.\n Fixed bit loading with 4-QAM constellation."},
-    {'number': 4,     'Pt': 1.0,    'B': 0.5,    'K': 8,    'Nr': 1,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 4",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 8 UTs with 1 receive antenna each.\n Fixed bit loading with 4-QAM constellation."},
-
-    # Reference Systems 5-8: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Fixed bit loading with 16-QAM constellation for each UT.
-    {'number': 5,     'Pt': 1.0,    'B': 0.5,    'K': 1,    'Nr': 8,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 5",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 1 UT with 8 receive antennas.\n Fixed bit loading with 16-QAM constellation."},
-    {'number': 6,     'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 6",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Fixed bit loading with 16-QAM constellation."},
-    {'number': 7,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 7",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 4 UTs with 2 receive antennas each.\n Fixed bit loading with 16-QAM constellation."},
-    {'number': 8,     'Pt': 1.0,    'B': 0.5,    'K': 8,    'Nr': 1,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 8",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 8 UTs with 1 receive antenna each.\n Fixed bit loading with 16-QAM constellation."},
-
-    # Reference Systems 9-12: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% of the channel capacities) with QAM constellation for each UT.
-    {'number': 9,     'Pt': 1.0,    'B': 0.5,    'K': 1,    'Nr': 8,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 1.0,     'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 9",     'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 1 UT with 8 receive antennas.\n Adaptive bit loading (100%% of the channel capacities) with QAM constellation."},
-    {'number': 10,    'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 1.0,     'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 10",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Adaptive bit loading (100%% of the channel capacities) with QAM constellation."},
-    {'number': 11,    'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 1.0,     'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 11",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 4 UTs with 2 receive antennas each.\n Adaptive bit loading (100%% of the channel capacities) with QAM constellation."},
-    {'number': 12,    'Pt': 1.0,    'B': 0.5,    'K': 8,    'Nr': 1,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 1.0,     'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 12",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 8 UTs with 1 receive antenna each.\n Adaptive bit loading (100%% of the channel capacities) with QAM constellation."},
-
-    # Reference Systems 13-16: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (75% of the channel capacities) with QAM constellation for each UT.
-    {'number': 13,    'Pt': 1.0,    'B': 0.5,    'K': 1,    'Nr': 8,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 13",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 1 UT with 8 receive antennas.\n Adaptive bit loading (75%% of the channel capacities) with QAM constellation."},
-    {'number': 14,    'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 14",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Adaptive bit loading (75%% of the channel capacities) with QAM constellation."},
-    {'number': 15,    'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 15",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 4 UTs with 2 receive antennas each.\n Adaptive bit loading (75%% of the channel capacities) with QAM constellation."},
-    {'number': 16,    'Pt': 1.0,    'B': 0.5,    'K': 8,    'Nr': 1,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,    'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 16",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 8 UTs with 1 receive antenna each.\n Adaptive bit loading (75%% of the channel capacities) with QAM constellation."},
-
-    # Reference System 17: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Fixed bit loading with 4-QAM and 16-PSK constellation.
-    {'number': 17,    'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': ["QAM", "PSK"],    'constellation sizes': [2, 4],       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 17",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Fixed bit loading with 4-QAM constellation for UT1 and 16-PSK constellation for UT2."},
-
-    # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
-    {'number': 18,    'Pt': 1.0,    'B': 0.5,    'K': 2,    'Nr': 4,    'Nt': 8,    'constellation types': "QAM",         'constellation sizes': None,     'capacity fractions': [1.0, 0.75],      'bit loader': AdaptiveBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 18",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 8 transmit antennas, 2 UTs with 4 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
-
-    # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
-    {'number': 19,    'Pt': 1.0,    'B': 0.5,    'K': 3,    'Nr': 2,    'Nt': 6,    'constellation types': "QAM",         'constellation sizes': 4,     'capacity fractions': None,      'bit loader': FixedBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 19",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 6 transmit antennas, 3 UTs with 2 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
-
-    # Reference System 18: Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation. Adaptive bit loading (100% and 75% of the channel capacities) with QAM constellation.
-    {'number': 20,    'Pt': 1.0,    'B': 0.5,    'K': 3,    'Nr': 2,    'Nt': 6,    'constellation types': "QAM",         'constellation sizes': 4,     'capacity fractions': None,      'bit loader': FixedBitLoader,     'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': LSVCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "Reference System 20",    'description': "Non-coordinated Beamforming with ZF Precoder, RSV Combiner and Optimal Power Allocation.\n 6 transmit antennas, 3 UTs with 2 receive antennas each.\n Adaptive bit loading with QAM constellation. UT1 is loaded with 100%% of the channel capacities and UT2 is loaded with 75%% of the channel capacities."},
-
-
-    # Presentation Reference Systems.
-
-    {'number': 101,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "4-QAM",     'description': ""},
-    {'number': 102,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "PSK",    'constellation sizes': 3,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "8-PSK",     'description': ""},
-    {'number': 103,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "16-QAM",     'description': ""},
-    {'number': 104,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "PSK",    'constellation sizes': 5,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "32-PSK",     'description': ""},
-    {'number': 105,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': 6,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "64-QAM",     'description': ""},
+    Returns
+    -------
+    sim_configs : dict[str, SimConfig]
+        A dictionary mapping each reference number to its corresponding SimConfig object.
+    """
     
+    sim_configs = {}
+    for ref_number in ref_numbers:
+        config_settings = _load_sim_config(filepath, ref_number)
+        sim_config = _create_sim_config(config_settings)
+        sim_configs[ref_number] = sim_config
 
-    {'number': 206,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,       'capacity fractions': 1.0,    'bit loader': AdaptiveBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "100%%",     'description': ""},
-    {'number': 207,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 8,    'constellation types': "QAM",    'constellation sizes': None,       'capacity fractions': 0.75,    'bit loader': AdaptiveBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "75%%",     'description': ""},
+    return sim_configs
+
+def _load_sim_config(filepath: Path, ref_number: str) -> dict:
+    """
+    Load the simulation configuration for a given reference number from a JSON file.
+
+    Parameters
+    ----------
+    filepath : Path
+        The path to the JSON file containing the simulation configurations.
+    ref_number : str
+        The reference number of the simulation configuration to load.
+
+    Returns
+    -------
+    config_settings : dict
+        The configuration settings for the specified reference number.\\
+        The keys of the dictionary correspond to the parameter names, and the values correspond to the effective configuration values.
+    """
     
-    {'number': 101,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 2,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "4-QAM ",     'description': ""},
-    {'number': 103,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 4,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "16-QAM ",     'description': ""},
-    {'number': 105,     'Pt': 1.0,    'B': 0.5,    'K': 4,    'Nr': 2,    'Nt': 12,    'constellation types': "QAM",    'constellation sizes': 6,       'capacity fractions': None,    'bit loader': FixedBitLoader,       'mapper': GrayCodeMapper,    'precoder': ZFPrecoder,        'channel model': IIDRayleighChannelModel,    'noise model': CSAWGNNoiseModel,      'combiner': NeutralCombiner,       'equalizer': Equalizer,    'detector': MDDetector,         'demapper': GrayCodeDemapper,    'name': "64-QAM ",     'description': ""},
+    with open(filepath, 'r') as f:
+        data = json.load(f)
     
-]
+    for config_settings in data['configurations']:
+        if config_settings["Ref. Number"] == ref_number:
+            return config_settings
 
+def _create_sim_config(config_settings: dict) -> SimConfig:
+    """
+    Create a SimConfig object from the given configuration settings.
 
-def _setup_settings(sim_config_idx, sys_config_idx):
+    Parameters
+    ----------
+    config_settings : dict
+        The configuration settings for the simulation.
 
-    # 1. Simulation Configuration Settings.
-    sim_config_settings = simulation_configuration_settings[sim_config_idx]
+    Returns
+    -------
+    sim_config : SimConfig
+        The SimConfig object created from the configuration settings.
+    """
     sim_config = SimConfig(
-        snr_dB_values            = sim_config_settings['SNR values (in dB)'],
-        num_channel_realizations = sim_config_settings['channel realizations per SNR value'],
-        num_bit_errors           = sim_config_settings['bit errors per SNR value'],
-        num_bit_errors_scope     = sim_config_settings['Scope of bit errors'],
-        M                        = sim_config_settings['Transmission per channel realization'],
-        name                     = sim_config_settings['name'],
+        snr_dB_values               = np.array(config_settings["SNR values (in dB)"], dtype=float),
+        num_channel_realizations    = int(config_settings["Channel realizations per SNR value"]),
+        num_bit_errors              = int(config_settings["Bit errors per SNR value"]),
+        num_bit_errors_scope        = str(config_settings["Scope of bit errors"]),
+        M                           = int(config_settings["Transmissions per channel realization"]),
+        name                        = "Sim Config " + str(config_settings["Ref. Number"]),
     )
 
+    return sim_config
 
-    # 2. System Configuration Settings.
-    sys_config_settings = system_configuration_settings[sys_config_idx]
 
+def _setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SystemConfig]:
+    """
+    Set up the system configurations for the given reference numbers.
+
+    Parameters
+    ----------
+    ref_numbers : list[str]
+        A list of reference numbers for which to set up the system configurations.
+    filepath : Path
+        The path to the JSON file containing the system configurations.
+
+    Returns
+    -------
+    system_configs : dict[str, SystemConfig]
+        A dictionary mapping each reference number to its corresponding SystemConfig object.
+    """
+    
+    system_configs = {}
+    for ref_number in ref_numbers:
+        config_settings = _load_sys_config(filepath, ref_number)
+        system_config = _create_sys_config(config_settings)
+        system_configs[ref_number] = system_config
+
+    return system_configs
+
+def _load_sys_config(filepath: Path, ref_number: str) -> dict:
+    """
+    Load the system configuration for a given reference number from a JSON file.
+
+    Parameters
+    ----------
+    filepath : Path
+        The path to the JSON file containing the system configurations.
+    ref_number : str
+        The reference number of the system configuration to load.
+
+    Returns
+    -------
+    config_settings : dict
+        The configuration settings for the specified reference number.\\
+        The keys of the dictionary correspond to the parameter names, and the values correspond to the effective configuration values.
+    """
+    
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    
+    for row in data['configurations']:
+        if row[data["configuration_format"]["Ref. Number"]] == ref_number:
+            config_settings = {name: row[idx] for name, idx in data['configuration_format'].items()}
+            return config_settings
+    
+    raise ValueError(f"The simulation configuration with ref. number '{ref_number}' not found.")
+
+def _create_sys_config(config_settings: dict) -> SystemConfig:
+    """
+    Create a SystemConfig object from the given configuration settings.
+
+    Parameters
+    ----------
+    config_settings : dict
+        The configuration settings for the system.
+
+    Returns
+    -------
+    system_config : SystemConfig
+        The SystemConfig object created from the configuration settings.
+    """
+    
+    precoder_mapping = {
+        "Neutral": NeutralPrecoder,
+        "ZF": ZFPrecoder,
+        "BD": BDPrecoder,
+        "WMMSE": WMMSEPrecoder,
+    }
+
+    combiner_mapping = {
+        "Neutral": NeutralCombiner,
+        "LSV": LSVCombiner,
+    }
+
+    bitloader_mapping = {
+        "Neutral": NeutralBitLoader,
+        "Fixed": FixedBitLoader,
+        "Adaptive": AdaptiveBitLoader,
+    }
+
+    mapper_mapping = {
+        "Neutral": NeutralMapper,
+        "Gray Code": GrayCodeMapper,
+    }
+
+    demapper_mapping = {
+        "Neutral": NeutralDemapper,
+        "Gray Code": GrayCodeDemapper,
+    }
+
+    detector_mapping = {
+        "Neutral": NeutralDetector,
+        "Symbol MD": MDDetector,
+    }
+
+    channel_model_mapping = {
+        "Neutral": NeutralChannelModel,
+        "Rayleigh": IIDRayleighChannelModel,
+    }
+
+    noise_model_mapping = {
+        "Neutral": NeutralNoiseModel,
+        "AWGN": CSAWGNNoiseModel,
+    }
+
+    
     # constellation configurations.
     c_configs = ConstConfig(
-        types                   = sys_config_settings['constellation types'],
-        sizes                   = sys_config_settings['constellation sizes'],
-        capacity_fractions      = sys_config_settings['capacity fractions'],
+        types                   = config_settings['Const. Type'],
+        sizes                   = config_settings['Const. Size (fixed)'],
+        capacity_fractions      = config_settings['Const. Size (adaptive)'],
     )
 
     # base station configurations.
     base_station_configs = BaseStationConfig(
-        precoder               = sys_config_settings['precoder'],
-        bit_loader             = sys_config_settings['bit loader'],
-        mapper                 = sys_config_settings['mapper'],
+        precoder               = precoder_mapping[config_settings['Precoder']],
+        bit_loader             = bitloader_mapping[config_settings['Bit Loader']],
+        mapper                 = mapper_mapping[config_settings['Mapper']],
     )
 
     # channel configurations.
     channel_configs = ChannelConfig(
-        channel_model          = sys_config_settings['channel model'],
-        noise_model            = sys_config_settings['noise model'],
+        channel_model          = channel_model_mapping[config_settings['Channel Model']],
+        noise_model            = noise_model_mapping[config_settings['Noise Model']],
     )
 
     # user terminal configerations.
     user_terminal_configs = UserTerminalConfig(
-        combiner              = sys_config_settings['combiner'],
-        equalizer             = sys_config_settings['equalizer'],
-        detector              = sys_config_settings['detector'],
-        demapper              = sys_config_settings['demapper'],
+        combiner              = combiner_mapping[config_settings['Combiner']],
+        equalizer             = Equalizer,
+        detector              = detector_mapping[config_settings['Detector']],
+        demapper              = demapper_mapping[config_settings['Mapper']],
     )
+
 
     # system configurations.
     system_config = SystemConfig(
-        Pt                    = sys_config_settings['Pt'],
-        B                     = sys_config_settings['B'],
-        K                     = sys_config_settings['K'],
-        Nr                    = sys_config_settings['Nr'],
-        Nt                    = sys_config_settings['Nt'],
+        Pt                    = float(config_settings['Pt']),
+        B                     = float(config_settings['B']),
+        K                     = int(config_settings['K']),
+        Nr                    = int(config_settings['Nr']),
+        Nt                    = int(config_settings['Nt']),
         c_configs             = c_configs,
         base_station_configs  = base_station_configs,
         channel_configs       = channel_configs,
         user_terminal_configs = user_terminal_configs,
-        name                  = sys_config_settings['name'],
+        name                  = "Ref. System " + str(config_settings['Ref. Number']),
     )
 
-    return sim_config, system_config
+    return system_config
 
-def main(sim_config_indices: IntArray, sys_config_indices: IntArray):
+
+
+def main(sim_ref_numbers: list[str], sys_ref_numbers: list[str]) -> list[SimResult]:
 
     results = []
 
-    for sim_config_idx in sim_config_indices:
-        for sys_config_idx in sys_config_indices:
+    sim_configs = _setup_sim_configs(sim_ref_numbers, SIM_CONFIG_PATH)
+    system_configs = _setup_sys_configs(sys_ref_numbers, SYSTEM_CONFIG_PATH)
 
-            # 1. SETTINGS
-            sim_config, system_config = _setup_settings(sim_config_idx, sys_config_idx)
+    for sim_ref_number in sim_ref_numbers:
+        for sys_ref_number in sys_ref_numbers:
             
-            # 2. SIMULATION.
-            runner = SimulationRunner(sim_config=sim_config, system_config=system_config)
+            runner = SimulationRunner(sim_config=sim_configs[sim_ref_number], system_config=system_configs[sys_ref_number])
             result = runner.run()
 
-            # 3. RESULT.
             results.append(result)
-            # ResultManager.display(result)
-            # ResultManager.plot_system_performance(result)
-            # ResultManager.plot_ut_performance(result)
-            # ResultManager.plot_stream_performance(result)
 
     return results
 
 
 if __name__ == "__main__":
-    results = main(sim_config_indices = [4], sys_config_indices = [28, 29, 30])
+
+    # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
+    sim_ref_numbers = ["2.1"]
+    sys_ref_numbers = [("1.1." + str(i) + "." + str(j)) for i in range(1, 5) for j in range(1, 6)] + [("1.2." + str(i) + "." + str(j)) for i in range(1, 5) for j in range(1, 6)]
+    
+    # RUN OR LOAD YOUR SIMULATION HERE.
+    results = main(sim_ref_numbers, sys_ref_numbers)
+
+
+    # PLOT YOUR RESULTS HERE.
     ResultManager.plot_system_performance_comparison(results)
