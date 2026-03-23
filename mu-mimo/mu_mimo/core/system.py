@@ -48,7 +48,9 @@ class SimulationRunner:
         
         # Check if this simulation has already been executed. If so, load the results and return them.
         if ResultManager.search_results(self.sim_config, self.system_config):
-            return ResultManager.load_results(self.sim_config, self.system_config)
+            sim_result = ResultManager.load_results(self.sim_config, self.system_config)
+            print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + f"  Results from {sim_result.system_configs.name} for {sim_result.sim_configs.name} successfully loaded.\n" + "="*60)
+            return sim_result
         else:
             print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + "="*60 + "\n" + self.system_config.display() + "\n" + self.sim_config.display() + "\n")
         
@@ -180,6 +182,7 @@ class SimulationRunner:
         
         ibr = np.sum(ut_ibrs)
         bec = np.nansum(ut_becs) if not np.all(np.isnan(ut_becs)) else np.nan
+        ar = 1 if ibr > 0 else 0
         R = np.sum(ut_Rs)
 
         stream_ars_avg = np.sum([np.sum(stream_ars[k]) for k in range(K)]) / (K*Nr)
@@ -202,6 +205,7 @@ class SimulationRunner:
             
             ibr = ibr,
             bec = bec,
+            ar = ar,
             R = R,
             
             stream_ars_avg = stream_ars_avg,
@@ -283,6 +287,9 @@ class SimulationRunner:
         becs_inner_loops = np.array([ilr.bec for ilr in inner_loop_results])
         bec = float(np.nansum(becs_inner_loops))
 
+        ars_inner_loops = np.array([ilr.ar for ilr in inner_loop_results])
+        ar = float(np.mean(ars_inner_loops))
+
         Rs_inner_loops = np.array([ilr.R for ilr in inner_loop_results])
         R = float(np.mean(Rs_inner_loops))
 
@@ -308,6 +315,7 @@ class SimulationRunner:
 
             ibr = ibr,
             bec = bec,
+            ar = ar,
             R = R,
 
             stream_ars_avg = stream_ars_avg,
