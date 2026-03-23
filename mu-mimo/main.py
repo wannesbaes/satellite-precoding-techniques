@@ -200,7 +200,7 @@ def _create_sys_config(config_settings: dict) -> SystemConfig:
     # constellation configurations.
     c_configs = ConstConfig(
         types                   = config_settings['Const. Type'],
-        sizes                   = config_settings['Const. Size (fixed)'],
+        sizes                   = int(np.log2(config_settings['Const. Size (fixed)'])) if config_settings['Const. Size (fixed)'] is not None else None,
         capacity_fractions      = config_settings['Const. Size (adaptive)'],
     )
 
@@ -273,4 +273,6 @@ if __name__ == "__main__":
 
 
     # PLOT YOUR RESULTS HERE.
-    ResultManager.plot_system_performance_comparison(results)
+    for result in results:
+        # ResultManager.plot_system_performance(result)
+        pass

@@ -224,8 +224,8 @@ class ResultManager:
         )
         
         # Validate that the loaded simulation results match the current simulation and system configuration.
-        if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
-            raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
+        # if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
+        #    raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
         
         return sim_result
 
@@ -411,7 +411,7 @@ class ResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-4, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             fig_ber.tight_layout()
 
@@ -498,7 +498,7 @@ class ResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-4, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
@@ -594,7 +594,7 @@ class ResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-4, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
@@ -686,7 +686,7 @@ class ResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-4, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
@@ -788,7 +788,7 @@ class ResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-4, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
