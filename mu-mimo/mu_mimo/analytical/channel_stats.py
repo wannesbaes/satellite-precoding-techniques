@@ -11,90 +11,18 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 from ..types import ComplexArray, RealArray
-from ..configs import SimConfig, SystemConfig
+from ..configs import SystemConfig, setup_sys_configs
+from ..processing import ChannelModel
 
-# CHANNEL MODELS
-
-class ChannelModel(ABC):
-    """
-    The Channel Model Abstract Base Class (ABC).
-
-    A channel model is responsible for generating the channel matrix according to a specific channel model and applying the channel effects to the transmitted signals.
-    """
-
-    @staticmethod
-    @abstractmethod
-    def generate(Nr_total: int, Nt: int) -> ComplexArray:
-        """
-        Generate the channel matrix.
-
-        Parameters
-        ----------
-        Nr_total : int
-            The total number of receive antennas across all UTs.
-        Nt : int
-            The number of transmit antennas at the BS.
-        
-        Returns
-        -------
-        H : ComplexArray, shape (Nr_total, Nt)
-            The generated channel matrix.
-        """
-        raise NotImplementedError
-
-    @staticmethod
-    def apply(x: ComplexArray, H: ComplexArray) -> ComplexArray:
-        """
-        Apply the channel effects to the transmitted signals.
-
-        Parameters
-        ----------
-        x : ComplexArray, shape (Nt, M)
-            The transmitted signals.
-        H : ComplexArray, shape (K*Nr, Nt)
-            The channel matrix.
-
-        Returns
-        -------
-        y : ComplexArray, shape (K*Nr, M)
-            The received signals.
-        """
-        y = H @ x
-        return y
-
-class NeutralChannelModel(ChannelModel):
-    """
-    Neutral Channel Model.
-    
-    This channel model acts as a 'neutral element' for the channel.\\
-    In particular, it generates an identity channel matrix, which means that the symbols are transmitted to the receive antennas for which they are intended, and without any interference.
-    """
-
-    @staticmethod
-    def generate( Nr_total: int, Nt: int) -> ComplexArray:
-        H = np.eye(Nr_total, Nt, dtype=complex)
-        return H
-
-class IIDRayleighChannelModel(ChannelModel):
-    """
-    Independent and Identically Distributed (IID) Rayleigh Fading Channel Model.
-
-    This channel model generates a channel matrix with independent and identically distributed (IID) circularly-symmetric zero-mean unit-variance complex Gaussian entries.\\
-    The Rayleigh fading aspect is captured by the fact that the channel coefficients change independently after M transmissions.
-    """
-
-    @staticmethod
-    def generate(Nr_total: int, Nt: int) -> ComplexArray:
-        H = (1 / np.sqrt(2)) * (np.random.randn(Nr_total, Nt) + 1j * np.random.randn(Nr_total, Nt))
-        return H
-
-
-# CHANNEL STATISTICS
+SYSTEM_CONFIG_PATH = Path(__file__).parent.parent.parent / 'system_configs.json'
 
 @dataclass
 class ChannelStatisticsData:
     """
     Data class for storing the channel statistics.
+
+    This class contains the channel statistics of the virtual independent parallel streamchannels of a single UT in a multi-user MIMO system.\\
+    The computation is based on the channel model, precoding technique, and combining technique used in the system, and is averaged over multiple channel realizations.
 
     Parameters
     ----------
@@ -150,20 +78,21 @@ class ChannelStatisticsData:
 
 class ChannelStatistics:
 
-    def __init__(self, Nt: int, K: int, Nr: int, num_channel_realizations: int, channel_model: type[ChannelModel], precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"], combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"]) -> None:
+    def __init__(self, system_config: SystemConfig, num_channel_realizations: int = 1_000_000):
         
-        self.Nt: int = Nt
-        self.K: int = K
-        self.Nr: int = Nr
+        self.Nt: int = system_config.Nt
+        self.K: int = system_config.K
+        self.Nr: int = system_config.Nr
+        self.channel_model: ChannelModel = system_config.channel_configs.channel_model()
+        self.precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"] = system_config.base_station_configs.precoder.__name__
+        self.combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"] = system_config.user_terminal_configs.combiner.__name__
+
         self.num_channel_realizations: int = num_channel_realizations
-        self.channel_model: ChannelModel = channel_model()
-        self.precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"] = precoding_technique
-        self.combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"] = combining_technique
 
         self.channel_statistics_data: ChannelStatisticsData = None
 
         # Argument validation.
-        if precoding_technique == "SVDPrecoder" and K > 1:
+        if self.precoding_technique == "SVDPrecoder" and self.K > 1:
             raise ValueError("SVD precoding is only applicable for single-user MIMO systems (K=1). Please choose K=1 or a different precoding technique.")
 
     def evaluate(self) -> ChannelStatistics:
@@ -437,6 +366,7 @@ class ChannelStatistics:
             bin_edges  = bin_edges,
             ecdf       = ecdf,
             quantiles  = quantiles,
+            
         )
         return channel_statistics_data
 
@@ -560,147 +490,14 @@ class ChannelStatistics:
         return
 
 
-# EXPECTED ACHIEVABLE RATES
-
-@dataclass
-class ExpectedAchievableRateData:
-    """
-    TO DO: add docstring.
-    """
-
-    # System parameters.
-    Nt: int
-    Nr: int
-    channel_model: type[ChannelModel]
-    precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"]
-    combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"]
-
-    # Computation parameters.
-    num_channel_realizations: int
-    num_bins: int
-
-    # Data.
-    snr_dB_values: RealArray
-    expected_achievable_rate: RealArray
-    expected_achievable_rate_ub: RealArray
-
-
-class ExpectedAchievableRate:
-
-    def __init__(self, channel_statistics: ChannelStatisticsData) -> None:
-        pass
-
-    def _generate_filepath(self) -> Path:
-        pass
-
-    def _store_expected_achievable_rate(self) -> None:
-        pass
-
-    def _load_expected_achievable_rate(self) -> ExpectedAchievableRateData | None:
-        pass
-
-    def evaluate(self) -> None:
-        pass
-    
-    @staticmethod
-    def _waterfilling_v1(gamma, pt):
-        r"""
-        Waterfilling algorithm.
-
-        This function implements the waterfilling algorithm to find the optimal power allocation across N transmission streams, given the channel-to-noise ratio (CNR) coefficients `gamma` and the total available transmit power `pt`.
-
-        In particular, it solves the following constraint optimization problem:
-
-        .. math::
-
-            \begin{aligned}
-                & \underset{\{p_n\}}{\text{max}}
-                & & \sum_{n=1}^{N} \log_2 \left( 1 + \gamma_n \, p_n \right) \\
-                & \text{s. t.}
-                & & \sum_{n=1}^{N} p_n = p_t \\
-                & & & \forall n \in \{1, \ldots, N\} : \, p_n \geq 0
-            \end{aligned}
-
-        Parameters
-        ----------
-        gamma : RealArray, shape (N,)
-            Channel-to-Noise Ratio (CNR) coefficients for each eigenchannel.
-        pt : float
-            Total available transmit power.
-
-        Returns
-        -------
-        p : RealArray, shape (N,)
-            Optimal power allocation across the eigenchannels.
-        """
-
-        # STEP 0: Sort the CNR coefficients in descending order.
-        sorted_indices = np.argsort(gamma)[::-1]
-        gamma = gamma[sorted_indices]
-
-        # STEP 1: Determine the number of active streams.
-        pt_iter = lambda as_iter: np.sum( (1 / gamma[as_iter]) - (1 / gamma[:as_iter]) )
-        as_UB = len(gamma)
-        as_LB = 0
-
-        while as_UB - as_LB > 1:
-            as_iter = (as_UB + as_LB) // 2
-            if pt > pt_iter(as_iter): as_LB = as_iter
-            elif pt < pt_iter(as_iter): as_UB = as_iter
-        
-        # STEP 2: Compute the optimal power allocation for each active stream.
-        p_step1 = ( (1 / gamma[as_LB]) - (1 / gamma[:as_LB]) )
-        p_step1 = np.concatenate( (p_step1, np.zeros(as_UB - as_LB)) )
-
-        power_remaining = pt - np.sum(p_step1)
-        p_step2 = (1 / as_UB) * power_remaining
-
-        p_sorted = np.concatenate( (p_step1 + p_step2, np.zeros(len(gamma) - as_UB)) )
-
-        # STEP 3: Reorder the power allocation to match the original order of the streams.
-        p = np.empty_like(p_sorted)
-        p[sorted_indices] = p_sorted
-
-        return p
-
-
-
-
-
 if __name__ == "__main__":
-
-
-    settings = [
-
-        {'Nt': 8, 'K': 2, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "NeutralCombiner"},
-        {'Nt': 8, 'K': 2, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "LSVCombiner"},
-        {'Nt': 8, 'K': 2, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "BDPrecoder", 'combining_technique': "NeutralCombiner"},
-        # {'Nt': 8, 'K': 2, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "WMMSEPrecoder", 'combining_technique': "NeutralCombiner"},
-
-        {'Nt': 8, 'K': 4, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "NeutralCombiner"},
-        {'Nt': 8, 'K': 4, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "LSVCombiner"},
-        {'Nt': 8, 'K': 4, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "BDPrecoder", 'combining_technique': "NeutralCombiner"},
-        # {'Nt': 8, 'K': 4, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "WMMSEPrecoder", 'combining_technique': "NeutralCombiner"},
-
-        {'Nt': 64, 'K': 16, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "NeutralCombiner"},
-        {'Nt': 64, 'K': 16, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "ZFPrecoder", 'combining_technique': "LSVCombiner"},
-        {'Nt': 64, 'K': 16, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "BDPrecoder", 'combining_technique': "NeutralCombiner"},
-        # {'Nt': 64, 'K': 16, 'Nr': 2, 'num_channel_realizations': 1_000_000, 'channel_model': IIDRayleighChannelModel, 'precoding_technique': "WMMSEPrecoder", 'combining_technique': "NeutralCombiner"},
-
-    ]
     
-    for setting in settings:
+    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1, 4) for j in range(1, 5) for k in range(1, 4)]
+    system_configs = setup_sys_configs(sys_ref_numbers, SYSTEM_CONFIG_PATH)
 
-        channel_statistics = ChannelStatistics(
-            Nt = setting['Nt'],
-            K  = setting['K'],
-            Nr = setting['Nr'],
-            num_channel_realizations = setting['num_channel_realizations'],
-            channel_model = setting['channel_model'],
-            precoding_technique = setting['precoding_technique'],
-            combining_technique = setting['combining_technique'],
-        )
+    for sys_ref_number in sys_ref_numbers:
 
+        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_realizations=100)
         channel_statistics = channel_statistics.evaluate()
-        channel_statistics._plot_streamchannel_pdf(num_uts=min(channel_statistics.K, 2), seperate_plots=True)
+        channel_statistics._plot_streamchannel_pdf(num_uts=1, seperate_plots=True)
 

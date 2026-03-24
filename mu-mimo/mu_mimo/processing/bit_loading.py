@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 import numpy as np
 from ..types import ComplexArray, RealArray, IntArray, BitArray, ChannelStateInformation
-from ..configs import ConstConfig
+if TYPE_CHECKING: from ..configs import ConstConfig
 
 
 class BitLoader(ABC):

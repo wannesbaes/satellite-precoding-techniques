@@ -2,18 +2,8 @@
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Literal
-#from ..types import ComplexArray, RealArray
-from tqdm import tqdm
 import numpy as np
-import scipy as sp
-import matplotlib.pyplot as plt
-import os
-
-ComplexArray = np.ndarray
-RealArray = np.ndarray
+from ..types import ComplexArray
 
 # CHANNEL MODELS
 
