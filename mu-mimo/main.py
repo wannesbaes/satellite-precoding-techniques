@@ -26,18 +26,28 @@ def main(sim_ref_numbers: list[str], sys_ref_numbers: list[str]) -> list[SimResu
 
     return results
 
+def main_ch_stats(sys_ref_numbers: list[str]) -> None:
+
+    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1, 4) for j in range(1, 5) for k in range(1, 4)]
+    system_configs = setup_sys_configs(sys_ref_numbers, SYSTEM_CONFIG_PATH)
+
+    for sys_ref_number in sys_ref_numbers:
+
+        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_realizations=100)
+        channel_statistics = channel_statistics.evaluate()
+        channel_statistics._plot_streamchannel_pdf(num_uts=1, seperate_plots=True)
+
 
 if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["2.1"]
-    sys_ref_numbers = ["1.1.1.1", "1.1.2.1", "1.1.3.1", "1.1.4.1", "1.2.1.1", "1.2.2.1", "1.2.3.1", "1.2.4.1"]
+    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1, 4) for j in range(1, 5) for k in range(1, 4)]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, sys_ref_numbers)
+    # main(sim_ref_numbers, sys_ref_numbers)
+    main_ch_stats(sys_ref_numbers)
 
 
     # PLOT YOUR RESULTS HERE.
-    for result in results:
-        # ResultManager.plot_system_performance(result)
-        pass
+    

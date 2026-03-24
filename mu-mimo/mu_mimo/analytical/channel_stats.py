@@ -1,10 +1,8 @@
 # mu-mimo/mu_mimo/analytical/channel_stats.py
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 from tqdm import tqdm
 import numpy as np
 import scipy as sp
@@ -26,20 +24,10 @@ class ChannelStatisticsData:
 
     Parameters
     ----------
-    Nt : int
-        The number of transmit antennas at the BS.
-    K : int
-        The number of UTs.
-    Nr : int
-        The number of receive antennas per UT.
+    system_configs : SystemConfig
+        The system configuration settings for which the channel statistics are computed.
     num_channel_realizations : int
         The number of channel realizations used to compute the channel statistics.
-    channel_model : type[ChannelModel]
-        The channel model used to generate the channel matrices.
-    precoding_technique : Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"]
-        The precoding technique to consider when computing the channel gains of the virtual independent parallel streamchannels.
-    combining_technique : Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"]
-        The combining technique to consider when computing the channel gains of the virtual independent parallel streamchannels.
     
     mean : RealArray, shape (K*Nr,)
         The mean of the channel gains of the virtual independent parallel streamchannels across all channel realizations.
@@ -58,13 +46,8 @@ class ChannelStatisticsData:
     """
     
     # System parameters.
-    Nt: int
-    K: int
-    Nr: int
+    system_configs: SystemConfig
     num_channel_realizations: int
-    channel_model: type[ChannelModel]
-    precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"]
-    combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"]
 
     # Channel statistics.
     mean: RealArray
@@ -80,19 +63,13 @@ class ChannelStatistics:
 
     def __init__(self, system_config: SystemConfig, num_channel_realizations: int = 1_000_000):
         
-        self.Nt: int = system_config.Nt
-        self.K: int = system_config.K
-        self.Nr: int = system_config.Nr
-        self.channel_model: ChannelModel = system_config.channel_configs.channel_model()
-        self.precoding_technique: Literal["SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder"] = system_config.base_station_configs.precoder.__name__
-        self.combining_technique: Literal["NeutralCombiner", "SVDCombiner", "LSVCombiner"] = system_config.user_terminal_configs.combiner.__name__
-
+        self.system_config: SystemConfig = system_config
         self.num_channel_realizations: int = num_channel_realizations
 
         self.channel_statistics_data: ChannelStatisticsData = None
 
         # Argument validation.
-        if self.precoding_technique == "SVDPrecoder" and self.K > 1:
+        if system_config.base_station_configs.precoder.__name__ == "SVDPrecoder" and self.system_config.K > 1:
             raise ValueError("SVD precoding is only applicable for single-user MIMO systems (K=1). Please choose K=1 or a different precoding technique.")
 
     def evaluate(self) -> ChannelStatistics:
@@ -110,11 +87,13 @@ class ChannelStatistics:
         # 0. Try to load the channel statistics from an existing .npz file. If the file does not yet exist, compute the channel statistics.
         self.channel_statistics_data = self._load_channel_statistics()
         if self.channel_statistics_data is not None:
-            print(f"Channel statistics loaded successfully from: {self._generate_filepath().with_suffix('.npz')}")
+            print(f"\nChannel statistics loaded successfully from:\n    {self._generate_filepath().with_suffix('.npz')}\n\n")
             return self
 
         # 1. Compute the corresponding channel gains statistics of the virtual independent parallel streamchannels.
-        g = np.empty((self.num_channel_realizations, self.K * self.Nr), dtype=float)
+        K = self.system_config.K
+        Nr = self.system_config.Nr
+        g = np.empty((self.num_channel_realizations, K * Nr), dtype=float)
         for i in tqdm(range(self.num_channel_realizations), desc="Generating channel realizations"):
             H = self._generate_channel()
             g[i] = self._compute_streamchannel_gains(H)
@@ -124,13 +103,13 @@ class ChannelStatistics:
 
         # 3. Store the computed channel statistics.
         self._store_channel_statistics()
-        print(f"Channel statistics computed successfully and stored to: {self._generate_filepath().with_suffix('.npz')}")
+        print(f"Channel statistics computed successfully and stored to:\n    {self._generate_filepath().with_suffix('.npz')}")
 
         # 4. Plot the channel statistics.
         print("Plotting channel statistics...")
-        self._plot_streamchannel_pdf(num_uts=min(self.K, 2), seperate_plots=True)
-        self._plot_streamchannel_ecdf(num_uts=min(self.K, 2), seperate_plots=True)
-        print(f"Channel statistics plots generated successfully and stored to: {self._generate_filepath().with_suffix('.png')}\n")
+        self._plot_streamchannel_pdf(num_uts=min(K, 1), seperate_plots=True)
+        self._plot_streamchannel_ecdf(num_uts=min(K, 1), seperate_plots=True)
+        print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filepath().with_suffix('.png')}\n\n")
 
         return self
 
@@ -145,12 +124,7 @@ class ChannelStatistics:
         """
         
         # Generate a unique file name based on the system parameters and the used precoding technique.
-        filename = Path(
-            f"virtual_streamchannel_gains"
-            f"__Nt_{self.Nt}_K_{self.K}_Nr_{self.Nr}"
-            f"__{self.channel_model.__class__.__name__}__{self.precoding_technique}__{self.combining_technique}"
-            f"__N_{self.num_channel_realizations//1_000_000:.0f}M"
-        )
+        filename = Path(f"stats virtual streamchannel gains ({self.num_channel_realizations//1_000_000}M samples) -- {self.system_config.name}.suffix")
 
         # Ensure both output trees exist, because plotting code saves into subfolders.
         stats_dir = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
@@ -179,13 +153,8 @@ class ChannelStatistics:
             
             dirname / filename,
             
-            Nt = data.Nt,
-            K  = data.K,
-            Nr = data.Nr,
+            system_configs = data.system_configs,
             num_channel_realizations = data.num_channel_realizations,
-            channel_model            = data.channel_model,
-            precoding_technique      = data.precoding_technique,
-            combining_technique      = data.combining_technique,
 
             mean        = data.mean,
             var         = data.var,
@@ -216,13 +185,8 @@ class ChannelStatistics:
         loaded = np.load(pathname, allow_pickle=True)
         data = ChannelStatisticsData(
             
-            Nt = int(loaded["Nt"]),
-            K  = int(loaded["K"]),
-            Nr = int(loaded["Nr"]),
-            num_channel_realizations = int(loaded["num_channel_realizations"]),
-            channel_model            = loaded["channel_model"].item(),
-            precoding_technique      = loaded["precoding_technique"].item(),
-            combining_technique      = loaded["combining_technique"].item(),
+            system_configs           = loaded["system_configs"].item(),
+            num_channel_realizations = int(loaded["num_channel_realizations"].item()),
             
             mean       = np.asarray(loaded["mean"], dtype=float),
             var        = np.asarray(loaded["var"], dtype=float),
@@ -232,7 +196,7 @@ class ChannelStatistics:
             quantiles  = np.asarray(loaded["quantiles"], dtype=float),
         )
 
-        if (data.Nt != self.Nt or data.K != self.K or data.Nr != self.Nr or data.num_channel_realizations != self.num_channel_realizations or data.channel_model != self.channel_model.__class__.__name__  or data.precoding_technique != self.precoding_technique  or data.combining_technique != self.combining_technique):
+        if (data.system_configs != self.system_config or data.num_channel_realizations != self.num_channel_realizations):
             raise ValueError("The configuration settings of the loaded channel statistics data do not match the configuration settings of the current ChannelStatistics instance. Please check the file name and the configuration settings of the current ChannelStatistics instance to solve this issue.")
 
         return data
@@ -246,7 +210,13 @@ class ChannelStatistics:
         H : ComplexArray, shape (K*Nr, Nt)
             The generated channel matrix.
         """
-        H = self.channel_model.generate(self.K * self.Nr, self.Nt)
+        
+        K = self.system_config.K
+        Nr = self.system_config.Nr
+        Nt = self.system_config.Nt
+        channel_model: ChannelModel = self.system_config.channel_configs.channel_model()
+        
+        H = channel_model.generate(K * Nr, Nt)
         return H
 
     def _compute_streamchannel_gains(self, H: ComplexArray) -> RealArray:
@@ -274,49 +244,59 @@ class ChannelStatistics:
             return g.real
 
         def zf_lsv_streamchannel_gains(H: ComplexArray) -> RealArray:
+
+            K = self.system_config.K
+            Nr = self.system_config.Nr
             
             H_eff = np.empty_like(H, dtype=complex)
-            for k in range(self.K):
-                H_k = H[k*self.Nr : (k+1)*self.Nr]
+            for k in range(K):
+                H_k = H[k*Nr : (k+1)*Nr]
                 U_k, Sigma_k, Vh_k = sp.linalg.svd(H_k)
                 H_eff_k = np.transpose(U_k.conj()) @ H_k
-                H_eff[k*self.Nr : (k+1)*self.Nr] = H_eff_k
+                H_eff[k*Nr : (k+1)*Nr] = H_eff_k
             
             g = zf_streamchannel_gains(H_eff)
             return g
 
         def bd_streamchannel_gains(H: ComplexArray) -> RealArray:
+
+            K = self.system_config.K
+            Nr = self.system_config.Nr
+            Nt = self.system_config.Nt
             
-            r_ring = self.Nt - (self.K-1)*self.Nr
-            F1 = np.empty((self.Nt, r_ring*self.K), dtype=complex)
-            for k in range(self.K):
-                H_ring_k = np.delete(H, slice(k*self.Nr, (k+1)*self.Nr), axis=0)
+            r_ring = Nt - (K-1)*Nr
+            F1 = np.empty((Nt, r_ring*K), dtype=complex)
+            for k in range(K):
+                H_ring_k = np.delete(H, slice(k*Nr, (k+1)*Nr), axis=0)
                 _, _, Vh_ring_k = sp.linalg.svd(H_ring_k)
                 V_ring_k = Vh_ring_k.conj().T
-                F1_k = V_ring_k[:, self.Nt-r_ring : self.Nt]
+                F1_k = V_ring_k[:, Nt-r_ring : Nt]
                 F1[:, k*r_ring : (k+1)*r_ring] = F1_k
             H_eff = H @ F1
 
-            g = np.empty(self.K * self.Nr, dtype=float)
-            for k in range(self.K):
-                H_eff_k = H_eff[k*self.Nr : (k+1)*self.Nr, k*r_ring : (k+1)*r_ring]
+            g = np.empty(K * Nr, dtype=float)
+            for k in range(K):
+                H_eff_k = H_eff[k*Nr : (k+1)*Nr, k*r_ring : (k+1)*r_ring]
                 g_k = svd_streamchannel_gains(H_eff_k)
-                g[k*self.Nr : (k+1)*self.Nr] = g_k
+                g[k*Nr : (k+1)*Nr] = g_k
             
             return g
 
         def wmmse_streamchannel_gains(H: ComplexArray) -> RealArray:
             raise NotImplementedError("WMMSE streamchannel gains computation is not implemented yet.")
         
-        if self.precoding_technique == "SVDPrecoder" and self.combining_technique == "SVDCombiner":
+        precoder_name = self.system_config.base_station_configs.precoder.__name__
+        combiner_name = self.system_config.user_terminal_configs.combiner.__name__
+        
+        if precoder_name == "SVDPrecoder" and combiner_name == "SVDCombiner":
             g = svd_streamchannel_gains(H)
-        elif self.precoding_technique == "ZFPrecoder" and self.combining_technique == "NeutralCombiner":
+        elif precoder_name == "ZFPrecoder" and combiner_name == "NeutralCombiner":
             g = zf_streamchannel_gains(H)
-        elif self.precoding_technique == "ZFPrecoder" and self.combining_technique == "LSVCombiner":
+        elif precoder_name == "ZFPrecoder" and combiner_name == "LSVCombiner":
             g = zf_lsv_streamchannel_gains(H)
-        elif self.precoding_technique == "BDPrecoder":
+        elif precoder_name == "BDPrecoder":
             g = bd_streamchannel_gains(H)
-        elif self.precoding_technique == "WMMSEPrecoder":
+        elif precoder_name == "WMMSEPrecoder":
             g = wmmse_streamchannel_gains(H)
         else:
             raise ValueError("Unsupported precoding and combining technique combination.")
@@ -343,7 +323,7 @@ class ChannelStatistics:
         mean = np.mean(g, axis=0)
         var = np.var(g, axis=0)
 
-        histograms_bins = [np.histogram(g[:, s], bins=num_bins, density=True) for s in range(self.K * self.Nr)]
+        histograms_bins = [np.histogram(g[:, s], bins=num_bins, density=True) for s in range(self.system_config.K * self.system_config.Nr)]
         histograms = np.asarray([hb[0] for hb in histograms_bins], dtype=float)
         bin_edges = np.asarray([hb[1] for hb in histograms_bins], dtype=float)
 
@@ -352,13 +332,8 @@ class ChannelStatistics:
 
         channel_statistics_data = ChannelStatisticsData(
             
-            Nt = self.Nt,
-            K  = self.K,
-            Nr = self.Nr,
+            system_configs = self.system_config,
             num_channel_realizations = self.num_channel_realizations,
-            channel_model            = self.channel_model.__class__.__name__,
-            precoding_technique      = self.precoding_technique,
-            combining_technique      = self.combining_technique,
             
             mean       = mean,
             var        = var,
@@ -397,14 +372,15 @@ class ChannelStatistics:
         for k in range(num_uts):
 
             ax = axs[k]
+            Nr = self.system_config.Nr
 
-            mean = self.channel_statistics_data.mean[k*self.Nr : (k+1)*self.Nr]
-            var = self.channel_statistics_data.var[k*self.Nr : (k+1)*self.Nr]
+            mean = self.channel_statistics_data.mean[k*Nr : (k+1)*Nr]
+            var = self.channel_statistics_data.var[k*Nr : (k+1)*Nr]
             
-            histograms = self.channel_statistics_data.histograms[k*self.Nr : (k+1)*self.Nr]
-            bin_edges = self.channel_statistics_data.bin_edges[k*self.Nr : (k+1)*self.Nr]
+            histograms = self.channel_statistics_data.histograms[k*Nr : (k+1)*Nr]
+            bin_edges = self.channel_statistics_data.bin_edges[k*Nr : (k+1)*Nr]
 
-            for nr in range(self.Nr):
+            for nr in range(Nr):
 
                 # The Probability Density Function (PDF) using histograms.
                 edges = bin_edges[nr]
@@ -422,7 +398,7 @@ class ChannelStatistics:
             ax.set_ylabel("Probability Density")
             ax.set_title("")
             ax.grid(True, alpha=0.3)
-            ax.set_xlim( xmax = (bin_edges[1][-1] + 0.25 * (bin_edges[0][-1] - bin_edges[1][-1])) if self.Nr > 1 else (bin_edges[0][-1]) )
+            ax.set_xlim(xmax = (bin_edges[1][-1] + 0.25 * (bin_edges[0][-1] - bin_edges[1][-1])) if Nr > 1 else (bin_edges[0][-1]) )
             ax.legend()
 
         # 3. Save the plot.
@@ -456,14 +432,15 @@ class ChannelStatistics:
         for k in range(num_uts):
 
             ax = axs[k]
+            Nr = self.system_config.Nr
 
-            mean = self.channel_statistics_data.mean[k*self.Nr : (k+1)*self.Nr]
-            var = self.channel_statistics_data.var[k*self.Nr : (k+1)*self.Nr]
+            mean = self.channel_statistics_data.mean[k*Nr : (k+1)*Nr]
+            var = self.channel_statistics_data.var[k*Nr : (k+1)*Nr]
 
             quantiles = self.channel_statistics_data.quantiles
-            ecdf_vals = self.channel_statistics_data.ecdf[:, k*self.Nr : (k+1)*self.Nr]
+            ecdf_vals = self.channel_statistics_data.ecdf[:, k*Nr : (k+1)*Nr]
 
-            for nr in range(self.Nr):
+            for nr in range(Nr):
             
                 # The Empirical Cumulative Distribution Function (ECDF).
                 ax.plot(ecdf_vals[:, nr], quantiles, label=f"UT {k+1}, Stream {nr+1}")
@@ -480,7 +457,7 @@ class ChannelStatistics:
             ax.set_title(f"")
             ax.grid(True, alpha=0.3)
             ax.set_yticks(np.linspace(0, 1, 11))
-            ax.set_xlim( xmax = (ecdf_vals[-1,1] + 0.25 * (ecdf_vals[-1,0] - ecdf_vals[-1,1])) if self.Nr > 1 else (ecdf_vals[-1,0]) )
+            ax.set_xlim( xmax = (ecdf_vals[-1,1] + 0.25 * (ecdf_vals[-1,0] - ecdf_vals[-1,1])) if Nr > 1 else (ecdf_vals[-1,0]) )
             ax.legend()
 
         # 3. Save the plot.
@@ -489,15 +466,4 @@ class ChannelStatistics:
         plot_ecdf.savefig(plot_ecdf_dir / plot_ecdf_filename, dpi=300, bbox_inches="tight")
         return
 
-
-if __name__ == "__main__":
-    
-    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1, 4) for j in range(1, 5) for k in range(1, 4)]
-    system_configs = setup_sys_configs(sys_ref_numbers, SYSTEM_CONFIG_PATH)
-
-    for sys_ref_number in sys_ref_numbers:
-
-        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_realizations=100)
-        channel_statistics = channel_statistics.evaluate()
-        channel_statistics._plot_streamchannel_pdf(num_uts=1, seperate_plots=True)
 
