@@ -25,8 +25,8 @@ docs/build/
 */report/LaTeX/src/
 */report/figures/src/
 */report/plots/
-*/report/simulation_results/
-*/report/channel_statistics/
+*/su_mimo/report/simulation_results/
+*/su_mimo/report/channel_statistics/
 
 # Simulation results channel gains.
 su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/
