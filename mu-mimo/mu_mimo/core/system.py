@@ -47,8 +47,8 @@ class SimulationRunner:
         
         
         # Check if this simulation has already been executed. If so, load the results and return them.
-        if ResultManager.search_results(self.sim_config, self.system_config):
-            sim_result = ResultManager.load_results(self.sim_config, self.system_config)
+        if SimResultManager.search_results(self.sim_config, self.system_config):
+            sim_result = SimResultManager.load_results(self.sim_config, self.system_config)
             print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + f"  Results from {sim_result.system_configs.name} for {sim_result.sim_configs.name} successfully loaded.\n" + "="*60)
             return sim_result
         else:
@@ -94,7 +94,7 @@ class SimulationRunner:
             sim_configs = self.sim_config,
             system_configs = self.system_config,
             simulation_results = simulation_results)
-        ResultManager.save_results(simulation_result)
+        SimResultManager.save_results(simulation_result)
 
         return simulation_result
 
@@ -464,6 +464,8 @@ class MuMimoSystem:
         # Initialization.
         Pt = self.system_config.Pt
         B = self.system_config.B
+        K = self.system_config.K
+        Nr = self.system_config.Nr
 
         snr = self.channel.state.snr
         H_eff = self.channel.state.H_eff
@@ -485,6 +487,7 @@ class MuMimoSystem:
 
         # Compute the achievable bit rates.
         capacity = 2*B * np.log2(1 + sinr)
+        capacity = capacity.reshape((K, Nr))
 
         return capacity
 

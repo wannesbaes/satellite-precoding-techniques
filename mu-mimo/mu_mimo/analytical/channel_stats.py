@@ -26,7 +26,7 @@ class ChannelStatisticsData:
     ----------
     system_configs : SystemConfig
         The system configuration settings for which the channel statistics are computed.
-    num_channel_realizations : int
+    num_channel_samples : int
         The number of channel realizations used to compute the channel statistics.
     
     mean : RealArray, shape (K*Nr,)
@@ -47,7 +47,7 @@ class ChannelStatisticsData:
     
     # System parameters.
     system_configs: SystemConfig
-    num_channel_realizations: int
+    num_channel_samples: int
 
     # Channel statistics.
     mean: RealArray
@@ -61,10 +61,10 @@ class ChannelStatisticsData:
 
 class ChannelStatistics:
 
-    def __init__(self, system_config: SystemConfig, num_channel_realizations: int = 1_000_000):
+    def __init__(self, system_config: SystemConfig, num_channel_samples: int = 1_000_000):
         
         self.system_config: SystemConfig = system_config
-        self.num_channel_realizations: int = num_channel_realizations
+        self.num_channel_samples: int = num_channel_samples
 
         self.channel_statistics_data: ChannelStatisticsData = None
 
@@ -72,16 +72,21 @@ class ChannelStatistics:
         if system_config.base_station_configs.precoder.__name__ == "SVDPrecoder" and self.system_config.K > 1:
             raise ValueError("SVD precoding is only applicable for single-user MIMO systems (K=1). Please choose K=1 or a different precoding technique.")
 
-    def evaluate(self) -> ChannelStatistics:
+    def evaluate(self, plot: bool = False) -> ChannelStatisticsData:
         """
         Evaluate the channel statistics of the virtual independent parallel streamchannels.
 
         The channel gain statistics of the virtual independent parallel streamchannels are computed based on the used precoding technique for multiple channel realizations.
 
+        Parameters
+        ----------
+        plot : bool, optional
+            Whether to plot the channel statistics, by default False.\\
+
         Returns
         -------
-        channel_statistics : ChannelStatistics
-            The channel statistics instance with the computed channel statistics data.
+        channel_statistics_data : ChannelStatisticsData
+            The computed channel statistics data of the virtual independent parallel streamchannels.
         """
 
         # 0. Try to load the channel statistics from an existing .npz file. If the file does not yet exist, compute the channel statistics.
@@ -93,25 +98,27 @@ class ChannelStatistics:
         # 1. Compute the corresponding channel gains statistics of the virtual independent parallel streamchannels.
         K = self.system_config.K
         Nr = self.system_config.Nr
-        g = np.empty((self.num_channel_realizations, K * Nr), dtype=float)
-        for i in tqdm(range(self.num_channel_realizations), desc="Generating channel realizations"):
+        g = np.empty((self.num_channel_samples, K * Nr), dtype=float)
+        for i in tqdm(range(self.num_channel_samples), desc="Generating channel realizations"):
             H = self._generate_channel()
             g[i] = self._compute_streamchannel_gains(H)
 
         print("Computing channel statistics...")
-        self.channel_statistics_data = self._compute_channel_statistics(g)
+        channel_statistics_data = self._compute_channel_statistics(g)
 
         # 3. Store the computed channel statistics.
+        self.channel_statistics_data = channel_statistics_data
         self._store_channel_statistics()
         print(f"Channel statistics computed successfully and stored to:\n    {self._generate_filepath().with_suffix('.npz')}")
 
         # 4. Plot the channel statistics.
-        print("Plotting channel statistics...")
-        self._plot_streamchannel_pdf(num_uts=min(K, 1), seperate_plots=True)
-        self._plot_streamchannel_ecdf(num_uts=min(K, 1), seperate_plots=True)
-        print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filepath().with_suffix('.png')}\n\n")
+        if plot:
+            print("Plotting channel statistics...")
+            self._plot_streamchannel_pdf(num_uts=min(K, 1), seperate_plots=True)
+            self._plot_streamchannel_ecdf(num_uts=min(K, 1), seperate_plots=True)
+            print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filepath().with_suffix('.png')}\n\n")
 
-        return self
+        return channel_statistics_data
 
     def _generate_filepath(self) -> Path:
         """
@@ -124,11 +131,11 @@ class ChannelStatistics:
         """
         
         # Generate a unique file name based on the system parameters and the used precoding technique.
-        filename = Path(f"stats virtual streamchannel gains ({self.num_channel_realizations//1_000_000}M samples) -- {self.system_config.name}.suffix")
+        filename = Path(f"stats virtual streamchannel gains ({self.num_channel_samples//1_000_000}M samples) -- {self.system_config.name}")
 
         # Ensure both output trees exist, because plotting code saves into subfolders.
-        stats_dir = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
-        plots_dir = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "plots"
+        stats_dir = Path(__file__).resolve().parents[2] / "report" / "analytical_results" /"channel_statistics" / "stats"
+        plots_dir = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots"
         stats_dir.mkdir(parents=True, exist_ok=True)
         plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -145,7 +152,7 @@ class ChannelStatistics:
         
         # Generate the file name.
         filename = self._generate_filepath().with_suffix(".npz")
-        dirname = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
+        dirname = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "stats"
 
         # Store the channel statistics data in a .npz file.
         data = self.channel_statistics_data
@@ -154,7 +161,7 @@ class ChannelStatistics:
             dirname / filename,
             
             system_configs = data.system_configs,
-            num_channel_realizations = data.num_channel_realizations,
+            num_channel_samples = data.num_channel_samples,
 
             mean        = data.mean,
             var         = data.var,
@@ -176,7 +183,7 @@ class ChannelStatistics:
         """
         
         filename = self._generate_filepath().with_suffix(".npz")
-        dirname = Path(__file__).resolve().parents[2] / "report" / "channel_statistics" / "stats"
+        dirname = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "stats"
         pathname = dirname / filename
 
         if not pathname.exists():
@@ -186,7 +193,7 @@ class ChannelStatistics:
         data = ChannelStatisticsData(
             
             system_configs           = loaded["system_configs"].item(),
-            num_channel_realizations = int(loaded["num_channel_realizations"].item()),
+            num_channel_samples = int(loaded["num_channel_samples"].item()),
             
             mean       = np.asarray(loaded["mean"], dtype=float),
             var        = np.asarray(loaded["var"], dtype=float),
@@ -196,7 +203,7 @@ class ChannelStatistics:
             quantiles  = np.asarray(loaded["quantiles"], dtype=float),
         )
 
-        if (data.system_configs != self.system_config or data.num_channel_realizations != self.num_channel_realizations):
+        if (data.system_configs != self.system_config or data.num_channel_samples != self.num_channel_samples):
             raise ValueError("The configuration settings of the loaded channel statistics data do not match the configuration settings of the current ChannelStatistics instance. Please check the file name and the configuration settings of the current ChannelStatistics instance to solve this issue.")
 
         return data
@@ -309,7 +316,7 @@ class ChannelStatistics:
         
         Parameters
         ----------
-        g : RealArray, shape (num_channel_realizations, K*Nr)
+        g : RealArray, shape (num_channel_samples, K*Nr)
             The channel gains of the virtual independent parallel streamchannels for multiple channel realizations.
         num_bins : int, optional
             The number of bins to use for the histogram, by default 100.
@@ -333,7 +340,7 @@ class ChannelStatistics:
         channel_statistics_data = ChannelStatisticsData(
             
             system_configs = self.system_config,
-            num_channel_realizations = self.num_channel_realizations,
+            num_channel_samples = self.num_channel_samples,
             
             mean       = mean,
             var        = var,
@@ -402,8 +409,8 @@ class ChannelStatistics:
             ax.legend()
 
         # 3. Save the plot.
-        plot_pdf_filename = Path(str(self._generate_filepath()) + f"__UTs_{num_uts}__pdf").with_suffix(".png")
-        plot_pdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots"
+        plot_pdf_filename = Path(str(self._generate_filepath()) + f" ({num_uts} UTs plotted)" + ".png")
+        plot_pdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots" / "pdf"
         plot_pdf.savefig(plot_pdf_dir / plot_pdf_filename, dpi=300, bbox_inches="tight")
         return
 
@@ -461,8 +468,8 @@ class ChannelStatistics:
             ax.legend()
 
         # 3. Save the plot.
-        plot_ecdf_filename = Path(str(self._generate_filepath()) + f"__UTs_{num_uts}__ecdf").with_suffix(".png")
-        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots"
+        plot_ecdf_filename = Path(str(self._generate_filepath()) + f" ({num_uts} UTs plotted)" + ".png")
+        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots" / "ecdf"
         plot_ecdf.savefig(plot_ecdf_dir / plot_ecdf_filename, dpi=300, bbox_inches="tight")
         return
 
