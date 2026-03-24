@@ -33,7 +33,7 @@ def main_ch_stats(sys_ref_numbers: list[str]) -> None:
 
     for sys_ref_number in sys_ref_numbers:
 
-        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_realizations=100)
+        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_realizations=1_000_000)
         channel_statistics = channel_statistics.evaluate()
         channel_statistics._plot_streamchannel_pdf(num_uts=1, seperate_plots=True)
 
@@ -41,11 +41,14 @@ def main_ch_stats(sys_ref_numbers: list[str]) -> None:
 if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
-    sim_ref_numbers = ["2.1"]
-    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1, 4) for j in range(1, 5) for k in range(1, 4)]
+    sim_ref_numbers = ["1.0"]
+    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
+    sys_ref_numbers_ZF     = [f"1.1.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
+    sys_ref_numbers_ZF_LSV = [f"1.2.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
+    sys_ref_numbers_BD     = [f"1.3.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    # main(sim_ref_numbers, sys_ref_numbers)
+    # main(sim_ref_numbers, sys_ref_numbers_BD)
     main_ch_stats(sys_ref_numbers)
 
 
