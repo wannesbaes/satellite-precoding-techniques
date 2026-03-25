@@ -19,9 +19,9 @@ def main(sim_ref_numbers: list[str], sys_ref_numbers: list[str]) -> list[SimResu
             runner = SimulationRunner(sim_config=sim_configs[sim_ref_number], system_config=system_configs[sys_ref_number])
             result = runner.run()
 
-            SimResultManager.plot_system_performance(result)
-            SimResultManager.plot_ut_performance(result)
-            SimResultManager.plot_stream_performance(result)
+            #SimResultManager.plot_system_performance(result)
+            #SimResultManager.plot_ut_performance(result)
+            #SimResultManager.plot_stream_performance(result)
 
     return
 
@@ -44,13 +44,13 @@ if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["1.0"]
-    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 6)]
+    sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
 
-    sys_ref_numbers_ZF = [f"1.1.{j}.{k}" for j in range(1, 5) for k in range(1, 6)]
-    sys_ref_numbers_ZF_LSV = [f"1.2.{j}.{k}" for j in range(1, 5) for k in range(1, 6)]
-    sys_ref_numbers_BD = [f"1.3.{j}.{k}" for j in range(1, 5) for k in range(1, 6)]
+    sys_ref_numbers_ZF = [f"1.1.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
+    sys_ref_numbers_ZF_LSV = [f"1.2.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
+    sys_ref_numbers_BD = [f"1.3.{j}.{k}" for j in range(1, 5) for k in range(1, 4)]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    main(sim_ref_numbers, sys_ref_numbers)
+    main(sim_ref_numbers, sys_ref_numbers_BD)
     #main_ch_stats(sys_ref_numbers)
     #main_ergodic_capacity(sys_ref_numbers)
