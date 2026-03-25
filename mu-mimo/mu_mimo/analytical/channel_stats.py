@@ -92,35 +92,33 @@ class ChannelStatistics:
         # 0. Try to load the channel statistics from an existing .npz file. If the file does not yet exist, compute the channel statistics.
         self.channel_statistics_data = self._load_channel_statistics()
         if self.channel_statistics_data is not None:
-            print(f"\nChannel statistics loaded successfully from:\n    {self._generate_filepath().with_suffix('.npz')}\n\n")
-            return self
+            print(f"\nChannel statistics loaded successfully from:\n    {self._generate_filename().with_suffix('.npz')}\n")
+            return self.channel_statistics_data
 
         # 1. Compute the corresponding channel gains statistics of the virtual independent parallel streamchannels.
-        K = self.system_config.K
-        Nr = self.system_config.Nr
-        g = np.empty((self.num_channel_samples, K * Nr), dtype=float)
+        print(f"Computing channel statistics for {self.system_config.name}...")
+        g = np.empty((self.num_channel_samples, self.system_config.K * self.system_config.Nr), dtype=float)
         for i in tqdm(range(self.num_channel_samples), desc="Generating channel realizations"):
             H = self._generate_channel()
             g[i] = self._compute_streamchannel_gains(H)
 
-        print("Computing channel statistics...")
         channel_statistics_data = self._compute_channel_statistics(g)
 
         # 3. Store the computed channel statistics.
         self.channel_statistics_data = channel_statistics_data
         self._store_channel_statistics()
-        print(f"Channel statistics computed successfully and stored to:\n    {self._generate_filepath().with_suffix('.npz')}")
+        print(f"Channel statistics computed successfully and stored to:\n    {self._generate_filename().with_suffix('.npz')}")
 
         # 4. Plot the channel statistics.
         if plot:
             print("Plotting channel statistics...")
-            self._plot_streamchannel_pdf(num_uts=min(K, 1), seperate_plots=True)
-            self._plot_streamchannel_ecdf(num_uts=min(K, 1), seperate_plots=True)
-            print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filepath().with_suffix('.png')}\n\n")
+            self.plot_streamchannel_gains_pdf(num_uts=min(self.system_config.K, 1), seperate_plots=True)
+            self.plot_streamchannel_gains_ecdf(num_uts=min(self.system_config.K, 1), seperate_plots=True)
+            print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filename().with_suffix('.png')}\n\n")
 
         return channel_statistics_data
 
-    def _generate_filepath(self) -> Path:
+    def _generate_filename(self) -> Path:
         """
         Generate the file name for storing the channel statistics and plots.
 
@@ -132,12 +130,6 @@ class ChannelStatistics:
         
         # Generate a unique file name based on the system parameters and the used precoding technique.
         filename = Path(f"stats virtual streamchannel gains ({self.num_channel_samples//1_000_000}M samples) -- {self.system_config.name}")
-
-        # Ensure both output trees exist, because plotting code saves into subfolders.
-        stats_dir = Path(__file__).resolve().parents[2] / "report" / "analytical_results" /"channel_statistics" / "stats"
-        plots_dir = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots"
-        stats_dir.mkdir(parents=True, exist_ok=True)
-        plots_dir.mkdir(parents=True, exist_ok=True)
 
         return filename
 
@@ -151,8 +143,9 @@ class ChannelStatistics:
             raise ValueError("No channel statistics available. Compute them before storing.")
         
         # Generate the file name.
-        filename = self._generate_filepath().with_suffix(".npz")
+        filename = Path(str(self._generate_filename()) + ".npz")
         dirname = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "stats"
+        dirname.mkdir(parents=True, exist_ok=True)
 
         # Store the channel statistics data in a .npz file.
         data = self.channel_statistics_data
@@ -182,7 +175,7 @@ class ChannelStatistics:
             The loaded channel statistics data. If the file does not yet exist, return None.
         """
         
-        filename = self._generate_filepath().with_suffix(".npz")
+        filename = Path(str(self._generate_filename()) + ".npz")
         dirname = Path(__file__).resolve().parents[2] / "report" / "analytical_results" / "channel_statistics" / "stats"
         pathname = dirname / filename
 
@@ -193,7 +186,7 @@ class ChannelStatistics:
         data = ChannelStatisticsData(
             
             system_configs           = loaded["system_configs"].item(),
-            num_channel_samples = int(loaded["num_channel_samples"].item()),
+            num_channel_samples      = int(loaded["num_channel_samples"].item()),
             
             mean       = np.asarray(loaded["mean"], dtype=float),
             var        = np.asarray(loaded["var"], dtype=float),
@@ -352,7 +345,44 @@ class ChannelStatistics:
         )
         return channel_statistics_data
 
-    def _plot_streamchannel_pdf(self, num_uts: int = 1, seperate_plots: bool = False) -> None:
+    def _streamchannel_gains_analytical_distribution(self, k: int, nr: int) -> tuple[callable, str] | None:
+        """
+        Return the analytical probability density function (PDF) of the channel gain of a virtual parallel channel of stream nr of UT k, if an analytical distribution is known for the current precoding and combining technique. Otherwise, return None.
+
+        Parameters
+        ----------
+        k : int
+            The index of the UT for which to return the analytical PDF of the channel gain of a virtual parallel channel. (0-based index)
+        nr : int
+            The index of the stream of the UT for which to return the analytical PDF of the channel gain of a virtual parallel channel. (0-based index)
+
+        Returns
+        -------
+        pdf : callable
+            The analytical PDF of the channel gain of the virtual parallel streamchannel if available for the current precoding and combining technique, otherwise None.
+        cdf : callable
+            The analytical cumulative distribution function (CDF) of the channel gain of the virtual parallel streamchannel if available for the current precoding and combining technique, otherwise None.
+        label : str
+            The label to use for the analytical PDF in the plot legend if an analytical distribution is known for the current precoding and combining technique, otherwise None.
+        """
+
+        precoder_name = self.system_config.base_station_configs.precoder.__name__
+        combiner_name = self.system_config.user_terminal_configs.combiner.__name__
+
+        if precoder_name == "ZFPrecoder" and combiner_name == "NeutralCombiner":
+            
+            # Channel gain g_(k,nr) ~ Gamma(alpha = Nt - K*Nr + 1, beta = 1)
+            alpha = self.system_config.Nt - (self.system_config.K * self.system_config.Nr) + 1
+            rv_gamma = sp.stats.gamma(a=alpha, scale=1.0)
+            label = rf"$Gamma(\alpha={alpha}, \beta=1)$" if nr == 0 else None
+            return rv_gamma.pdf, rv_gamma.cdf, label
+
+        else:
+            print(f"Warning: The Analytical PDF of the virtual parallel streamchannel gain is not implemented for the current precoding and combining technique ({self.system_config.name}). No analytical PDF will be plotted.")
+        
+        return None
+
+    def plot_streamchannel_gains_pdf(self, num_uts: int = 1, seperate_plots: bool = True, analytical: bool = True) -> None:
         """
         Plot the probability density function (PDF) of the channel gains of the virtual independent parallel streamchannels for multiple channel realizations, and save the plot as a .png file.
 
@@ -362,7 +392,9 @@ class ChannelStatistics:
             The number of UTs to consider for the plot, by default 1.\\
             e.g., if num_uts=2, the plot will show the PDF of the channel gains of the virtual independent parallel streamchannels for the first 2 UTs (i.e., for the first 2*Nr streamchannels).
         seperate_plots : bool, optional
-            Whether to plot the PDFs of the channel gains of the virtual independent parallel streamchannels for each UT in a separate subplot, by default False.\\
+            Whether to plot the PDFs of the channel gains of the virtual independent parallel streamchannels for each UT in a separate subplot, by default True.
+        analytical : bool, optional
+            Whether to plot the analytical PDFs of the channel gains of the virtual independent parallel streamchannels if available, by default True.
         """
         
         # 1. Plot initialization.
@@ -389,6 +421,13 @@ class ChannelStatistics:
 
             for nr in range(Nr):
 
+                # Analytical Probability Density Function (PDF) overlay (if available).
+                analytical = self._streamchannel_gains_analytical_distribution(k, nr) if analytical else None
+                if analytical is not None:
+                    pdf_func, _, label = analytical
+                    x_analytical = np.linspace(bin_edges[nr][0], bin_edges[nr][-1], 1000)
+                    ax.plot(x_analytical, pdf_func(x_analytical), linestyle="--", color="black", label=label, zorder=2.5)
+
                 # The Probability Density Function (PDF) using histograms.
                 edges = bin_edges[nr]
                 centers = 0.5 * (edges[:-1] + edges[1:])
@@ -403,18 +442,19 @@ class ChannelStatistics:
             # Plot settings.
             ax.set_xlabel("Virtual Channel Gain")
             ax.set_ylabel("Probability Density")
-            ax.set_title("")
+            ax.set_title(f"UT {k+1}" if seperate_plots and num_uts > 1 else "")
             ax.grid(True, alpha=0.3)
             ax.set_xlim(xmax = (bin_edges[1][-1] + 0.25 * (bin_edges[0][-1] - bin_edges[1][-1])) if Nr > 1 else (bin_edges[0][-1]) )
             ax.legend()
 
         # 3. Save the plot.
-        plot_pdf_filename = Path(str(self._generate_filepath()) + f" ({num_uts} UTs plotted)" + ".png")
-        plot_pdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots" / "pdf"
+        plot_pdf_filename = Path(str(self._generate_filename()) + f" ({num_uts} UTs plotted)" + ".png")
+        plot_pdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "pdf"
+        plot_pdf_dir.mkdir(parents=True, exist_ok=True)
         plot_pdf.savefig(plot_pdf_dir / plot_pdf_filename, dpi=300, bbox_inches="tight")
         return
 
-    def _plot_streamchannel_ecdf(self, num_uts: int = 1, seperate_plots: bool = False) -> None:
+    def plot_streamchannel_gains_ecdf(self, num_uts: int = 1, seperate_plots: bool = True, analytical: bool = True) -> None:
         """
         Plot the empirical cumulative distribution function (ECDF) of the channel gains of the virtual independent parallel streamchannels for multiple channel realizations, and save the plot as a .png file.
 
@@ -423,6 +463,10 @@ class ChannelStatistics:
         num_uts : int, optional
             The number of UTs to consider for the plot, by default 1.\\
             e.g., if num_uts=2, the plot will show the ECDF of the channel gains of the virtual independent parallel streamchannels for the first 2 UTs (i.e., for the first 2*Nr streamchannels).
+        seperate_plots : bool, optional
+            Whether to plot the ECDFs of the channel gains of the virtual independent parallel streamchannels for each UT in a separate subplot, by default True.
+        analytical : bool, optional
+            Whether to plot the analytical CDFs of the channel gains of the virtual independent parallel streamchannels if available, by default True.
         """
         
         # 1. Plot initialization.
@@ -448,6 +492,13 @@ class ChannelStatistics:
             ecdf_vals = self.channel_statistics_data.ecdf[:, k*Nr : (k+1)*Nr]
 
             for nr in range(Nr):
+
+                # Analytical CDF overlay (if available).
+                analytical = self._streamchannel_gains_analytical_distribution(k, nr) if analytical else None
+                if analytical is not None:
+                    _, ecdf_func, label = analytical
+                    x_analytical = np.linspace(ecdf_vals[0, nr], ecdf_vals[-1, nr], 500)
+                    ax.plot(x_analytical, ecdf_func(x_analytical), linestyle="--", color="black", label=label, zorder=2.5)
             
                 # The Empirical Cumulative Distribution Function (ECDF).
                 ax.plot(ecdf_vals[:, nr], quantiles, label=f"UT {k+1}, Stream {nr+1}")
@@ -461,15 +512,16 @@ class ChannelStatistics:
 
             ax.set_xlabel("Virtual Channel Gain")
             ax.set_ylabel("Quantiles")
-            ax.set_title(f"")
+            ax.set_title(f"UT {k+1}" if seperate_plots and num_uts > 1 else "")
             ax.grid(True, alpha=0.3)
             ax.set_yticks(np.linspace(0, 1, 11))
             ax.set_xlim( xmax = (ecdf_vals[-1,1] + 0.25 * (ecdf_vals[-1,0] - ecdf_vals[-1,1])) if Nr > 1 else (ecdf_vals[-1,0]) )
             ax.legend()
 
         # 3. Save the plot.
-        plot_ecdf_filename = Path(str(self._generate_filepath()) + f" ({num_uts} UTs plotted)" + ".png")
-        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "channel_statistics" / "plots" / "ecdf"
+        plot_ecdf_filename = Path(str(self._generate_filename()) + f" ({num_uts} UTs plotted)" + ".png")
+        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ecdf"
+        plot_ecdf_dir.mkdir(parents=True, exist_ok=True)
         plot_ecdf.savefig(plot_ecdf_dir / plot_ecdf_filename, dpi=300, bbox_inches="tight")
         return
 

@@ -546,10 +546,10 @@ class SimResultManager:
         if ber:
             fig_ber, ax_ber = plt.subplots(figsize=(6, 5))
             for k in range(K):
-                SimResultManager._plot_curve(ax_ber, snr_dB, bers[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k}")
+                SimResultManager._plot_curve(ax_ber, snr_dB, bers[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k+1}")
             if ana_result is not None and ana_result.BER_uts is not None:
                 for k in range(K):
-                    ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=colors[k], linestyle="--", label=f"UT {k} (analytical)")
+                    ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=colors[k], linestyle="--", label=f"UT {k+1} (analytical)")
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
@@ -566,7 +566,7 @@ class SimResultManager:
         if ibr:
             fig_ibr, ax_ibr = plt.subplots(figsize=(6, 5))
             for k in range(K):
-                SimResultManager._plot_curve(ax_ibr, snr_dB, ibrs[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k}")
+                SimResultManager._plot_curve(ax_ibr, snr_dB, ibrs[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k+1}")
             ax_ibr.set_xlabel("SNR [dB]")
             ax_ibr.set_ylabel("IBR")
             ax_ibr.set_ylim(0, None)
@@ -583,10 +583,10 @@ class SimResultManager:
         if R:
             fig_R, ax_R = plt.subplots(figsize=(6, 5))
             for k in range(K):
-                SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k}")
+                SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=colors[k], marker="o", label=f"UT {k+1}")
             if ana_result is not None and ana_result.R_uts is not None:
                 for k in range(K):
-                    ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=colors[k], linestyle="--", label=f"UT {k} (analytical)")
+                    ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=colors[k], linestyle="--", label=f"UT {k+1} (analytical)")
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("R [bits/s/Hz]")
             ax_R.set_ylim(0, None)
@@ -650,11 +650,11 @@ class SimResultManager:
             fig_ber, ax_ber = plt.subplots(figsize=(6, 5))
             for k in range(K):
                 for nr in range(Nr):
-                    SimResultManager._plot_curve(ax_ber, snr_dB, stream_bers[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k}, Stream {nr}")
+                    SimResultManager._plot_curve(ax_ber, snr_dB, stream_bers[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k+1}, Stream {nr+1}")
             if ana_result is not None and ana_result.BER_streams is not None:
                 for k in range(K):
                     for nr in range(Nr):
-                        ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_streams[k*Nr + nr], color=colors[k], marker=markers[nr % len(markers)], linestyle="--", label=f"UT {k}, Stream {nr} (analytical)")
+                        ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_streams[k*Nr + nr], color=colors[k], marker=markers[nr % len(markers)], linestyle="--", label=f"UT {k+1}, Stream {nr+1} (analytical)")
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
@@ -672,7 +672,7 @@ class SimResultManager:
             fig_ibr, ax_ibr = plt.subplots(figsize=(6, 5))
             for k in range(K):
                 for nr in range(Nr):
-                    SimResultManager._plot_curve(ax_ibr, snr_dB, stream_ibrs[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k}, Stream {nr}")
+                    SimResultManager._plot_curve(ax_ibr, snr_dB, stream_ibrs[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k+1}, Stream {nr+1}")
             ax_ibr.set_xlabel("SNR [dB]")
             ax_ibr.set_ylabel("IBR")
             ax_ibr.set_ylim(0, None)
@@ -690,11 +690,11 @@ class SimResultManager:
             fig_R, ax_R = plt.subplots(figsize=(6, 5))
             for k in range(K):
                 for nr in range(Nr):
-                    SimResultManager._plot_curve(ax_R, snr_dB, stream_Rs[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k}, Stream {nr}")
+                    SimResultManager._plot_curve(ax_R, snr_dB, stream_Rs[k][nr], stream_ars[k][nr], color=colors[k], marker=markers[nr % len(markers)], label=f"UT {k+1}, Stream {nr+1}")
             if ana_result is not None and ana_result.R_streams is not None:
                 for k in range(K):
                     for nr in range(Nr):
-                        ax_R.plot(ana_result.snr_dB_R, ana_result.R_streams[k*Nr + nr], color=colors[k], marker=markers[nr % len(markers)], linestyle="--", label=f"UT {k}, Stream {nr} (analytical)")
+                        ax_R.plot(ana_result.snr_dB_R, ana_result.R_streams[k*Nr + nr], color=colors[k], marker=markers[nr % len(markers)], linestyle="--", label=f"UT {k+1}, Stream {nr+1} (analytical)")
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("R [bit/s/Hz]")
             ax_R.set_ylim(0, None)
@@ -760,7 +760,7 @@ class SimResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(None, 1)
+            ax_ber.set_ylim(1e-6, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
@@ -863,13 +863,13 @@ class SimResultManager:
                 ut_bers = np.transpose(np.array([sim_res.ut_bers for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_ber, snr_dB, ut_bers[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k}")
+                    SimResultManager._plot_curve(ax_ber, snr_dB, ut_bers[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.BER_uts is not None:
                         K = ana_result.BER_uts.shape[0]
                         for k in range(K):
-                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k} (analytical)")
+                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"label")
 
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
@@ -891,7 +891,7 @@ class SimResultManager:
                 ut_ibrs = np.transpose(np.array([sim_res.ut_ibrs for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_ibr, snr_dB, ut_ibrs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k}")
+                    SimResultManager._plot_curve(ax_ibr, snr_dB, ut_ibrs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
 
             ax_ibr.set_xlabel("SNR [dB]")
             ax_ibr.set_ylabel("IBR")
@@ -913,13 +913,13 @@ class SimResultManager:
                 ut_Rs = np.transpose(np.array([sim_res.ut_Rs for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k}")
+                    SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.R_uts is not None:
                         K = ana_result.R_uts.shape[0]
                         for k in range(K):
-                            ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k} (analytical)")
+                            ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k+1} (analytical)")
 
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("R [bits/s/Hz]")
