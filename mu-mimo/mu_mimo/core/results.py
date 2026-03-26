@@ -384,6 +384,58 @@ class SimResultManager:
         return filepath
 
     @staticmethod
+    def _plot_get_label(system_configs: SystemConfig, label_type: str = "default") -> str | None:
+        """
+        Generate the label for the plot legend based on the system configuration.\\
+        Multiple labels for the same system configuration are available, and the label_type parameter is used to specify which one to use.
+
+        Parameters
+        ----------
+        system_configs : SystemConfig
+            The system configuration for which the label is generated.
+        label_type : str
+            The type of label.\\
+            Possible options:
+                - 'default': Default label type, which is the name of the system.
+                - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
+                - 'BL': The bit loader configurations. (e.g. '4-QAM')
+                - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
+
+        Returns
+        -------
+        label : str | None
+            The generated label for the plot legend.
+        """
+        
+        label = None
+        system_name = system_configs.name
+        reference_number = system_name[-7:]
+        print(reference_number)
+
+        if label_type == "default":
+            label = reference_number
+        
+        elif label_type == "PT":
+            PT_mapping = {"1": "ZF", "2": "ZF+LSV", "3": "BD", "4": "WMMSE"}
+            PT_number = reference_number.split(".")[1]
+            label = PT_mapping.get(PT_number, None)
+
+        elif label_type == "BL":
+            BL_mapping = {"1": "4-QAM", "2": "64-QAM", "3": r"$\approx 1.0R$-QAM", "4": r"$\approx 0.75 R$-QAM"}
+            BL_number = reference_number.split(".")[2]
+            label = BL_mapping.get(BL_number, None)
+
+        elif label_type == "SD":
+            SD_mapping = {"1": "Nt=8, Nr=2, K=2", "2": "Nt=8, Nr=4, K=2", "3": "Nt=8, Nr=2, K=4"}
+            SD_number = reference_number.split(".")[3]
+            label = SD_mapping.get(SD_number, None)
+
+        else:
+            print(f"Warning: Unknown label type '{label_type}'. No label will be generated for the plot legend.")
+
+        return label
+    
+    @staticmethod
     def _plot_curve(ax, x, y, ar, color, marker, label):
 
         x_v, y_v, ar_v = x[~np.isnan(y)], y[~np.isnan(y)], ar[~np.isnan(y)]
@@ -710,7 +762,7 @@ class SimResultManager:
         return figs
 
     @staticmethod
-    def plot_system_performance_comparison(sim_results: list[SimResult], ber: bool = True, ibr: bool = True, R: bool = True, ana_results: list[AnaResult] | None = None):
+    def plot_system_performance_comparison(sim_results: list[SimResult], ber: bool = True, ibr: bool = True, R: bool = True, label_type: str = "default", ana_results: list[AnaResult] | None = None):
         """
         Plot the system performance of multiple systems for comparison.
 
@@ -727,6 +779,13 @@ class SimResultManager:
             Whether to plot and save the system-wide IBR comparison. Default is True.
         R : bool, optional
             Whether to plot and save the system-wide R comparison. Default is True.
+        label_type: str, optional
+            The type of label to use for the legend.\\
+            Possible options:
+                - 'default': Default label type, which is the name of the system.
+                - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
+                - 'BL': The bit loader configurations. (e.g. '4-QAM')
+                - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
         ana_results : list[AnaResult] or None, optional
             If provided, analytical results are overlaid on the simulation plots. Must have the same length as sim_results. Default is None.
         
@@ -746,13 +805,16 @@ class SimResultManager:
         
         # BER vs SNR.
         if ber:
+            
             fig_ber, ax_ber = plt.subplots(figsize=(6, 5))
+            
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 bers = np.array([sim_res.ber for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                label = get_label_pt(sim_result.system_configs.name)
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 SimResultManager._plot_curve(ax_ber, snr_dB, bers, stream_ars, color=f"C{i}", marker="o", label=label)
+            
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.BER_system is not None:
@@ -772,12 +834,14 @@ class SimResultManager:
 
         # IBR vs SNR.
         if ibr:
+            
             fig_ibr, ax_ibr = plt.subplots(figsize=(6, 5))
+            
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 ibrs = np.array([sim_res.ibr for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                label = get_label_pt(sim_result.system_configs.name)
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 SimResultManager._plot_curve(ax_ibr, snr_dB, ibrs, stream_ars, color=f"C{i}", marker="o", label=label)
 
             ax_ibr.set_xlabel("SNR [dB]")
@@ -794,13 +858,16 @@ class SimResultManager:
 
         # Achievable Rate vs SNR.
         if R:
+
             fig_R, ax_R = plt.subplots(figsize=(6, 5))
+
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 Rs = np.array([sim_res.R for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                label = get_label_pt(sim_result.system_configs.name)
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 SimResultManager._plot_curve(ax_R, snr_dB, Rs, stream_ars, color=f"C{i}", marker="o", label=label)
+
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.R_system is not None:
@@ -821,7 +888,7 @@ class SimResultManager:
         return figs
 
     @staticmethod
-    def plot_ut_performance_comparison(sim_results: list[SimResult], ber: bool = True, ibr: bool = True, R: bool = True, ana_results: list[AnaResult] | None = None):
+    def plot_ut_performance_comparison(sim_results: list[SimResult], ber: bool = True, ibr: bool = True, R: bool = True, label_type: str = "default", ana_results: list[AnaResult] | None = None):
         """
         Plot the user terminal performance of multiple systems for comparison.
 
@@ -838,6 +905,13 @@ class SimResultManager:
             Whether to plot and save the per-UT IBR comparison. Default is True.
         R : bool, optional
             Whether to plot and save the per-UT achievable rate comparison. Default is True.
+        label_type : str, optional
+            The type of label to use for the plots.\\
+            Possible options:
+                    - 'default': Default label type, which is the name of the system.
+                    - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
+                    - 'BL': The bit loader configurations. (e.g. '4-QAM')
+                    - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
         ana_results : list[AnaResult] or None, optional
             If provided, analytical results are overlaid on the simulation plots. Must have the same length as sim_results. Default is None.
         
@@ -860,19 +934,24 @@ class SimResultManager:
 
         # BER vs SNR.
         if ber:
+            
             fig_ber, ax_ber = plt.subplots(figsize=(6, 5))
+            
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 ut_bers = np.transpose(np.array([sim_res.ut_bers for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_ber, snr_dB, ut_bers[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
+                    SimResultManager._plot_curve(ax_ber, snr_dB, ut_bers[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{label} - UT {k+1}")
+            
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.BER_uts is not None:
                         K = ana_result.BER_uts.shape[0]
+                        label = SimResultManager._plot_get_label(ana_result.system_configs, label_type=label_type)
                         for k in range(K):
-                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k+1} (analytical)")
+                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"{label} - UT {k+1} (analytical)")
 
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
@@ -888,13 +967,16 @@ class SimResultManager:
 
         # IBR vs SNR.
         if ibr:
+            
             fig_ibr, ax_ibr = plt.subplots(figsize=(6, 5))
+            
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 ut_ibrs = np.transpose(np.array([sim_res.ut_ibrs for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_ibr, snr_dB, ut_ibrs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
+                    SimResultManager._plot_curve(ax_ibr, snr_dB, ut_ibrs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{label} - UT {k+1}")
 
             ax_ibr.set_xlabel("SNR [dB]")
             ax_ibr.set_ylabel("IBR")
@@ -910,19 +992,24 @@ class SimResultManager:
 
         # Achievable Rate vs SNR.
         if R:
+            
             fig_R, ax_R = plt.subplots(figsize=(6, 5))
+            
             for i, sim_result in enumerate(sim_results):
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 ut_Rs = np.transpose(np.array([sim_res.ut_Rs for sim_res in sim_result.simulation_results], dtype=float))
                 ut_ars = np.transpose(np.array([sim_res.ut_ars for sim_res in sim_result.simulation_results], dtype=float))
+                label = SimResultManager._plot_get_label(sim_result.system_configs, label_type=label_type)
                 for k in range(sim_result.system_configs.K):
-                    SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{sim_result.system_configs.name} - UT {k+1}")
+                    SimResultManager._plot_curve(ax_R, snr_dB, ut_Rs[k], ut_ars[k], color=f"C{i}", marker=markers[k % len(markers)], label=f"{label} - UT {k+1}")
+            
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.R_uts is not None:
+                        label = SimResultManager._plot_get_label(ana_result.system_configs, label_type=label_type)
                         K = ana_result.R_uts.shape[0]
                         for k in range(K):
-                            ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k+1} (analytical)")
+                            ax_R.plot(ana_result.snr_dB_R, ana_result.R_uts[k], color=f"C{i}", linestyle="--", label=f"{label} - UT {k+1} (analytical)")
 
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("R [bits/s/Hz]")
@@ -1508,15 +1595,3 @@ __all__ = [
     "SingleSnrSimResult", "SimResult", "SimResultManager",
     "AnaResult", "AnaResultManager",
 ]
-
-## DRAFT HELPERS
-
-def get_label(name: str) -> str:
-    return name
-
-def get_label_pt(name: str) -> str:
-    label = ""
-    pt_mapping = {"1": "ZF", "2": "ZF+LSV", "3": "BD", "4": "BD+LSV"}
-    pt = name.split(".")[2]
-    label = pt_mapping.get(pt)
-    return label
