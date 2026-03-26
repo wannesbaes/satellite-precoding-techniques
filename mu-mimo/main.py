@@ -52,7 +52,7 @@ if __name__ == "__main__":
     sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, [""])
+    results = main(sim_ref_numbers, ["2x6 4-QAM SU-MIMO (SVD)", "2x6 R-QAM SU-MIMO (SVD)", "2x2 4-QAM SU-MIMO (SVD)", "2x2 R-QAM SU-MIMO (SVD)", "4x4 4-QAM SU-MIMO (SVD)", "4x4 R-QAM SU-MIMO (SVD)"])
     # main_ch_stats(sys_ref_numbers_ZF)
 
     # PLOT THE RESULTS HERE.
