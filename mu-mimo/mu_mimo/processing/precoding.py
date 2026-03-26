@@ -120,7 +120,7 @@ class SVDPrecoder(Precoder):
         FP = F @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = equalization_coefficients(csi.H_eff, F, P)
+        C_eq = equalization_coefficients(G @ csi.H_eff, F, P)
 
         return FP, G, C_eq
 

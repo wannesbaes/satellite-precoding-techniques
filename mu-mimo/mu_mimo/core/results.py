@@ -869,12 +869,12 @@ class SimResultManager:
                     if ana_result is not None and ana_result.BER_uts is not None:
                         K = ana_result.BER_uts.shape[0]
                         for k in range(K):
-                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"label")
+                            ax_ber.plot(ana_result.snr_dB_BER, ana_result.BER_uts[k], color=f"C{i}", linestyle="--", label=f"{ana_result.system_configs.name} - UT {k+1} (analytical)")
 
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(None, 1)
+            ax_ber.set_ylim(0.5e-5, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()

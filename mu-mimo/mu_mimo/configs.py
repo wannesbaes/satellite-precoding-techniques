@@ -457,6 +457,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         
         precoder_mapping = {
             "Neutral": NeutralPrecoder,
+            "SVD": SVDPrecoder,
             "ZF": ZFPrecoder,
             "BD": BDPrecoder,
             "WMMSE": WMMSEPrecoder,

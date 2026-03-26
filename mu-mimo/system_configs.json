@@ -130,7 +130,17 @@
     ["1.4.4.2", 1.0, 0.5,   8,  2, 4, "QAM", null,  0.75,    "Adaptive", "Gray Code", "Symbol MD",   "WMMSE", "Neutral",     "Rayleigh", "AWGN"],
     ["1.4.4.3", 1.0, 0.5,   8,  4, 2, "QAM", null,  0.75,    "Adaptive", "Gray Code", "Symbol MD",   "WMMSE", "Neutral",     "Rayleigh", "AWGN"],
     ["1.4.4.4", 1.0, 0.5,  64, 16, 2, "QAM", null,  0.75,    "Adaptive", "Gray Code", "Symbol MD",   "WMMSE", "Neutral",     "Rayleigh", "AWGN"],
-    ["1.4.4.5", 1.0, 0.5,  64, 16, 4, "QAM", null,  0.75,    "Adaptive", "Gray Code", "Symbol MD",   "WMMSE", "Neutral",     "Rayleigh", "AWGN"]
+    ["1.4.4.5", 1.0, 0.5,  64, 16, 4, "QAM", null,  0.75,    "Adaptive", "Gray Code", "Symbol MD",   "WMMSE", "Neutral",     "Rayleigh", "AWGN"],
 
+
+
+    ["2x6 4-QAM SU-MIMO (SVD)", 1.0, 0.5,  6, 1, 2, "QAM", 4,  null,       "Fixed", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"],
+    ["2x6 R-QAM SU-MIMO (SVD)", 1.0, 0.5,  6, 1, 2, "QAM", null,  1.00, "Adaptive", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"],
+
+    ["4x4 4-QAM SU-MIMO (SVD)", 1.0, 0.5,  4, 1, 4, "QAM", 4,  null,       "Fixed", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"],
+    ["4x4 R-QAM SU-MIMO (SVD)", 1.0, 0.5,  4, 1, 4, "QAM", null,  1.00, "Adaptive", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"],
+
+    ["2x2 4-QAM SU-MIMO (SVD)", 1.0, 0.5,  2, 1, 2, "QAM", 4,  null,       "Fixed", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"],
+    ["2x2 R-QAM SU-MIMO (SVD)", 1.0, 0.5,  2, 1, 2, "QAM", null,  1.00, "Adaptive", "Gray Code", "Symbol MD", "SVD", "Neutral",  "Rayleigh", "AWGN"]
   ]
 }

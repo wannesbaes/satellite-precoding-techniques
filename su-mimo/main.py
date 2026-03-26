@@ -889,12 +889,4 @@ if __name__ == "__main__":
     # example:
     # plots = test_0_2_1(Nt=4, Nr=4, c_types=['PAM', 'PSK', 'QAM'], SNRs=np.arange(0, 31, 5))
     # plt.show()
-    
-    SNRs = np.arange(-10, 31, 2.5)
-    su_mimo_svd = SuMimoSVD(6, 2, "QAM")
-    # su_mimo_svd = SuMimoSVD(6, 2, "QAM", RAS={'control channel': True, 'power allocation': 'optimal', 'bit allocation': 'fixed', 'data rate': None, 'constellation sizes': 4})
-    BERs, IBRs, ARs = su_mimo_svd.BERs_simulation(SNRs=SNRs)
-
-    location = '/Users/wannesbaes/Desktop/'
-    filename = f'{su_mimo_svd.Nt}x{su_mimo_svd.Nr}_{su_mimo_svd.c_type}__pa_optimal__ba_adaptive__R_100.npz'
-    np.savez(location + filename, SNRs=SNRs, BERs=BERs, IBRs=IBRs, ARs=ARs)
+    pass
