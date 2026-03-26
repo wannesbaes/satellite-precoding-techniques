@@ -751,7 +751,8 @@ class SimResultManager:
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 bers = np.array([sim_res.ber for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                SimResultManager._plot_curve(ax_ber, snr_dB, bers, stream_ars, color=f"C{i}", marker="o", label=sim_result.system_configs.name)
+                label = get_label_pt(sim_result.system_configs.name)
+                SimResultManager._plot_curve(ax_ber, snr_dB, bers, stream_ars, color=f"C{i}", marker="o", label=label)
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.BER_system is not None:
@@ -760,7 +761,7 @@ class SimResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(1e-6, 1)
+            ax_ber.set_ylim(0.5e-6, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
@@ -776,7 +777,8 @@ class SimResultManager:
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 ibrs = np.array([sim_res.ibr for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                SimResultManager._plot_curve(ax_ibr, snr_dB, ibrs, stream_ars, color=f"C{i}", marker="o", label=sim_result.system_configs.name)
+                label = get_label_pt(sim_result.system_configs.name)
+                SimResultManager._plot_curve(ax_ibr, snr_dB, ibrs, stream_ars, color=f"C{i}", marker="o", label=label)
 
             ax_ibr.set_xlabel("SNR [dB]")
             ax_ibr.set_ylabel("IBR")
@@ -797,7 +799,8 @@ class SimResultManager:
                 snr_dB = np.array([sim_res.snr_dB for sim_res in sim_result.simulation_results], dtype=float)
                 Rs = np.array([sim_res.R for sim_res in sim_result.simulation_results], dtype=float)
                 stream_ars = np.array([sim_res.stream_ars_avg for sim_res in sim_result.simulation_results], dtype=float)
-                SimResultManager._plot_curve(ax_R, snr_dB, Rs, stream_ars, color=f"C{i}", marker="o", label=sim_result.system_configs.name)
+                label = get_label_pt(sim_result.system_configs.name)
+                SimResultManager._plot_curve(ax_R, snr_dB, Rs, stream_ars, color=f"C{i}", marker="o", label=label)
             if ana_results is not None:
                 for i, ana_result in enumerate(ana_results):
                     if ana_result is not None and ana_result.R_system is not None:
@@ -1505,3 +1508,15 @@ __all__ = [
     "SingleSnrSimResult", "SimResult", "SimResultManager",
     "AnaResult", "AnaResultManager",
 ]
+
+## DRAFT HELPERS
+
+def get_label(name: str) -> str:
+    return name
+
+def get_label_pt(name: str) -> str:
+    label = ""
+    pt_mapping = {"1": "ZF", "2": "ZF+LSV", "3": "BD", "4": "BD+LSV"}
+    pt = name.split(".")[2]
+    label = pt_mapping.get(pt)
+    return label

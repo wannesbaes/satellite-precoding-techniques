@@ -30,6 +30,26 @@ class ChannelStateInformation:
     H_eff: ComplexArray | None = None
 
 @dataclass()
+class ChannelState:
+    """
+    The state of the channel.
+
+    Parameters
+    ----------
+    snr : float
+        The signal-to-noise ratio.
+    H : ComplexArray, shape (K*Nr, Nt)
+        The channel matrix.
+    
+    Remarks
+    -------
+    How does the channel state differ from the channel state information (CSI)?\\
+    The channel state contains the actual channel matrix and current SNR value. The channel state information (CSI), however, contains the effective channel matrix instead of the actual channel matrix. So, in case of coordinated beamforming, there is no difference. But in case of non-coordinated beamforming, the effective channel matrix is the actual channel matrix followed by the compound combining matrix (G * H).
+    """
+    snr: float | None = None
+    H: ComplexArray | None = None
+
+@dataclass()
 class BaseStationState:
     """
     The state of a base station (for a specific channel and SNR value).
@@ -44,14 +64,14 @@ class BaseStationState:
         The information bit rates for each data stream of each UT.
     Ns : IntArray, shape (K,)
         The number of data streams for each UT.
-    G : ComplexArray, shape (K*Nr, K*Nr)
-        The compound combining matrix.
+    G : ComplexArray, shape (K*Nr, K*Nr) or None
+        The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
     F: ComplexArray
     C_eq: ComplexArray
     ibr: IntArray
     Ns: IntArray
-    G: ComplexArray
+    G: ComplexArray | None
 
 @dataclass()
 class UserTerminalState:
@@ -174,7 +194,7 @@ class ReceiveFeedforwardMessage:
 __all__ = [
     "RealArray", "ComplexArray", "IntArray", "BitArray", "ConstType",
     "ChannelStateInformation",
-    "BaseStationState", "UserTerminalState",
+    "ChannelState", "BaseStationState", "UserTerminalState",
     "TransmitPilotMessage", "ReceivePilotMessage",
     "TransmitFeedbackMessage", "ReceiveFeedbackMessage",
     "TransmitFeedforwardMessage", "ReceiveFeedforwardMessage",

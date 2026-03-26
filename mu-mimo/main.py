@@ -50,10 +50,14 @@ if __name__ == "__main__":
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["1.0"]
     sys_ref_numbers = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
+
+    sys_ref_numbers_ZF_LSV_4QAM = ["1.2.1.1", "1.2.1.2", "1.2.1.3"]
+    sys_ref_numbers_ZF_LSV_64QAM = ["1.2.2.1", "1.2.2.2", "1.2.2.3"]
+    sys_ref_numbers_ZF_LSV_100RQAM = ["1.2.3.1", "1.2.3.2", "1.2.3.3"]
+    sys_ref_numbers_ZF_LSV_75RQAM = ["1.2.3.1", "1.2.3.2", "1.2.3.3"]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, ["2x6 4-QAM SU-MIMO (SVD)", "2x6 R-QAM SU-MIMO (SVD)", "2x2 4-QAM SU-MIMO (SVD)", "2x2 R-QAM SU-MIMO (SVD)", "4x4 4-QAM SU-MIMO (SVD)", "4x4 R-QAM SU-MIMO (SVD)"])
-    # main_ch_stats(sys_ref_numbers_ZF)
+    results = main(sim_ref_numbers, sys_ref_numbers)
 
     # PLOT THE RESULTS HERE.
     # SimResultManager.plot_system_performance_comparison(results)

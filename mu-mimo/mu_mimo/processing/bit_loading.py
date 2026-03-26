@@ -202,7 +202,7 @@ class AdaptiveBitLoader(BitLoader):
         T = H_eff @ F
         
         # Compute the power of the noise, the interference, and the useful signal for each data stream.
-        p_noise = Pt / csi.snr      # p_noise = N0 = sigma^2 = Pt / SNR
+        p_noise = (Pt / csi.snr) * np.sum( np.abs(G)**2, axis=1 ) if G is not None else (Pt / csi.snr)
         p_interference = np.sum( np.abs( T - np.diag(np.diagonal(T)) )**2, axis=1 )
         p_useful = np.abs( np.diagonal(T) )**2
 

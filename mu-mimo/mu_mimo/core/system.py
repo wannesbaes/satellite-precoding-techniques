@@ -69,7 +69,7 @@ class SimulationRunner:
             while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.num_channel_realizations):
 
                 # Reset.
-                csi = self.mu_mimo_system.reset(ChannelStateInformation(snr=snr, H_eff=None))
+                cs = self.mu_mimo_system.reset(ChannelState(snr=snr, H=None))
 
                 # Configuration.
                 stream_Rs = self.mu_mimo_system.configure()
@@ -354,7 +354,7 @@ class MuMimoSystem:
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
 
-    def reset(self, csi: ChannelStateInformation) -> ChannelStateInformation:
+    def reset(self, cs: ChannelState) -> ChannelState:
         """
         Resets the MU-MIMO system. 
         
@@ -363,8 +363,8 @@ class MuMimoSystem:
 
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information to reset to.
+        cs : ChannelState
+            The channel state to reset to.
         """
 
         # Reset the base station state.
@@ -374,9 +374,9 @@ class MuMimoSystem:
         for ut in self.uts: ut.reset_state()
 
         # Reset the channel state.
-        csi = self.channel.reset(csi)
+        cs = self.channel.reset(cs)
 
-        return csi
+        return cs
 
     def configure(self) -> None:
         """
@@ -394,7 +394,7 @@ class MuMimoSystem:
         # Pilot Phase.
         tx_pilot_msg = self.bs.transmit_pilots()
         rx_pilot_msgs = self.channel.propagate_pilots(tx_pilot_msg)
-        for ut, rx_pilot_msg in zip(self.uts, rx_pilot_msgs): ut.receive_pilots(rx_pilot_msg)
+        for ut in self.uts: ut.receive_pilots(rx_pilot_msgs[ut.ut_id])
 
         # Feedback Phase.
         tx_fb_msgs = [ut.transmit_feedback() for ut in self.uts]
@@ -404,7 +404,7 @@ class MuMimoSystem:
         # Feedforward Phase.
         tx_ff_msg = self.bs.transmit_feedforward()
         rx_ff_msgs = self.channel.propagate_feedforward(tx_ff_msg)
-        for ut, rx_ff_msg in zip(self.uts, rx_ff_msgs): ut.receive_feedforward(rx_ff_msg)
+        for ut in self.uts: ut.receive_feedforward(rx_ff_msgs[ut.ut_id])
 
         return self._compute_capacity()
 
@@ -435,7 +435,7 @@ class MuMimoSystem:
         y_k_list = self.channel.propagate(x)
 
         # Receive at the UTs.
-        rx_bits_list = [ut.receive(y_k) for ut, y_k in zip(self.uts, y_k_list)]
+        rx_bits_list = [ut.receive(y_k_list[ut.ut_id]) for ut in self.uts]
 
         return tx_bits_list, rx_bits_list
 
@@ -464,21 +464,26 @@ class MuMimoSystem:
         # Initialization.
         Pt = self.system_config.Pt
         B = self.system_config.B
-        K = self.system_config.K
         Nr = self.system_config.Nr
+        K = self.system_config.K
 
         snr = self.channel.state.snr
-        H_eff = self.channel.state.H_eff
+        H = self.channel.state.H
 
         F = self.bs.state.F
-        G = self.bs.state.G
+        if self.bs.state.G is not None:
+            G = self.bs.state.G
+        else:
+            G = np.zeros((K*Nr, K*Nr), dtype=complex)
+            for ut in self.uts:
+                k = ut.ut_id
+                G[k*Nr: (k+1)*Nr, k*Nr: (k+1)*Nr] = ut.state.G_k
         
-        # Compute the transfer matrix T = G @ H @ F = H_eff @ F.
-        H_eff = H_eff if G is None else (G @ H_eff)
-        T = H_eff @ F
+        # Compute the transfer matrix T = G @ H @ F.
+        T = G @ H @ F
         
         # Compute the power of the noise, the interference, and the useful signal for each data stream.
-        p_noise = Pt / snr
+        p_noise = (Pt / snr) * np.sum( np.abs(G)**2, axis=1 )
         p_interference = np.sum( np.abs( T - np.diag(np.diagonal(T)) )**2, axis=1 )
         p_useful = np.abs( np.diagonal(T) )**2
 
@@ -652,49 +657,49 @@ class Channel:
         self.noise_model: type[NoiseModel] = configs.noise_model
 
         # State.
-        self.state = ChannelStateInformation()
+        self.state = ChannelState()
 
-    def set(self, csi: ChannelStateInformation) -> None:
+    def set(self, cs: ChannelState) -> None:
         """
-        Sets the channel state information (CSI).
+        Sets the channel state.
 
-        The CSI consists of the SNR and the channel matrix H. If either of them is not provided, the old value is kept.
+        The channel state consists of the SNR and the channel matrix H. If either of them is not provided, the old value is kept.
 
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information to set.
+        cs : ChannelState
+            The channel state to set.
         """
        
-        if csi.snr is not None: self.state.snr = csi.snr
-        if csi.H_eff is not None: self.state.H_eff = csi.H_eff
+        if cs.snr is not None: self.state.snr = cs.snr
+        if cs.H is not None: self.state.H = cs.H
 
         return
 
-    def reset(self, csi: ChannelStateInformation) -> ChannelStateInformation:
+    def reset(self, cs: ChannelState) -> ChannelState:
         """
-        Resets the channel state information (CSI).
+        Resets the channel state.
 
-        If the SNR or the channel matrix H is not provided in the input CSI, they are set to default values.
+        If the SNR or the channel matrix H is not provided in the input channel state, they are set to default values.
         For the SNR, the default value is infinity, which corresponds to the absence of noise. For the channel matrix H, the default value is a randomly generated channel matrix according to the specified channel model.
 
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information to reset to.
+        cs : ChannelState
+            The channel state to reset to.
 
         Returns
         -------
-        ChannelStateInformation
-            The new channel state information.
+        ChannelState
+            The new channel state.
         """
         
-        if csi.snr is None: csi.snr = np.inf
-        if csi.H_eff is None: csi.H_eff = self.channel_model.generate(self.K * self.Nr, self.Nt)
+        if cs.snr is None: cs.snr = np.inf
+        if cs.H is None: cs.H = self.channel_model.generate(self.K * self.Nr, self.Nt)
         
-        self.set(csi)
+        self.set(cs)
 
-        return csi
+        return cs
 
     def propagate_pilots(self, tx_pilot_msg: TransmitPilotMessage) -> list[ReceivePilotMessage]:
         """
@@ -713,7 +718,7 @@ class Channel:
             The list of pilot messages that will be received by each UT.
         """
 
-        rx_pilot_msgs = [ReceivePilotMessage(H_k = self.state.H_eff[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
+        rx_pilot_msgs = [ReceivePilotMessage(H_k = self.state.H[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
         return rx_pilot_msgs
 
     def propagate_feedback(self, tx_fb_msgs: list[TransmitFeedbackMessage]) -> ReceiveFeedbackMessage:
@@ -801,7 +806,7 @@ class Channel:
         n = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
-        y_noiseless = self.channel_model.apply(x, self.state.H_eff)
+        y_noiseless = self.channel_model.apply(x, self.state.H)
         y = self.noise_model.apply(y_noiseless, n)
 
         # Split the received signal y into K different signals y_k, one for each UT.

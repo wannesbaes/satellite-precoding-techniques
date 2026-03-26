@@ -78,7 +78,7 @@ class LSVCombiner(Combiner):
     
     @staticmethod
     def compute(H_k: ComplexArray) -> ComplexArray:
-        U, _, _ = np.linalg.svd(H_k)
-        G_k = U.conj().T
+        U_k, _, _ = np.linalg.svd(H_k)
+        G_k = U_k.conj().T
         return G_k
 
