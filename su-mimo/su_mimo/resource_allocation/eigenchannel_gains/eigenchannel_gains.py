@@ -285,11 +285,11 @@ def demo_eigenchannel_gains_stats(Nt_list, Nr_list, num_samples, input_dir, outp
 
 if __name__ == "__main__":
 
-    N = 10e6                                                        # Number of channel realizations.
-    Nt = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)                            # Number of transmit antennas.
-    Nr = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)                            # Number of receive antennas.
-    stats_dir = 'mu-mimo/src/helpers/eigenchannel_gains/stats/'     # Directory to store the eigenchannel gain statistics.
-    plots_dir = 'mu-mimo/src/helpers/eigenchannel_gains/plots/'     # Directory to store the eigenchannel gain plots.
+    N = 10e6                                                                        # Number of channel realizations.
+    Nt = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)                                            # Number of transmit antennas.
+    Nr = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)                                            # Number of receive antennas.
+    stats_dir = 'su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/'     # Directory to store the eigenchannel gain statistics.
+    plots_dir = 'su-mimo/su_mimo/resource_allocation/eigenchannel_gains/plots/'     # Directory to store the eigenchannel gain plots.
     os.makedirs(stats_dir, exist_ok=True)
     os.makedirs(plots_dir, exist_ok=True)
 

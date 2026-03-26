@@ -410,7 +410,6 @@ class SimResultManager:
         label = None
         system_name = system_configs.name
         reference_number = system_name[-7:]
-        print(reference_number)
 
         if label_type == "default":
             label = reference_number
@@ -421,7 +420,7 @@ class SimResultManager:
             label = PT_mapping.get(PT_number, None)
 
         elif label_type == "BL":
-            BL_mapping = {"1": "4-QAM", "2": "64-QAM", "3": r"$\approx 1.0R$-QAM", "4": r"$\approx 0.75 R$-QAM"}
+            BL_mapping = {"1": "4-QAM", "2": "64-QAM", "3": r"$\approx R$-QAM", "4": r"$\approx \frac{3}{4}R$-QAM"}
             BL_number = reference_number.split(".")[2]
             label = BL_mapping.get(BL_number, None)
 
@@ -823,7 +822,7 @@ class SimResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-6, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
