@@ -120,7 +120,7 @@ class SVDPrecoder(Precoder):
         FP = F @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = equalization_coefficients(G @ csi.H_eff, F, P)
+        C_eq = np.diag( G @ csi.H_eff @ FP )
 
         return FP, G, C_eq
 
@@ -140,16 +140,17 @@ class ZFPrecoder(Precoder):
         # The combining matrix is not computed in the ZF precoding strategy.
         G = None
 
-        # The power allocation across the data streams is computed using the waterfilling algorithm to maximize the sum rate under the total power constraint Pt.
-        gamma = (1 / np.abs(np.diag(np.linalg.inv(csi.H_eff @ csi.H_eff.conj().T)))) * (csi.snr / Pt)
-        P = waterfilling_v1(gamma=gamma, pt=Pt)
-
         # The precoding matrix is computed as the pseudo-inverse of the effective channel matrix.
         F = np.linalg.pinv(csi.H_eff)
-        FP = F @ np.diag(np.sqrt(P))
+        F_norm = F / np.linalg.norm(F, axis=0)
+
+        # The power allocation across the data streams is computed using the waterfilling algorithm to maximize the sum rate under the total power constraint Pt.
+        gamma = (1 / np.linalg.norm(F, axis=0)) * (csi.snr / Pt)
+        P = waterfilling_v1(gamma=gamma, pt=Pt)
+        FP = F_norm @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = equalization_coefficients(csi.H_eff, F, P)
+        C_eq = np.diag( csi.H_eff @ FP )
 
         return FP, G, C_eq
     
@@ -200,37 +201,13 @@ class BDPrecoder(Precoder):
         FP = F @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = equalization_coefficients(G @ H, F, P)
+        C_eq = np.diag( G @ H @ FP )
 
         return FP, G, C_eq
 
 class WMMSEPrecoder(Precoder):
     pass
 
-
-def equalization_coefficients(H_eff: ComplexArray, F: ComplexArray, P: ComplexArray) -> ComplexArray:
-    r"""
-    Compute the equalization coefficients for each data stream.
-
-    .. math::
-        C_{eq \; (k,nr)}  = \left( G H F \right)_{(k,nr),(k,nr)} \cdot \sqrt{P_{(k,nr)}}
-
-    Parameters
-    ----------
-    H_eff : ComplexArray, shape (K*Nr, Nt)
-        The effective channel matrix, here G @ H !
-    F : ComplexArray, shape (Nt, K*Nr)
-        The compound precoding matrix for all UTs.
-    P : ComplexArray, shape (K*Nr,)
-        The power allocation for each data stream.
-    
-    Returns
-    -------
-    C_eq : ComplexArray, shape (K*Nr,)
-        The equalization coefficients for each data stream.
-    """
-    C_eq = np.diag( H_eff @ F @ np.diag(np.sqrt(P)) )
-    return C_eq
 
 def waterfilling_v1(gamma: RealArray, pt: float) -> RealArray:
     r"""
