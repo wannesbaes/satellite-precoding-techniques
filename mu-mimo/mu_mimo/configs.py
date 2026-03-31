@@ -117,13 +117,13 @@ class ChannelConfig:
 
     Parameters
     ----------
-    channel_model : type[ChannelModel]
-        The type of the channel model (the concrete channel model class).
-    noise_model : type[NoiseModel]
-        The type of the noise model (the concrete noise model class).
+    channel_model : ChannelModel
+        The channel model (an instance of the concrete channel model class).
+    noise_model : NoiseModel
+        The noise model (an instance of the concrete noise model class).
     """
-    channel_model: type["ChannelModel"]
-    noise_model: type["NoiseModel"]
+    channel_model: ChannelModel
+    noise_model: NoiseModel
 
 @dataclass()
 class SystemConfig:
@@ -455,6 +455,14 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
             The SystemConfig object created from the configuration settings.
         """
         
+
+        bitloader_mapping = {
+            "Neutral": NeutralBitLoader,
+            "Fixed": FixedBitLoader,
+            "Adaptive": AdaptiveBitLoader,
+        }
+
+        
         precoder_mapping = {
             "Neutral": NeutralPrecoder,
             "SVD": SVDPrecoder,
@@ -468,11 +476,6 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
             "LSV": LSVCombiner,
         }
 
-        bitloader_mapping = {
-            "Neutral": NeutralBitLoader,
-            "Fixed": FixedBitLoader,
-            "Adaptive": AdaptiveBitLoader,
-        }
 
         mapper_mapping = {
             "Neutral": NeutralMapper,
@@ -489,22 +492,33 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
             "Symbol MD": MDDetector,
         }
 
+
+        channel_predictor_mapping = {
+            "Neutral": None,
+        }
+
+        channel_estimator_mapping = {
+            "Neutral": None,
+        }
+
         channel_model_mapping = {
-            "Neutral": NeutralChannelModel,
-            "Rayleigh": IIDRayleighChannelModel,
+            "Neutral": NeutralChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
+            "IID Rayleigh Fading": IIDRayleighFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
+            "Ricean Fading": None,
+            "Satellite": None,
         }
 
         noise_model_mapping = {
-            "Neutral": NeutralNoiseModel,
-            "AWGN": CSAWGNNoiseModel,
+            "Neutral": NeutralNoiseModel(int(config_settings['Nr']), int(config_settings['K'])),
+            "AWGN": CSAWGNNoiseModel(int(config_settings['Nr']), int(config_settings['K'])),
         }
 
         
         # constellation configurations.
         c_configs = ConstConfig(
             types                   = config_settings['Const. Type'],
-            sizes                   = int(np.log2(config_settings['Const. Size (fixed)'])) if config_settings['Const. Size (fixed)'] is not None else None,
-            capacity_fractions      = config_settings['Const. Size (adaptive)'],
+            sizes                   = int(np.log2(config_settings['Const. Size'])) if config_settings['Bit Loader'] == "Fixed" else None,
+            capacity_fractions      = float(config_settings['Const. Size']) if config_settings['Bit Loader'] == "Adaptive" else None
         )
 
         # base station configurations.

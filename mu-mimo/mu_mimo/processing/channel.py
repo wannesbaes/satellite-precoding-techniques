@@ -14,22 +14,32 @@ class ChannelModel(ABC):
     A channel model is responsible for generating the channel matrix according to a specific channel model and applying the channel effects to the transmitted signals.
     """
 
-    @staticmethod
-    @abstractmethod
-    def generate(Nr_total: int, Nt: int) -> ComplexArray:
+    def __init__(self, Nt: int, Nr: int, K: int):
         """
-        Generate the channel matrix.
+        Instantiate the channel model.
 
         Parameters
         ----------
-        Nr_total : int
-            The total number of receive antennas across all UTs.
         Nt : int
-            The number of transmit antennas at the BS.
-        
+            The number of transmit antennas at the base station.
+        Nr : int
+            The number of receive antennas per user terminal.
+        K : int
+            The number of user terminals.
+        """
+
+        self.Nt = Nt
+        self.Nr = Nr
+        self.K = K
+    
+    @abstractmethod
+    def generate(self) -> ComplexArray:
+        """
+        Generate the channel matrix.
+
         Returns
         -------
-        H : ComplexArray, shape (Nr_total, Nt)
+        H : ComplexArray, shape (K*Nr, Nt)
             The generated channel matrix.
         """
         raise NotImplementedError
@@ -62,12 +72,11 @@ class NeutralChannelModel(ChannelModel):
     In particular, it generates an identity channel matrix, which means that the symbols are transmitted to the receive antennas for which they are intended, and without any interference.
     """
 
-    @staticmethod
-    def generate( Nr_total: int, Nt: int) -> ComplexArray:
-        H = np.eye(Nr_total, Nt, dtype=complex)
+    def generate(self) -> ComplexArray:
+        H = np.eye(self.K*self.Nr, self.Nt, dtype=complex)
         return H
 
-class IIDRayleighChannelModel(ChannelModel):
+class IIDRayleighFadingChannelModel(ChannelModel):
     """
     Independent and Identically Distributed (IID) Rayleigh Fading Channel Model.
 
@@ -75,14 +84,14 @@ class IIDRayleighChannelModel(ChannelModel):
     The Rayleigh fading aspect is captured by the fact that the channel coefficients change independently after M transmissions.
     """
 
-    @staticmethod
-    def generate(Nr_total: int, Nt: int) -> ComplexArray:
-        H = (1 / np.sqrt(2)) * (np.random.randn(Nr_total, Nt) + 1j * np.random.randn(Nr_total, Nt))
+    def generate(self) -> ComplexArray:
+        H = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt) + 1j * np.random.randn(self.K*self.Nr, self.Nt))
         return H
 
-class SatelliteChannelModel(ChannelModel):
+class RiceanChannelModel(ChannelModel):
     r"""
-    The satellite channel model.
+    The ricean channel model.
+    The LoS component is modeled as a deterministic component independent of time and across users. The NLoS component is modeled according to Jake's model.
 
     ..math:
     \begin{equation}
@@ -107,9 +116,23 @@ class NoiseModel(ABC):
     A noise model is responsible for generating the noise vectors according to a specific noise model and applying the noise effects to the received signals.
     """
 
-    @staticmethod
+    def __init__(self, Nr: int, K: int):
+        """
+        Instantiate the noise model.
+
+        Parameters
+        ----------
+        Nr : int
+            The number of receive antennas per user terminal.
+        K : int
+            The number of user terminals.
+        """
+
+        self.Nr = Nr
+        self.K = K
+    
     @abstractmethod
-    def generate(snr: float, x: ComplexArray, Nr_total: int) -> ComplexArray:
+    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
         """
         Generate the noise vectors.
 
@@ -119,12 +142,10 @@ class NoiseModel(ABC):
             The signal-to-noise ratio.
         x : ComplexArray, shape (Nt, M)
             The transmitted signals.
-        Nr_total : int
-            The total number of receive antennas across all UTs.
 
         Returns
         -------
-        n : ComplexArray, shape (Nr_total, M)
+        n : ComplexArray, shape (K*Nr, M)
             The generated noise vectors.
         """
         raise NotImplementedError
@@ -157,9 +178,8 @@ class NeutralNoiseModel(NoiseModel):
     It does not add any noise to the received signals but simply lets the noiseless received signals pass through.
     """
 
-    @staticmethod
-    def generate(snr: float, x: ComplexArray, Nr_total: int) -> ComplexArray:
-        n = np.zeros((Nr_total, x.shape[1]), dtype=complex)
+    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
+        n = np.zeros((self.K * self.Nr, x.shape[1]), dtype=complex)
         return n
 
 class CSAWGNNoiseModel(NoiseModel):
@@ -169,8 +189,7 @@ class CSAWGNNoiseModel(NoiseModel):
     This noise model generates complex proper, circularly-symmetric additive white Gaussian noise (AWGN) vectors based on the specified signal-to-noise ratio (SNR).
     """
 
-    @staticmethod
-    def generate(snr: float, x: ComplexArray, Nr_total: int) -> ComplexArray:
+    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
         
         # Compute the noise power based on the current SNR and the signal power of x.
         p_signal = np.mean( np.sum( np.abs(x)**2, axis=0 ) )
@@ -178,5 +197,5 @@ class CSAWGNNoiseModel(NoiseModel):
         sigma = np.sqrt(p_noise / 2)
 
         # Generate complex proper, circularly-symmetric AWGN noise vectors with the computed noise power.
-        n = sigma * (np.random.randn(Nr_total, x.shape[1]) + 1j * np.random.randn(Nr_total, x.shape[1]))
+        n = sigma * (np.random.randn(self.K*self.Nr, x.shape[1]) + 1j * np.random.randn(self.K*self.Nr, x.shape[1]))
         return n

@@ -648,13 +648,14 @@ class Channel:
             The channel configurations (channel model & noise model).
         """
 
+        # System dimensions.
         self.K = K
         self.Nr = Nr
         self.Nt = Nt
 
         # Channel model and noise model.
-        self.channel_model: type[ChannelModel] = configs.channel_model
-        self.noise_model: type[NoiseModel] = configs.noise_model
+        self.channel_model: ChannelModel = configs.channel_model
+        self.noise_model: NoiseModel = configs.noise_model
 
         # State.
         self.state = ChannelState()
@@ -695,7 +696,7 @@ class Channel:
         """
         
         if cs.snr is None: cs.snr = np.inf
-        if cs.H is None: cs.H = self.channel_model.generate(self.K * self.Nr, self.Nt)
+        if cs.H is None: cs.H = self.channel_model.generate()
         
         self.set(cs)
 
@@ -803,7 +804,7 @@ class Channel:
         """
 
         # Generate the noise samples according to the specified noise model.
-        n = self.noise_model.generate(self.state.snr, x, self.K * self.Nr)
+        n = self.noise_model.generate(self.state.snr, x)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
         y_noiseless = self.channel_model.apply(x, self.state.H)
