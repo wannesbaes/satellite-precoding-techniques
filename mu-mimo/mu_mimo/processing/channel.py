@@ -80,6 +80,23 @@ class IIDRayleighChannelModel(ChannelModel):
         H = (1 / np.sqrt(2)) * (np.random.randn(Nr_total, Nt) + 1j * np.random.randn(Nr_total, Nt))
         return H
 
+class SatelliteChannelModel(ChannelModel):
+    r"""
+    The satellite channel model.
+
+    ..math:
+    \begin{equation}
+        H_k(t) = e^{j\theta_k} \left( \sqrt{\frac{K}{K+1}} + \sqrt{\frac{1}{K+1}} H_{\text{NLoS},k}(t) \right),
+    \end{equation}
+    
+    \begin{itemize}
+        \item $K \in [0, +\infty)$: The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
+        \item $\theta_k$: : The arbitrary channel phase., uniformly distributed over $[-\pi, \pi]$ and statistically independent for different users $k$.
+        \item $H_{\text{NLoS},k}(t)$: The No Line-of-Sight (NLoS) components.\\
+        The entries of $H_{\text{NLoS},k}(t)$ are i.i.d. zero-mean unit-variance complex Gaussian random processes. Each process is correlated in time. The power spectral density (PSD) is given by Jake's model: $S(f) = \frac{1}{\pi f_D \sqrt{1 - \left(\tfrac{f}{f_D}\right)^2}}, \quad |f| < f_D.$
+    \end{itemize}
+    """
+
 
 # NOISE MODELS
 

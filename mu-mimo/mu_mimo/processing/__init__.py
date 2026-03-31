@@ -5,7 +5,7 @@ mu_mimo.processing package
 @date 2026
 """
 
-from .precoding import Precoder, NeutralPrecoder, SVDPrecoder, ZFPrecoder, BDPrecoder, WMMSEPrecoder
+from .precoding import Precoder, NeutralPrecoder, SVDPrecoder, ZFPrecoder, BDPrecoder, WMMSEPrecoder, waterfilling_v1
 
 from .combining import Combiner, NeutralCombiner, LSVCombiner
 
