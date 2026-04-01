@@ -24,5 +24,23 @@ When the channel is called and given a transmitted signal, it performs the follo
 Documentation
 -------------
 
-.. autoclass:: su_mimo.channel.Channel
-   :members:
+.. autosummary::
+   :nosignatures:
+
+   ~su_mimo.channel.Channel.get_CSI
+   ~su_mimo.channel.Channel.set_CSI
+   ~su_mimo.channel.Channel.reset_CSI
+   ~su_mimo.channel.Channel.generate_noise
+   ~su_mimo.channel.Channel.simulate
+
+
+See Also
+--------
+
+- :doc:`detailed_documentation/channel`
+- :doc:`../su_mimo`
+
+.. toctree::
+   :hidden:
+
+   detailed_documentation/channel

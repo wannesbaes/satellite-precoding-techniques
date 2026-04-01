@@ -6,8 +6,8 @@ The :class:`~mu_mimo.core.system.SimulationRunner` class provides the main inter
 Documentation
 -------------
 
-.. autoclass:: mu_mimo.core.system.SimulationRunner
-   :class-doc-from: class
+.. autoclass:: mu_mimo.core.system.SimulationRunner()
+   :no-index:
    :members:
    :special-members: __init__
 
@@ -15,4 +15,10 @@ Documentation
 See Also
 --------
 
+- :doc:`detailed_documentation/simulation_runner`
 - :doc:`mu_mimo_system`
+
+.. toctree::
+   :hidden:
+   
+   detailed_documentation/simulation_runner

@@ -24,5 +24,26 @@ When the transmitter is called and given an input bit sequence, it performs the 
 Documentation
 -------------
 
-.. autoclass:: su_mimo.transmitter.Transmitter
-   :members:
+.. autosummary::
+   :nosignatures:
+
+   ~su_mimo.transmitter.Transmitter.get_CCI
+   ~su_mimo.transmitter.Transmitter.set_RAS
+   ~su_mimo.transmitter.Transmitter.resource_allocation
+   ~su_mimo.transmitter.Transmitter.bit_allocator
+   ~su_mimo.transmitter.Transmitter.mapper
+   ~su_mimo.transmitter.Transmitter.power_allocator
+   ~su_mimo.transmitter.Transmitter.precoder
+   ~su_mimo.transmitter.Transmitter.simulate
+
+
+See Also
+--------
+
+- :doc:`detailed_documentation/transmitter`
+- :doc:`../su_mimo`
+
+.. toctree::
+   :hidden:
+
+   detailed_documentation/transmitter

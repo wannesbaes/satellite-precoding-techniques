@@ -25,5 +25,26 @@ When the receiver is called and given a received input signal y, it performs the
 Documentation
 -------------
 
-.. autoclass:: su_mimo.receiver.Receiver
-   :members:
+.. autosummary::
+   :nosignatures:
+
+   ~su_mimo.receiver.Receiver.set_RAS
+   ~su_mimo.receiver.Receiver.resource_allocation
+   ~su_mimo.receiver.Receiver.combiner
+   ~su_mimo.receiver.Receiver.power_deallocator
+   ~su_mimo.receiver.Receiver.detector
+   ~su_mimo.receiver.Receiver.demapper
+   ~su_mimo.receiver.Receiver.bit_deallocator
+   ~su_mimo.receiver.Receiver.simulate
+
+
+See Also
+--------
+
+- :doc:`detailed_documentation/receiver`
+- :doc:`../su_mimo`
+
+.. toctree::
+   :hidden:
+
+   detailed_documentation/receiver
