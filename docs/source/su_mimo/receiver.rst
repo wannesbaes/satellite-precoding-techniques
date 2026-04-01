@@ -27,5 +27,3 @@ Documentation
 
 .. autoclass:: su_mimo.receiver.Receiver
    :members:
-   :undoc-members:
-   :show-inheritance:

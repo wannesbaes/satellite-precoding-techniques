@@ -1,21 +1,18 @@
 Simulation Runner
 =================
 
+The :class:`~mu_mimo.core.system.SimulationRunner` class provides the main interface for running simulations of multi-user MIMO downlink systems. It is called by the user scripts and orchestrates the entire simulation process.
+
+Documentation
+-------------
+
 .. autoclass:: mu_mimo.core.system.SimulationRunner
-   :members: __init__
-   :no-undoc-members:
-   :show-inheritance:
+   :class-doc-from: class
+   :members:
+   :special-members: __init__
 
-.. rubric:: Public Methods
 
-.. automethod:: mu_mimo.core.system.SimulationRunner.run
+See Also
+--------
 
-.. rubric:: Private Methods
-
-.. automethod:: mu_mimo.core.system.SimulationRunner._generate_filepath
-.. automethod:: mu_mimo.core.system.SimulationRunner._calculate_inner_loop_result
-.. automethod:: mu_mimo.core.system.SimulationRunner._calculate_outer_loop_result
-.. automethod:: mu_mimo.core.system.SimulationRunner._calculate_bit_error_count_update
-.. automethod:: mu_mimo.core.system.SimulationRunner._save_results
-.. automethod:: mu_mimo.core.system.SimulationRunner._load_results
-
+- :doc:`mu_mimo_system`

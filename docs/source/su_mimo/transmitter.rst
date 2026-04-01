@@ -26,5 +26,3 @@ Documentation
 
 .. autoclass:: su_mimo.transmitter.Transmitter
    :members:
-   :undoc-members:
-   :show-inheritance:

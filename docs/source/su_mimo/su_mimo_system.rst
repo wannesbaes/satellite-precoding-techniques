@@ -17,5 +17,3 @@ Documentation
 
 .. autoclass:: su_mimo.su_mimo_svd.SuMimoSVD
    :members:
-   :undoc-members:
-   :show-inheritance:

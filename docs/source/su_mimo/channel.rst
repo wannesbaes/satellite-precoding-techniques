@@ -26,5 +26,3 @@ Documentation
 
 .. autoclass:: su_mimo.channel.Channel
    :members:
-   :undoc-members:
-   :show-inheritance:

@@ -122,8 +122,8 @@ class ChannelConfig:
     noise_model : NoiseModel
         The noise model (an instance of the concrete noise model class).
     """
-    channel_model: ChannelModel
-    noise_model: NoiseModel
+    channel_model: "ChannelModel"
+    noise_model: "NoiseModel"
 
 @dataclass()
 class SystemConfig:

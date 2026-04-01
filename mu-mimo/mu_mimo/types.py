@@ -21,8 +21,9 @@ class ChannelStateInformation:
     ----------
     snr : float
         The signal-to-noise ratio. (optional, default None)
-    H_eff : ComplexArray, shape (K*Nr, Nt) or (Ns_total, Nt)
-        The effective channel matrix. (optional, default None)\\
+    H_eff : ComplexArray, shape (K * Nr, Nt) or (Ns_total, Nt)
+        The effective channel matrix. (optional, default None)
+
         In case of coordinated beamforming, the effective channel matrix equals the actual channel matrix.
         In case of non-coordinated beamforming, the effective channel matrix equals the the actual channel matrix followed by the compound combining matrix (G * H).
     """
@@ -38,12 +39,13 @@ class ChannelState:
     ----------
     snr : float
         The signal-to-noise ratio.
-    H : ComplexArray, shape (K*Nr, Nt)
+    H : ComplexArray, shape (K * Nr, Nt)
         The channel matrix.
-    
-    Remarks
-    -------
-    How does the channel state differ from the channel state information (CSI)?\\
+
+    Notes
+    -----
+    How does the channel state differ from the channel state information (CSI)?
+
     The channel state contains the actual channel matrix and current SNR value. The channel state information (CSI), however, contains the effective channel matrix instead of the actual channel matrix. So, in case of coordinated beamforming, there is no difference. But in case of non-coordinated beamforming, the effective channel matrix is the actual channel matrix followed by the compound combining matrix (G * H).
     """
     snr: float | None = None
@@ -56,15 +58,15 @@ class BaseStationState:
 
     Parameters
     ----------
-    F : ComplexArray, shape (Nt, K*Nr)
+    F : ComplexArray, shape (Nt, K * Nr)
         The compound precoding matrix.
-    C_eq : ComplexArray, shape (K*Nr,)
+    C_eq : ComplexArray, shape (K * Nr,)
         The equalization coefficients for each data stream.
-    ibr : IntArray, shape (K*Nr,)
+    ibr : IntArray, shape (K * Nr,)
         The information bit rates for each data stream of each UT.
     Ns : IntArray, shape (K,)
         The number of data streams for each UT.
-    G : ComplexArray, shape (K*Nr, K*Nr) or None
+    G : ComplexArray, shape (K * Nr, K * Nr) or None
         The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
     F: ComplexArray
@@ -102,6 +104,9 @@ class UserTerminalState:
 
 @dataclass()
 class TransmitPilotMessage:
+    """
+    The pilot message transmitted by the BS.
+    """
     pass
 
 @dataclass()
@@ -154,11 +159,11 @@ class TransmitFeedforwardMessage:
     ----------
     c_type : list[ConstType]
         The constellation types for the data streams to each UT.
-    C_eq : ComplexArray, shape (K*Nr,)
+    C_eq : ComplexArray, shape (K * Nr,)
         The equalization coefficients for each data stream of each UT.
-    ibr : IntArray, shape (K*Nr,)
+    ibr : IntArray, shape (K * Nr,)
         The information bit rates for each data stream of each UT.
-    G : ComplexArray, shape (K*Nr, K*Nr)
+    G : ComplexArray, shape (K * Nr, K * Nr)
         The compound combining matrix. It is None in case of non-coordinated beamforming.
     """
     c_type: list[ConstType]

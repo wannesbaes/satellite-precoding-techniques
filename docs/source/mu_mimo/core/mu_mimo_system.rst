@@ -10,7 +10,7 @@ The :class:`~mu_mimo.core.system.MuMimoSystem` class represents the complete MU-
 - A :class:`~mu_mimo.core.system.Channel` — responsible for propagating signals and control messages between the BS and the UTs.
 - A set of :class:`~mu_mimo.core.system.UserTerminal` (UT) instances — each responsible for combining, equalizing, detecting and demapping the received signal.
 
-The system is driven by the :class:`~mu_mimo.core.system.SimulationRunner`, which calls the three methods of this class in sequence for each channel realization:
+The system is driven by the :class:`~mu_mimo.core.system.SimulationRunner`, which calls the three methods of this class in the following order for each channel realization:
 
 .. code-block:: text
 
@@ -86,14 +86,12 @@ Documentation
 
 .. autoclass:: mu_mimo.core.system.MuMimoSystem
    :members:
-   :undoc-members:
-   :show-inheritance:
-   :no-index:
 
 
 See Also
 --------
 
+- :doc:`simulation_runner`
 - :doc:`base_station`
 - :doc:`channel`
 - :doc:`user_terminal`

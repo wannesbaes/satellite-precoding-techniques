@@ -1,23 +1,37 @@
 Base Station
 ============
 
+The :class:`~mu_mimo.core.system.BaseStation` class is responsible for properly initializing the precoder (and the combiners in case of coordinated beamforming) and for transmitting the data streams to the user terminals.
+
+.. figure:: /_static/mu-mimo/figures/base_station.png
+   :width: 60%
+   :align: center
+   :alt: base station block diagram
+
 
 Documentation
 -------------
 
-.. autoclass:: mu_mimo.core.system.BaseStation
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: mu_mimo.core.system.BaseStation()
    :no-index:
+   
+   .. autosummary::
+      :nosignatures:
+
+      ~BaseStation.reset_state
+      ~BaseStation.transmit_pilots
+      ~BaseStation.receive_feedback
+      ~BaseStation.transmit_feedforward
+      ~BaseStation.transmit
 
 
 See Also
 --------
 
+- :doc:`detailed_documentation/base_station`
 - :doc:`mu_mimo_system`
-- :doc:`channel`
-- :doc:`user_terminal`
-- :doc:`../processing/precoding_and_combining`
-- :doc:`../processing/bit_loading`
-- :doc:`../processing/modulation_and_detection`
+
+.. toctree::
+   :hidden:
+   
+   detailed_documentation/base_station

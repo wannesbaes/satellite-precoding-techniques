@@ -70,6 +70,15 @@ html_static_path = [
     '_static'
 ]
 
+# Warnings to suppress during doc build.
+suppress_warnings = [
+    'ref.python'
+]
+
+# Docstring interpretation settings:
+napoleon_numpy_docstring = True
+napoleon_google_docstring = False
+
 # Patterns (relative to source dir) to ignore when scanning for sources.
 exclude_patterns = []
 

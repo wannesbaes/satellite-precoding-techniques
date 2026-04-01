@@ -394,7 +394,8 @@ class SimResultManager:
         system_configs : SystemConfig
             The system configuration for which the label is generated.
         label_type : str
-            The type of label.\\
+            The type of label.
+
             Possible options:
                 - 'default': Default label type, which is the name of the system.
                 - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
@@ -779,7 +780,8 @@ class SimResultManager:
         R : bool, optional
             Whether to plot and save the system-wide R comparison. Default is True.
         label_type: str, optional
-            The type of label to use for the legend.\\
+            The type of label to use for the legend.
+
             Possible options:
                 - 'default': Default label type, which is the name of the system.
                 - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
@@ -905,12 +907,13 @@ class SimResultManager:
         R : bool, optional
             Whether to plot and save the per-UT achievable rate comparison. Default is True.
         label_type : str, optional
-            The type of label to use for the plots.\\
+            The type of label to use for the plots.
+
             Possible options:
-                    - 'default': Default label type, which is the name of the system.
-                    - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
-                    - 'BL': The bit loader configurations. (e.g. '4-QAM')
-                    - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
+                - 'default': Default label type, which is the name of the system.
+                - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
+                - 'BL': The bit loader configurations. (e.g. '4-QAM')
+                - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
         ana_results : list[AnaResult] or None, optional
             If provided, analytical results are overlaid on the simulation plots. Must have the same length as sim_results. Default is None.
         

@@ -90,21 +90,28 @@ class IIDRayleighFadingChannelModel(ChannelModel):
 
 class RiceanChannelModel(ChannelModel):
     r"""
-    The ricean channel model.
-    The LoS component is modeled as a deterministic component independent of time and across users. The NLoS component is modeled according to Jake's model.
+    The Ricean channel model.
 
-    ..math:
-    \begin{equation}
-        H_k(t) = e^{j\theta_k} \left( \sqrt{\frac{K}{K+1}} + \sqrt{\frac{1}{K+1}} H_{\text{NLoS},k}(t) \right),
-    \end{equation}
-    
-    \begin{itemize}
-        \item $K \in [0, +\infty)$: The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
-        \item $\theta_k$: : The arbitrary channel phase., uniformly distributed over $[-\pi, \pi]$ and statistically independent for different users $k$.
-        \item $H_{\text{NLoS},k}(t)$: The No Line-of-Sight (NLoS) components.\\
-        The entries of $H_{\text{NLoS},k}(t)$ are i.i.d. zero-mean unit-variance complex Gaussian random processes. Each process is correlated in time. The power spectral density (PSD) is given by Jake's model: $S(f) = \frac{1}{\pi f_D \sqrt{1 - \left(\tfrac{f}{f_D}\right)^2}}, \quad |f| < f_D.$
-    \end{itemize}
+    The LoS component is modeled as a deterministic component independent of time and across users.
+    The NLoS component follows Jake's model.
+
+    .. math::
+
+        H_k(t) = e^{j \theta_k} \left(\sqrt{\frac{K}{K+1}} + \sqrt{\frac{1}{K+1}} \mathbf{H}_{\text{NLoS},k}(t)\right)
+
+    the parameters are:
+
+    - :math:`K \in [0, +\infty)`: The Rice factor, quantifying the strength of the deterministic LoS component relative to the scattered multipath.
+    - :math:`\theta_k`: The arbitrary channel phase, uniformly distributed over $[-\pi, \pi]$ and independent across users $k$.
+    - :math:`\mathbf{H}_{\text{NLoS},k}(t)`: The NLoS components. Each entry is an i.i.d. zero-mean unit-variance complex Gaussian process correlated in time. The PSD is:
+
+    .. math::
+
+        S(f) = \frac{1}{\pi f_D \sqrt{1 - \left( \frac{f}{f_D} \right)^2}}, \quad |f| < f_D
+
     """
+
+
 
 
 # NOISE MODELS
