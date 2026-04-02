@@ -376,6 +376,7 @@ def setup_sim_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SimCo
         sim_config : SimConfig
             The SimConfig object created from the configuration settings.
         """
+
         sim_config = SimConfig(
             snr_dB_values               = np.array(config_settings["SNR values (in dB)"], dtype=float),
             num_channel_realizations    = int(config_settings["Channel realizations per SNR value"]),
@@ -504,7 +505,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         channel_model_mapping = {
             "Neutral": NeutralChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
             "IID Rayleigh Fading": IIDRayleighFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
-            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 12, fD = 9),
+            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 9.265),
             "Satellite": None,
         }
 

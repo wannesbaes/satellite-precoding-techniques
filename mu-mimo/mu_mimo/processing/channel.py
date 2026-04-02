@@ -125,7 +125,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, fD: float, NLoS_method : str = "Cholesky-decomposition method"):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, fD: float, num_channel_realizations: int = 2000, NLoS_method : str = "Cholesky-decomposition method"):
         """
         Instantiate the channel model.
 
@@ -153,8 +153,8 @@ class RiceanFadingChannelModel(ChannelModel):
         self.fD = fD
         self.NLoS_method = NLoS_method
 
-        self.num_channel_realizations = 2000         # The number of channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.
-        self.Ts = 20e-3                              # The time interval between two consecutive channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.       
+        self.num_channel_realizations = num_channel_realizations            # The number of channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.
+        self.Ts = 20e-3                                                     # The time interval between two consecutive channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.       
 
         # Generate the channel phase for each user k, which is uniformly distributed over [-pi, pi) and independent of time and across users k.
         self._theta = np.random.uniform(-np.pi, np.pi, size=self.K)
@@ -165,7 +165,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
-        return f"Ricean Fading Channel (K_rice={self.K_rice}, fD={self.fD}, NLoS_method='{self.NLoS_method}')"
+        return f"Ricean Fading Channel (K = {self.K_rice}, fD = {self.fD})"
     
     def reset(self) -> None:
         """
@@ -312,15 +312,15 @@ class RiceanFadingChannelModel(ChannelModel):
         """
         raise NotImplementedError("The FIR filter method for generating the NLoS component is not implemented yet.")
 
-    def plot_autocorrelation(self, max_lag: int = 200, num_samples: int = 1) -> None:
+    def plot_autocorrelation(self, max_lag: int = 200, num_samples: int = 1, component: str = "NLoS") -> None:
         r"""
-        Plot the autocorrelation function of the generated NLoS process and compare it to the analytical expression.
+        Plot the autocorrelation function of the generated channel gain process and compare it to the analytical expression.
 
         The simulated autocorrelation is computed as the empirical autocorrelation, averaged over num_samples independent realizations of the NLoS process:
         
         .. math::
 
-            \hat{R}_h(k) = \frac{1}{N \cdot M} \sum_{m=1}^{M} \sum_{n=0}^{N-k-1} h_m[n+k] h_m^*[n], \quad k = 0, 1, \ldots, N-1
+            \hat{R}_h(k) = \frac{1}{M} \sum_{m=1}^{M} \cdot \frac{1}{N-k} \sum_{n=0}^{N-k-1} h_m[n+k] h_m^*[n], \quad k = 0, 1, \ldots, N-1
         
         The analytical autocorrelation equals the zero-order Bessel function of the first kind:
         
@@ -335,6 +335,10 @@ class RiceanFadingChannelModel(ChannelModel):
         num_samples : int
             The number of independent realizations of the NLoS process to average over. Default is 1.
             Should be smaller than or equal to K * Nr * Nt, because the average cannot be taken accross different simulations.
+        component : str
+            The component of the channel to plot the autocorrelation for. 
+            Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.
+
         
         Returns
         -------
@@ -354,17 +358,35 @@ class RiceanFadingChannelModel(ChannelModel):
         
         # 1. Compute empirical autocorrelation.
 
-        # Generate enough realizations of the NLoS process using the specified method.
-        H_NLoS = self._generate_NLoS(method=self.NLoS_method)
-        H_NLoS_flat = H_NLoS.reshape(self.K*self.Nr*self.Nt, self.num_channel_realizations)
+        # Generate the channel gain process (for the specified component) for each propagation link.
+        
+        if component == "LoS":
+            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.num_channel_realizations)).reshape(self.K*self.Nr, self.Nt, self.num_channel_realizations)
+            H = np.exp(1j * theta)
+        
+        elif component == "NLoS":
+            H_NLoS = self._generate_NLoS(method=self.NLoS_method)
+            H = H_NLoS
+        
+        elif component == "LoS + NLoS":
+            H_NLoS = self._generate_NLoS(method=self.NLoS_method)
+            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.num_channel_realizations)).reshape(self.K*self.Nr, self.Nt, self.num_channel_realizations)
+            H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
+        
+        else:
+            raise ValueError(f"Unknown component '{component}' for plotting the autocorrelation function. Valid options are: 'LoS', 'NLoS' and 'LoS + NLoS'.")
+
+        H_flat = H.reshape(self.K*self.Nr*self.Nt, self.num_channel_realizations)
+
 
         # Compute the empirical autocorrelation for each realization.
+        
         tau_sim = np.arange(-max_lag, max_lag + 1) * self.Ts
         R_empirical = np.zeros(2 * max_lag + 1, dtype=complex)
         
         for sample_num in range(num_samples):
             
-            h = H_NLoS_flat[sample_num, :]
+            h = H_flat[sample_num, :]
             R_realization = np.zeros(2 * max_lag + 1, dtype=complex)
             R_realization[max_lag] = np.mean(np.abs(h)**2)
             for lag in range(1, max_lag + 1):
@@ -392,13 +414,13 @@ class RiceanFadingChannelModel(ChannelModel):
         ax.grid(True)
         plt.tight_layout()
  
-        plot_Rh_filename = f"Rh NLoS process ({self.NLoS_method}) ({num_samples} samples).png"
+        plot_Rh_filename = f"Rh {component} process ({self.NLoS_method}) ({num_samples} samples).png"
         plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots"
         plot_Rh_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_Rh_dir / plot_Rh_filename, dpi=300, bbox_inches="tight")
         return fig, ax
 
-    def plot_psd(self, num_samples: int = 1) -> None:
+    def plot_NLoS_PSD(self, num_samples: int = 1) -> None:
         r"""
         Plot the power spectral density (PSD) of the generated NLoS process and compare it to the analytical expression.
 
