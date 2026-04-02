@@ -258,6 +258,7 @@ class RiceanFadingChannelModel(ChannelModel):
         Generate the NLoS component for user k using the Cholesky decomposition method for generating a Gaussian process with a specified auto-correlation function.
 
         The Cholesky decomposition method for generating a zero-mean unit-variance complex Gaussian process :math:`\mathbf{h}` of length :math:`N` with a specified autocorrelation function :math:`R_h(\tau)`:
+        
         - **Step 1:** Build the :math:`N \times N` covariance matrix :math:`\mathbf{C}` with entries :math:`C_{i,j} = R_h((i-j)T_s)`.
         - **Step 2:** Compute the Cholesky decomposition of the covariance matrix :math:`\mathbf{C} = \mathbf{L}\mathbf{L}^H`, where :math:`\mathbf{L}` is a lower triangular matrix.
         - **Step 3:** Generate a column vector :math:`\mathbf{w}` of :math:`N` i.i.d. white complex Gaussian random variables with zero mean and unit variance.
@@ -289,28 +290,40 @@ class RiceanFadingChannelModel(ChannelModel):
 
         return H_NLoS
 
-    def _generate_NLoS_spectral(self, k: int) -> ComplexArray:
+    def _generate_NLoS_spectral(self) -> ComplexArray:
         """
-        Generate the NLoS component for user k using the spectral method for generating a Gaussian process with a specified power spectral density (PSD) function.
-        """
-        pass
+        Generate the NLoS component for all users using the spectral method for generating a Gaussian process with a specified power spectral density (PSD) function.
 
-    def _generate_NLoS_FIR_filter(self, k: int) -> ComplexArray:
+        Returns
+        -------
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, M)
+            The generated NLoS component for all propagation links and all time instants.
         """
-        Generate the NLoS component for user k using the FIR filter method for generating a Gaussian process with a specified power spectral density (PSD) function.
+        raise NotImplementedError("The spectral method for generating the NLoS component is not implemented yet.")
+
+    def _generate_NLoS_FIR_filter(self) -> ComplexArray:
         """
-        pass
+        Generate the NLoS component for all users using the FIR filter method for generating a Gaussian process with a specified power spectral density (PSD) function.
+        
+        Returns
+        -------
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, M)
+            The generated NLoS component for all propagation links and all time instants.
+        """
+        raise NotImplementedError("The FIR filter method for generating the NLoS component is not implemented yet.")
 
     def plot_autocorrelation(self, max_lag: int = 200, num_samples: int = 1) -> None:
         r"""
         Plot the autocorrelation function of the generated NLoS process and compare it to the analytical expression.
 
         The simulated autocorrelation is computed as the empirical autocorrelation, averaged over num_samples independent realizations of the NLoS process:
+        
         .. math::
 
             \hat{R}_h(k) = \frac{1}{N \cdot M} \sum_{m=1}^{M} \sum_{n=0}^{N-k-1} h_m[n+k] h_m^*[n], \quad k = 0, 1, \ldots, N-1
         
         The analytical autocorrelation equals the zero-order Bessel function of the first kind:
+        
         .. math::
 
             R_h(\tau) = J_0(2\pi f_D \tau)
@@ -323,7 +336,7 @@ class RiceanFadingChannelModel(ChannelModel):
             The number of independent realizations of the NLoS process to average over. Default is 1.
             Should be smaller than or equal to K * Nr * Nt, because the average cannot be taken accross different simulations.
         
-        Results
+        Returns
         -------
         fig : matplotlib.figure.Figure
             The figure object containing the plot.
@@ -390,6 +403,7 @@ class RiceanFadingChannelModel(ChannelModel):
         Plot the power spectral density (PSD) of the generated NLoS process and compare it to the analytical expression.
 
         The simulated PSD is calculated by averaging the periodograms of num_samples independent realizations (Bartlett's method):
+        
         .. math::
 
             \hat{S}_h(f) = \frac{1}{M} \sum_{m=1}^{M} \frac{T_s}{N} \left| H_m(f) \right|^2
@@ -397,6 +411,7 @@ class RiceanFadingChannelModel(ChannelModel):
         where M is the number of realizations (num_samples).
         
         The analytical PSD is given by Jake's Doppler Spectrum:
+        
         .. math::
 
             S_h(f) = \frac{1}{\pi f_D \sqrt{1 - \left( \frac{f}{f_D} \right)^2}}, \quad |f| < f_D
@@ -407,7 +422,7 @@ class RiceanFadingChannelModel(ChannelModel):
             The number of periodogram realizations to average over. Default is 1. 
             Should be smaller than or equal to K * Nr * Nt, because the average cannot be taken across different simulations.
 
-        Results
+        Returns
         -------
         fig : matplotlib.figure.Figure
             The figure object containing the plot.
