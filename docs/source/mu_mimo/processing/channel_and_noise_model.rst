@@ -15,7 +15,7 @@ Channel Model
     :show-inheritance:
     :no-index:
 
-.. autoclass:: mu_mimo.processing.channel.RiceanChannelModel
+.. autoclass:: mu_mimo.processing.channel.RiceanFadingChannelModel
     :show-inheritance:
     :no-index:
 

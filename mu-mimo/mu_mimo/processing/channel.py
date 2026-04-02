@@ -118,7 +118,7 @@ class RiceanFadingChannelModel(ChannelModel):
     - :math:`K \in [0, +\infty)`: The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
     - :math:`\theta_k`: The arbitrary channel phase, uniformly distributed over $[-\pi, \pi]$ and independent across users $k$.
     - :math:`\mathbf{H}_{\text{NLoS},k}(t)`: The NLoS components. Each entry is an i.i.d. zero-mean unit-variance complex Gaussian process correlated in time. The PSD is:
-
+    
     .. math::
 
         S(f) = \frac{1}{\pi f_D \sqrt{1 - \left( \frac{f}{f_D} \right)^2}}, \quad |f| < f_D
@@ -307,10 +307,12 @@ class RiceanFadingChannelModel(ChannelModel):
 
         The simulated autocorrelation is computed as the empirical autocorrelation, averaged over num_samples independent realizations of the NLoS process:
         .. math::
+
             \hat{R}_h(k) = \frac{1}{N \cdot M} \sum_{m=1}^{M} \sum_{n=0}^{N-k-1} h_m[n+k] h_m^*[n], \quad k = 0, 1, \ldots, N-1
         
         The analytical autocorrelation equals the zero-order Bessel function of the first kind:
         .. math::
+
             R_h(\tau) = J_0(2\pi f_D \tau)
 
         Parameters
@@ -389,12 +391,14 @@ class RiceanFadingChannelModel(ChannelModel):
 
         The simulated PSD is calculated by averaging the periodograms of num_samples independent realizations (Bartlett's method):
         .. math::
+
             \hat{S}_h(f) = \frac{1}{M} \sum_{m=1}^{M} \frac{T_s}{N} \left| H_m(f) \right|^2
 
         where M is the number of realizations (num_samples).
         
         The analytical PSD is given by Jake's Doppler Spectrum:
         .. math::
+
             S_h(f) = \frac{1}{\pi f_D \sqrt{1 - \left( \frac{f}{f_D} \right)^2}}, \quad |f| < f_D
 
         Parameters

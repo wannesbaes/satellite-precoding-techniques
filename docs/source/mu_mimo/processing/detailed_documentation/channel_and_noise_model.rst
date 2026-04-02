@@ -23,7 +23,7 @@ Channel Model
     :private-members:
     :special-members: __init__
 
-.. autoclass:: mu_mimo.processing.channel.RiceanChannelModel
+.. autoclass:: mu_mimo.processing.channel.RiceanFadingChannelModel
     :show-inheritance:
     :members:
     :private-members:
