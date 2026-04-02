@@ -20,7 +20,7 @@ from .modulation import (
 )
 
 from .channel import (
-    ChannelModel, NeutralChannelModel, IIDRayleighFadingChannelModel, RiceanChannelModel,
+    ChannelModel, NeutralChannelModel, IIDRayleighFadingChannelModel, RiceanFadingChannelModel,
     NoiseModel, NeutralNoiseModel, CSAWGNNoiseModel
 )
 
@@ -34,6 +34,6 @@ __all__ = [
     "Demapper", "NeutralDemapper", "GrayCodeDemapper",
     "Equalizer",
     "Detector", "NeutralDetector", "MDDetector",
-    "ChannelModel", "NeutralChannelModel", "IIDRayleighFadingChannelModel", "RiceanChannelModel",
+    "ChannelModel", "NeutralChannelModel", "IIDRayleighFadingChannelModel", "RiceanFadingChannelModel",
     "NoiseModel", "NeutralNoiseModel", "CSAWGNNoiseModel",
 ]

@@ -191,8 +191,8 @@ class SystemConfig:
         lines.append(f"  Precoder  : {self.base_station_configs.precoder.__name__}")
         lines.append(f"  Combiner  : {self.user_terminal_configs.combiner.__name__}")
         lines.append(f"  BitLoader : {self.base_station_configs.bit_loader.__name__}")
-        lines.append(f"  Channel   : {type(self.channel_configs.channel_model).__name__}")
-        lines.append(f"  Noise     : {type(self.channel_configs.noise_model).__name__}")
+        lines.append(f"  Channel   : {str(self.channel_configs.channel_model)}")
+        lines.append(f"  Noise     : {str(self.channel_configs.noise_model)}")
         lines.append("-" * 60)
 
         str_display = "\n".join(lines)
@@ -504,7 +504,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         channel_model_mapping = {
             "Neutral": NeutralChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
             "IID Rayleigh Fading": IIDRayleighFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
-            "Ricean Fading": RiceanChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 12, fD = 9),
+            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 12, fD = 9),
             "Satellite": None,
         }
 

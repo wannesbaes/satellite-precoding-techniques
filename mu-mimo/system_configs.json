@@ -13,20 +13,20 @@
     "K"                         : 5,
 
     "Bit Loader"                : 6,
-    "Const. Type"               : 7,
-    "Const. Size"               : 8,
+    "Const. Size"               : 7,
+    "Const. Type"               : 8,
 
-    "Mapper"                    : 10,
-    "Detector"                  : 11,
+    "Mapper"                    : 9,
+    "Detector"                  : 10,
 
-    "Precoder"                  : 12,
-    "Combiner"                  : 13,
+    "Precoder"                  : 11,
+    "Combiner"                  : 12,
 
-    "Channel Predictor"         : 14,
-    "Channel Estimator"         : 15,
+    "Channel Predictor"         : 13,
+    "Channel Estimator"         : 14,
 
-    "Channel Model"             : 16,
-    "Noise Model"               : 17
+    "Channel Model"             : 15,
+    "Noise Model"               : 16
 
   },
 

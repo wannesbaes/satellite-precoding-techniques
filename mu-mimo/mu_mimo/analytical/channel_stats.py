@@ -129,7 +129,7 @@ class ChannelStatistics:
         """
         
         # Generate a unique file name based on the system parameters and the used precoding technique.
-        filename = Path(f"stats virtual streamchannel gains ({self.num_channel_samples//1_000_000}M samples) -- {self.system_config.name}")
+        filename = Path(f"{self.system_config.name} -- {str(self.system_config.channel_configs.channel_model)} -- ({self.num_channel_samples//1_000_000}M samples)")
 
         return filename
 
@@ -214,7 +214,7 @@ class ChannelStatistics:
         K = self.system_config.K
         Nr = self.system_config.Nr
         Nt = self.system_config.Nt
-        channel_model: ChannelModel = self.system_config.channel_configs.channel_model()
+        channel_model: ChannelModel = self.system_config.channel_configs.channel_model
         
         H = channel_model.generate(K * Nr, Nt)
         return H
@@ -449,7 +449,7 @@ class ChannelStatistics:
 
         # 3. Save the plot.
         plot_pdf_filename = Path(str(self._generate_filename()) + f" ({num_uts} UTs plotted)" + ".png")
-        plot_pdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "pdf"
+        plot_pdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "virtual streamchannel gains - pdf"
         plot_pdf_dir.mkdir(parents=True, exist_ok=True)
         plot_pdf.savefig(plot_pdf_dir / plot_pdf_filename, dpi=300, bbox_inches="tight")
         return
@@ -520,7 +520,7 @@ class ChannelStatistics:
 
         # 3. Save the plot.
         plot_ecdf_filename = Path(str(self._generate_filename()) + f" ({num_uts} UTs plotted)" + ".png")
-        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ecdf"
+        plot_ecdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "virtual streamchannel gains - ecdf"
         plot_ecdf_dir.mkdir(parents=True, exist_ok=True)
         plot_ecdf.savefig(plot_ecdf_dir / plot_ecdf_filename, dpi=300, bbox_inches="tight")
         return
