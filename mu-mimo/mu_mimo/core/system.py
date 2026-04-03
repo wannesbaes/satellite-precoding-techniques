@@ -52,7 +52,7 @@ class SimulationRunner:
             print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + f"  Results from {sim_result.system_configs.name} for {sim_result.sim_configs.name} successfully loaded.\n" + "="*60)
             return sim_result
         else:
-            print("="*60 + "\n  MU-MIMO Downlink Simulation \n" + "="*60 + "\n" + self.system_config.display() + "\n" + self.sim_config.display() + "\n")
+            print("\n" + "="*60 + "\n  MU-MIMO Downlink Simulation \n" + "="*60 + "\n" + self.system_config.display() + "\n" + self.sim_config.display() + "\n")
         
         # Run the simulation.
         simulation_results: list[SingleSnrSimResult] = []
@@ -65,17 +65,17 @@ class SimulationRunner:
             channel_realization_count = 0
             hard_stop = 0
 
-            # Inner loop: Iterate over the channel realizations.
-            while (channel_realization_count < self.sim_config.num_channel_realizations) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.num_channel_realizations):
+            # Reset.
+            self.mu_mimo_system.reset(snr)
 
-                # Reset.
-                cs = self.mu_mimo_system.reset(ChannelState(snr=snr, H=None))
+            # Inner loop: Iterate over the channel realizations.
+            while (channel_realization_count < self.sim_config.Mch_min) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.Mch_min):
 
                 # Configuration.
                 stream_Rs = self.mu_mimo_system.configure()
 
                 # Communication.
-                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.M)
+                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.Msv)
 
                 # Store inner loop results.
                 inner_loop_result = self._calculate_inner_loop_result(snr, stream_Rs, tx_bits_list, rx_bits_list)
@@ -138,9 +138,9 @@ class SimulationRunner:
             The SNR value for this simulation.
         stream_Rs : RealArray, shape (K, Nr)
             The achievable rates of each UT and each stream for this channel realization (and SNR value and system configuration).
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
             The list of bitstreams for each UT k and each data stream s that were reconstructed by the UTs.
         
         Returns
@@ -171,7 +171,7 @@ class SimulationRunner:
 
             for a_s in range(Ns[k]):
                 active_streams = np.where(ibr[k*Nr : (k+1)*Nr] > 0)[0]
-                stream_ibrs[k][active_streams[a_s]] = len(tx_bits_list[k][a_s]) // self.sim_config.M
+                stream_ibrs[k][active_streams[a_s]] = len(tx_bits_list[k][a_s]) // self.sim_config.Msv
                 stream_becs[k][active_streams[a_s]] = np.sum(tx_bits_list[k][a_s] != rx_bits_list[k][a_s])
                 stream_ars[k][active_streams[a_s]] = 1
             
@@ -211,8 +211,8 @@ class SimulationRunner:
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
 
-            M = self.sim_config.M,
-            num_channel_realizations = 1
+            Msv = self.sim_config.Msv,
+            Mch = 1
         )
         return inner_loop_result
 
@@ -321,8 +321,8 @@ class SimulationRunner:
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
 
-            M = self.sim_config.M,
-            num_channel_realizations = len(inner_loop_results)
+            Msv = self.sim_config.Msv,
+            Mch = len(inner_loop_results)
         )
         return outer_loop_result
 
@@ -354,35 +354,31 @@ class MuMimoSystem:
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
 
-    def reset(self, cs: ChannelState) -> ChannelState:
+    def reset(self, snr: float) -> None:
         """
         Resets the MU-MIMO system. 
         
-        After resetting, the system is ready for configuration.
-        For more datail on the reset phase, we refer to the reset_state() methods of the BS, UTs and channel.
+        Before starting the simulation for a new SNR value, the system must be resetted.
+        For more datail on the reset phase, we refer to the reset_state() methods of the channel.
 
         Parameters
         ----------
-        cs : ChannelState
-            The channel state to reset to.
+        snr : float
+            The SNR value to reset the system to.
         """
 
-        # Reset the base station state.
-        self.bs.reset_state()
-
-        # Reset each user terminal state.
-        for ut in self.uts: ut.reset_state()
-
         # Reset the channel state.
-        cs = self.channel.reset(cs)
+        self.channel.reset(snr)
 
-        return cs
+        return
 
     def configure(self) -> None:
         """
         Configuration the MU-MIMO system. 
         
-        Make sure the system has been reset first. After configuration, the system is ready for communication.
+        First, the state of the system components (precoding matrices, combiners, equalizers, etc.) are cleared. Then, a new state is computed based on the current channel realization and SNR value.
+        After configuration, the system is ready for communication.
+
         For more datails on the configuration phase, we refer to the receive, propagate and transmit methods of the pilot signals, feedback messages and feedforward messages of the BS, UTs and channel.
 
         Returns
@@ -391,6 +387,11 @@ class MuMimoSystem:
             The capacity of each stream of each UT for the current channel realization, SNR value and system configurations.
         """
 
+        # Clearing Phase.
+        self.bs.clear_state()
+        for ut in self.uts: ut.clear_state()
+        self.channel.proceed()
+        
         # Pilot Phase.
         tx_pilot_msg = self.bs.transmit_pilots()
         rx_pilot_msgs = self.channel.propagate_pilots(tx_pilot_msg)
@@ -408,7 +409,7 @@ class MuMimoSystem:
 
         return self._compute_capacity()
 
-    def communicate(self, M: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
+    def communicate(self, Msv: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
         """
         Communication of the MU-MIMO system.
 
@@ -417,19 +418,19 @@ class MuMimoSystem:
 
         Parameters
         ----------
-        M : int
+        Msv : int
             The number of symbol vector transmissions for this channel realization and SNR.
         
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
             The list of bitstreams for each UT k and each data stream s that were received by the UTs.
         """
 
         # Transmit from the BS.
-        tx_bits_list, x = self.bs.transmit(M)
+        tx_bits_list, x = self.bs.transmit(Msv)
 
         # Propagate through the channel.
         y_k_list = self.channel.propagate(x)
@@ -538,9 +539,9 @@ class BaseStation:
         self.c_configs: ConstConfig = c_configs
         self.state: BaseStationState | None = None
 
-    def reset_state(self) -> None:
+    def clear_state(self) -> None:
         """
-        Resets the state of the BS. 
+        Clears the state of the BS. 
         
         It clears the precoder F, the power allocation P, the information bit rates ibr, the number of data streams for each UT Ns and the combining matrices G for each UT in case of coordinated beamforming from the previous channel realization and SNR.
         """
@@ -598,30 +599,30 @@ class BaseStation:
         tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, C_eq=self.state.C_eq, ibr=self.state.ibr, G=self.state.G)
         return tx_ff_msg
 
-    def transmit(self, M: int) -> tuple[list[list[BitArray]], ComplexArray]:
+    def transmit(self, Msv: int) -> tuple[list[list[BitArray]], ComplexArray]:
         """
         Simulate the transmit processing chain of the BS to obtain the transmitted signal x.
 
         The processing chain consists of the following steps:
 
-        1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted M.
+        1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted Msv.
         2. Mapping - convert the bitstreams b_s to the corresponding data symbol streams a_s based on the modulation scheme (determined by the information bit rates ibr).
         3. Precoding - apply the precoding matrix F to the symbol streams a_s to obtain the transmitted signal x.
 
         Parameters
         ----------
-        M : int
+        Msv : int
             The number of symbol vector transmissions for this channel realization and SNR.
 
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
             The list of bitstreams for each UT k and each data stream s.
-        x : ComplexArray, shape (Nt, M)
+        x : ComplexArray, shape (Nt, Msv)
             The transmitted signal.
         """
 
-        tx_bits_list, b = self.bit_loader.apply(self.state.ibr, M, self.state.Ns)
+        tx_bits_list, b = self.bit_loader.apply(self.state.ibr, Msv, self.state.Ns)
         a = self.mapper.apply(b, self.state.ibr, self.c_configs.types, self.state.Ns)
         x = self.precoder.apply(a, self.state.F, self.state.ibr)
 
@@ -658,49 +659,40 @@ class Channel:
         self.noise_model: NoiseModel = configs.noise_model
 
         # State.
-        self.state = ChannelState()
+        self.state: ChannelState | None = None
 
-    def set(self, cs: ChannelState) -> None:
+    def reset(self, snr: float) -> None:
         """
-        Sets the channel state.
+        Resets the channel.
 
-        The channel state consists of the SNR and the channel matrix H. If either of them is not provided, the old value is kept.
+        First, the state of the channel is reset.
+        Then, the channel model and noise model are reset.
+        After this method is called, the channel is ready for a new simulation for the specified SNR value.
 
         Parameters
         ----------
-        cs : ChannelState
-            The channel state to set.
+        snr : float
+            The signal-to-noise ratio (SNR) to reset the channel to.
         """
-       
-        if cs.snr is not None: self.state.snr = cs.snr
-        if cs.H is not None: self.state.H = cs.H
+        
+        # Reset the state of the channel.
+        self.state = ChannelState(snr=snr, H=None)
+
+        # Reset the channel model and noise model.
+        self.channel_model.reset()
+        self.noise_model.reset()
 
         return
 
-    def reset(self, cs: ChannelState) -> ChannelState:
+    def proceed(self) -> None:
         """
-        Resets the channel state.
+        Proceed to the next channel realization.
 
-        If the SNR or the channel matrix H is not provided in the input channel state, they are set to default values.
-        For the SNR, the default value is infinity, which corresponds to the absence of noise. For the channel matrix H, the default value is a randomly generated channel matrix according to the specified channel model.
-
-        Parameters
-        ----------
-        cs : ChannelState
-            The channel state to reset to.
-
-        Returns
-        -------
-        ChannelState
-            The new channel state.
+        This method should be called when the coherence time of the channel is passed.
+        When this method is called, the system is ready to continue the configuration by sending the configuration messages.
         """
-        
-        if cs.snr is None: cs.snr = np.inf
-        if cs.H is None: cs.H = self.channel_model.generate()
-        
-        self.set(cs)
-
-        return cs
+        self.state.H = self.channel_model.proceed()
+        return
 
     def propagate_pilots(self, tx_pilot_msg: TransmitPilotMessage) -> list[ReceivePilotMessage]:
         """
@@ -717,9 +709,15 @@ class Channel:
         -------
         rx_pilot_msgs : list[ReceivePilotMessage]
             The list of pilot messages that will be received by each UT.
+
+        Notes
+        -----
+        Because we do not consider channel estimation at this point, the pilot messages contain the exact current channel state information, retrieved from the channel model! The receiver does not have to do any estimation. 
+        Also, in case a satellite channel, the CSI given to the receiver is a delayed compared to the channel used to propagate the information data.
         """
 
-        rx_pilot_msgs = [ReceivePilotMessage(H_k = self.state.H[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
+        H = self.channel_model.get_channel()
+        rx_pilot_msgs = [ReceivePilotMessage(H_k = H[k*self.Nr:(k+1)*self.Nr, :]) for k in range(self.K)]
         return rx_pilot_msgs
 
     def propagate_feedback(self, tx_fb_msgs: list[TransmitFeedbackMessage]) -> ReceiveFeedbackMessage:
@@ -794,20 +792,20 @@ class Channel:
 
         Parameters
         ----------
-        x : ComplexArray, shape (Nt, M)
+        x : ComplexArray, shape (Nt, Msv)
             The transmitted signal.
         
         Returns
         -------
-        y_k_list : list[ComplexArray], shape (K, Nr, M)
+        y_k_list : list[ComplexArray], shape (K, Nr, Msv)
             The list of received signals for each UT k.
         """
 
         # Generate the noise samples according to the specified noise model.
-        n = self.noise_model.generate(self.state.snr, x)
+        n = self.noise_model.get_noise(self.state.snr, x)
 
         # Apply the channel matrix H to the transmitted signal x and add the noise to obtain the received signal y.
-        y_noiseless = self.channel_model.apply(x, self.state.H)
+        y_noiseless = self.channel_model.apply(x)
         y = self.noise_model.apply(y_noiseless, n)
 
         # Split the received signal y into K different signals y_k, one for each UT.
@@ -848,9 +846,9 @@ class UserTerminal:
         # UT ID.
         self.ut_id = ut_id
 
-    def reset_state(self) -> None:
+    def clear_state(self) -> None:
         """
-        Reset the state of the user terminal.
+        Clears the state of the user terminal.
 
         It clears the channel matrix H_k, the combining matrix G_k, the equalization coefficients C_eq_k, the information bit rates ibr_k and the number of data streams Ns_k for the previous channel realization and SNR.
         """
@@ -862,14 +860,16 @@ class UserTerminal:
         """
         Receive and process the pilot message from the BS.
 
-        Normally, the pilot signals are used to estimate the current channel matrix H_k. We do not consider channel estimation in this framework, so we directly retrieve the channel matrix H_k from the received pilot message. 
-
         In case of non-coordinated beamforming, a suboptimal combining matrix G_k is computed based on the current channel. The state of the UT is updated to the current channel realization.
 
         Parameters
         ----------
         rx_pilots_msg : ReceivePilotMessage
             The pilot message received by the UT.
+        
+        Notes
+        -----
+        Normally, the pilot signals are used to estimate the current channel matrix H_k. We do not consider channel estimation in this framework, so we directly retrieve the channel matrix H_k from the received pilot message. 
         """
         
         # Retrieve the channel estimate from the received pilot message.
@@ -933,12 +933,12 @@ class UserTerminal:
 
         Parameters
         ----------
-        y_k : ComplexArray, shape (Nr, M)
+        y_k : ComplexArray, shape (Nr, Msv)
             The received signal at this UT.
         
         Returns
         -------
-        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * M)
+        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * Msv)
             The list of estimated bitstreams for each data stream s of this UT.
         """
 

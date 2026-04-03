@@ -37,38 +37,83 @@ class ChannelModel(ABC):
         self.Nt = Nt
         self.Nr = Nr
         self.K = K
+
+        # The current channel matrix H.
+        self._H = None
+
+        # The current time index m_ch
+        self._m_ch = -1
+    
+    def __str__(self) -> str:
+        """ Return a string representation of the channel model. """
+        return "Channel Model (abstract base class)"
+    
+    def reset(self) -> None:
+        """
+        Reset the channel model to its initial state.
+        """
+        self._H = None
+        self._m_ch = -1
+        return
     
     @abstractmethod
-    def generate(self) -> ComplexArray:
+    def proceed(self) -> ComplexArray:
         """
-        Generate the channel matrix.
+        Update the channel state (time index and current channel matrix).
 
         Returns
         -------
-        H : ComplexArray, shape (K*Nr, Nt)
-            The generated channel matrix.
+        H : ComplexArray, shape (K * Nr, Nt)
+            The new, current channel matrix.
+        """
+        
+        # Update the time index.
+        self._m_ch += 1
+
+        return
+    
+    @abstractmethod
+    def get_channel(self) -> ComplexArray:
+        """
+        Retrieve the channel matrix.
+        
+        If there is a delay on the CSI, it will return a previous version of the channel matrix!
+
+        Returns
+        -------
+        H : ComplexArray, shape (K * Nr, Nt)
+            The channel matrix (corresping to the current CSI).
         """
         raise NotImplementedError
-
-    @staticmethod
-    def apply(x: ComplexArray, H: ComplexArray) -> ComplexArray:
+    
+    def apply(self, x: ComplexArray) -> ComplexArray:
         """
         Apply the channel effects to the transmitted signals.
 
         Parameters
         ----------
-        x : ComplexArray, shape (Nt, M)
+        x : ComplexArray, shape (Nt, Msv)
             The transmitted signals.
-        H : ComplexArray, shape (K*Nr, Nt)
-            The channel matrix.
 
         Returns
         -------
-        y : ComplexArray, shape (K*Nr, M)
+        y : ComplexArray, shape (K*Nr, Msv)
             The received signals.
         """
-        y = H @ x
+        y = self._H @ x
         return y
+
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, ChannelModel):
+            return NotImplemented
+        
+        return (
+            type(self) == type(other) and
+            self.Nt == other.Nt and
+            self.Nr == other.Nr and
+            self.K == other.K
+        )
 
 class NeutralChannelModel(ChannelModel):
     """
@@ -82,8 +127,21 @@ class NeutralChannelModel(ChannelModel):
         """ Return a string representation of the channel model. """
         return "Neutral Channel"
 
-    def generate(self) -> ComplexArray:
+    def proceed(self) -> ComplexArray:
+        
+        # Update the time index.
+        super().proceed()
+
+        # Update the current channel matrix.
         H = np.eye(self.K*self.Nr, self.Nt, dtype=complex)
+        self._H = H
+        
+        return H
+    
+    def get_channel(self) -> ComplexArray:
+        
+        # Return the channel matrix corresponding to the current CSI.
+        H = self._H
         return H
 
 class IIDRayleighFadingChannelModel(ChannelModel):
@@ -91,15 +149,28 @@ class IIDRayleighFadingChannelModel(ChannelModel):
     Independent and Identically Distributed (IID) Rayleigh Fading Channel Model.
 
     This channel model generates a channel matrix with independent and identically distributed (IID) circularly-symmetric zero-mean unit-variance complex Gaussian entries.\\
-    The Rayleigh fading aspect is captured by the fact that the channel coefficients change independently after M transmissions.
+    The Rayleigh fading aspect is captured by the fact that the channel coefficients change independently after Msv transmissions.
     """
 
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
         return "IID Rayleigh Fading Channel"
     
-    def generate(self) -> ComplexArray:
+    def proceed(self) -> ComplexArray:
+        
+        # Update the time index.
+        super().proceed()
+
+        # Update the current channel matrix.
         H = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt) + 1j * np.random.randn(self.K*self.Nr, self.Nt))
+        self._H = H
+
+        return H
+
+    def get_channel(self) -> ComplexArray:
+        
+        # Return the channel matrix corresponding to the current CSI.
+        H = self._H
         return H
 
 class RiceanFadingChannelModel(ChannelModel):
@@ -125,7 +196,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, fD: float, num_channel_realizations: int = 2000, NLoS_method : str = "Cholesky-decomposition method"):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, fD: float, mode: str, Mch_max: int = 210, NLoS_method : str = "Cholesky-decomposition method"):
         """
         Instantiate the channel model.
 
@@ -142,6 +213,14 @@ class RiceanFadingChannelModel(ChannelModel):
             The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
         fD : float
             The maximum Doppler frequency (in Hertz).
+        mode : str
+            The mode of the channel model, a.k.a. the scenario in which the channel model is used.
+            Choose between 'terrestrial' and 'satellite'. In satellite mode, the CSI given to the receiver is a delayed version of the CSI.
+        
+        Mch_max : int
+            The maximum number of channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants.
+        Tc : float
+            The coherence time of the channel. This is the time duration between two consecutive channel realizations.
         
         NLoS_method : str
             The method to use for generating the NLoS component. Choose between: 'Cholesky-decomposition method', 'spectral method', 'FIR filter method'.
@@ -151,78 +230,94 @@ class RiceanFadingChannelModel(ChannelModel):
         
         self.K_rice = K_rice
         self.fD = fD
+        self.mode = mode
+
+        self.Mch_max = Mch_max
+        self.Tc = 25e-3    
+
+        # Set the delay on the CSI according to the mode.
+        self.delay = 0 if mode == "terrestrial" else 10
+
+        # Set the method to use for generating the NLoS component.
         self.NLoS_method = NLoS_method
 
-        self.num_channel_realizations = num_channel_realizations            # The number of channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.
-        self.Ts = 20e-3                                                     # The time interval between two consecutive channel realizations. Needed for methods that require pre-generating the NLoS component for all time instants. Hardcoded for now.       
-
-        # Generate the channel phase for each user k, which is uniformly distributed over [-pi, pi) and independent of time and across users k.
-        self._theta = np.random.uniform(-np.pi, np.pi, size=self.K)
-
-        # Store the NLoS component for later use if the generating method requires pre-generating the NLoS component for all time instants.
-        self.H_NLoS = None
-        self.M = np.zeros(self.K, dtype=int)
+        # Initialize the channel state.
+        self._theta = None
+        self._H_NLoS = None
+        self._m_ch += self.delay
 
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
-        return f"Ricean Fading Channel (K = {self.K_rice}, fD = {self.fD})"
+        return f"Ricean Fading Channel (K = {self.K_rice}, fD = {self.fD}, " + ("satellite" if self.delay > 0 else "terrestrial") + " mode)"
     
     def reset(self) -> None:
         """
-        Reset the time instant to zero and delete all pre-generated NLoS components.
+        Reset the channel model to its initial state.
+
+        Then, generate the channel matrices for the upcoming simulation.
         """
-        self.H_NLoS = None
-        self.M = np.zeros(self.K, dtype=int)
+        
+        # Reset the channel model to its initial state.
+        super().reset()
+        self._theta = None
+        self._H_NLoS = None
+        self._m_ch += self.delay
+
+        # Generate the channel matrices for the upcoming simulation.
+        self._generate()
+
         return
 
-    def generate(self) -> ComplexArray:
+    def proceed(self) -> ComplexArray:
         
-        H = np.empty((self.K*self.Nr, self.Nt), dtype=complex)
+        # Update and validate the time index. It cannot exceed the maximum number of channel realizations Mch_max.
+        super().proceed()
 
-        for k in range(self.K):
+        if self._m_ch >= self.Mch_max:
+            raise IndexError(f"The time index m_ch cannot exceed the maximum number of channel realizations 2*Mch_max = {self.Mch_max}. However, m_ch = {self._m_ch} was given. Please take a closer look at these parameters.")
 
-            # Retrieve the channel phase for user k. 
-            theta_k = self._theta[k]
+        # Update the current channel matrix.
+        theta = np.repeat(self._theta, self.Nr*self.Nt).reshape(self.K*self.Nr, self.Nt)
+        H_NLoS = self._H_NLoS[:, :, self._m_ch]
 
-            # Retrieve the current NLoS component for user k, using the specified method.
-            H_NLoS_k = self._retrieve_NLoS(k, method = self.NLoS_method)
-            
-            # Generate the current channel matrix for user k.
-            H_k = np.exp(1j * theta_k) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS_k)
+        H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
+        self._H = H
 
-            # Store the current channel matrix for user k in the compound channel matrix H.
-            H[k*self.Nr : (k+1)*self.Nr] = H_k
-        
         return H
 
-    def _retrieve_NLoS(self, k: int, method: str) -> ComplexArray:
-        """
-        Retrieve the current NLoS component for user k.
+    def get_channel(self):
 
-        If this is the first time instant, generate the NLoS component for all time instants and all users using the specified method and store it in the state for later use. Then, retrieve the current NLoS component for user k.
+        # Get the LoS and NLoS component.
+        theta = np.repeat(self._theta, self.Nr*self.Nt).reshape(self.K*self.Nr, self.Nt)
+        H_NLoS = self._H_NLoS[:, :, self._m_ch - self.delay]
+
+        # Return the channel corresonding to the CSI.
+        H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
+        return H
         
-        Parameters
-        ----------
-        k : int
-            The user terminal ID for which to retrieve the current NLoS component.
-        method : str
-            The method to use for generating the NLoS component. Choose between: 'Cholesky-decomposition method', 'spectral method', 'FIR filter method'.
-        
+    def _generate(self) -> tuple[RealArray, ComplexArray]:
+        """
+        Generate the channel matrices for all users and all future time instances.
+        Store them in the channel state.
+
         Returns
         -------
-        H_NLoS_k : ComplexArray, shape (Nr, Nt)
-            The current NLoS component for user k.
+        theta : RealArray, shape (K,)
+            The arbitrary channel phase, uniformly distributed over [-pi, pi) and statistically independent across different users k.
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
+            The No Line-of-Sight (NLoS) component of the channel. 
+            It is a complex Gaussian random process with zero mean and unit variance. The channel gains of the different propagation links are correlated in time and uncorrelate din space.
         """
 
-        # If this is the first time instant, generate the NLoS component for all time instants and all users and store it in the state for later use.
-        if np.all(self.M == 0):
-            self.H_NLoS = self._generate_NLoS(method=method)
+        # Generate the arbitrary channel phase.
+        theta = np.random.uniform(low=-np.pi, high=np.pi, size=self.K)
+        self._theta = theta
 
-        # Retrieve the current NLoS component for user k.
-        H_NLoS_k = self.H_NLoS[k*self.Nr : (k+1)*self.Nr, :, self.M[k]]
-        self.M[k] += 1
+        # Generate the NLoS component.
+        H_NLoS = self._generate_NLoS(method=self.NLoS_method)
+        self._H_NLoS = H_NLoS
 
-        return H_NLoS_k
+        return theta, H_NLoS
     
     def _generate_NLoS(self, method: str) -> ComplexArray:
         """
@@ -235,7 +330,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, num_channel_realizations)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
             The generated NLoS component of the channel, for all time instants.
         """
         
@@ -266,24 +361,24 @@ class RiceanFadingChannelModel(ChannelModel):
 
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, M)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
             The generated NLoS component for all propagation links and all time instants.
         """
 
         # STEP 1.
         R_h = lambda tau: j0(2*np.pi * self.fD * (tau))
         
-        i = np.arange(self.num_channel_realizations).reshape(-1,1)
-        j = np.arange(self.num_channel_realizations)
-        C = R_h((i - j)*self.Ts)
-        C += (10e-10)*np.eye(self.num_channel_realizations)
+        i = np.arange(self.Mch_max).reshape(-1,1)
+        j = np.arange(self.Mch_max)
+        C = R_h((i - j)*self.Tc)
+        C += (10e-10)*np.eye(self.Mch_max)
 
         # STEP 2.
         L = np.linalg.cholesky(C)
 
 
         # STEP 3.
-        w = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt, self.num_channel_realizations) + 1j * np.random.randn(self.K*self.Nr, self.Nt, self.num_channel_realizations))
+        w = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt, self.Mch_max) + 1j * np.random.randn(self.K*self.Nr, self.Nt, self.Mch_max))
 
         # STEP 4.
         H_NLoS = w @ L.T
@@ -296,7 +391,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, M)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
             The generated NLoS component for all propagation links and all time instants.
         """
         raise NotImplementedError("The spectral method for generating the NLoS component is not implemented yet.")
@@ -307,7 +402,7 @@ class RiceanFadingChannelModel(ChannelModel):
         
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, M)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
             The generated NLoS component for all propagation links and all time instants.
         """
         raise NotImplementedError("The FIR filter method for generating the NLoS component is not implemented yet.")
@@ -320,7 +415,7 @@ class RiceanFadingChannelModel(ChannelModel):
         
         .. math::
 
-            \hat{R}_h(k) = \frac{1}{M} \sum_{m=1}^{M} \cdot \frac{1}{N-k} \sum_{n=0}^{N-k-1} h_m[n+k] h_m^*[n], \quad k = 0, 1, \ldots, N-1
+            \hat{R}_h(k) = \frac{1}{Msv} \sum_{m_{sv}=1}^{Msv} \cdot \frac{1}{N-k} \sum_{n=0}^{N-k-1} h_{m_{sv}}[n+k] h_{m_{sv}}^*[n], \quad k = 0, 1, \ldots, N-1
         
         The analytical autocorrelation equals the zero-order Bessel function of the first kind:
         
@@ -352,7 +447,7 @@ class RiceanFadingChannelModel(ChannelModel):
         This function is intended to be used for validating the generated NLoS process! It will reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted. Then, it will generate num_samples sequences of the NLoS process using the specified method, and compute the averaged empirical autocorrelation for both positive and negative lags. Finally, it will compute the analytical autocorrelation and plot both the empirical and analytical autocorrelation functions.
         """
  
-        # 0. Reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted.
+        # 0. Reset the channel model.
         assert num_samples <= self.K * self.Nr * self.Nt, f"num_samples should be smaller than or equal to K * Nr * Nt = {self.K * self.Nr * self.Nt}, because the average cannot be taken accross different simulations. However, num_samples={num_samples} was given."
         self.reset()
         
@@ -361,27 +456,27 @@ class RiceanFadingChannelModel(ChannelModel):
         # Generate the channel gain process (for the specified component) for each propagation link.
         
         if component == "LoS":
-            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.num_channel_realizations)).reshape(self.K*self.Nr, self.Nt, self.num_channel_realizations)
+            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.Mch_max)).reshape(self.K*self.Nr, self.Nt, self.Mch_max)
             H = np.exp(1j * theta)
         
         elif component == "NLoS":
-            H_NLoS = self._generate_NLoS(method=self.NLoS_method)
+            H_NLoS = self._H_NLoS
             H = H_NLoS
         
         elif component == "LoS + NLoS":
-            H_NLoS = self._generate_NLoS(method=self.NLoS_method)
-            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.num_channel_realizations)).reshape(self.K*self.Nr, self.Nt, self.num_channel_realizations)
+            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.Mch_max)).reshape(self.K*self.Nr, self.Nt, self.Mch_max)
+            H_NLoS = self._H_NLoS
             H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
         
         else:
             raise ValueError(f"Unknown component '{component}' for plotting the autocorrelation function. Valid options are: 'LoS', 'NLoS' and 'LoS + NLoS'.")
 
-        H_flat = H.reshape(self.K*self.Nr*self.Nt, self.num_channel_realizations)
+        H_flat = H.reshape(self.K*self.Nr*self.Nt, self.Mch_max)
 
 
         # Compute the empirical autocorrelation for each realization.
         
-        tau_sim = np.arange(-max_lag, max_lag + 1) * self.Ts
+        tau_sim = np.arange(-max_lag, max_lag + 1) * self.Tc
         R_empirical = np.zeros(2 * max_lag + 1, dtype=complex)
         
         for sample_num in range(num_samples):
@@ -398,7 +493,7 @@ class RiceanFadingChannelModel(ChannelModel):
         R_empirical /= num_samples
  
         # 2. Compute the analytical autocorrelation.
-        tau_analytical = np.linspace(-max_lag * self.Ts, max_lag * self.Ts, 10_000)
+        tau_analytical = np.linspace(-max_lag * self.Tc, max_lag * self.Tc, 10_000)
         R_analytical = j0(2 * np.pi * self.fD * tau_analytical)
  
         # 3. Plot.
@@ -428,7 +523,7 @@ class RiceanFadingChannelModel(ChannelModel):
         
         .. math::
 
-            \hat{S}_h(f) = \frac{1}{M} \sum_{m=1}^{M} \frac{T_s}{N} \left| H_m(f) \right|^2
+            \hat{S}_h(f) = \frac{1}{M} \sum_{m=1}^{M} \frac{T_s}{N} \left| H_{m}(f) \right|^2
 
         where M is the number of realizations (num_samples).
         
@@ -456,26 +551,25 @@ class RiceanFadingChannelModel(ChannelModel):
         This function is intended to be used for validating the generated NLoS process! It will reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted. Then, it will generate num_samples sequences of the NLoS process using the specified method, compute the periodogram for each, and average them (Bartlett's method). Finally, it will compute the analytical PSD and plot both the empirical and analytical PSDs.
         """
  
-        # 0. Reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted.
+        # 0. Reset the channel model.
         assert num_samples <= self.K * self.Nr * self.Nt, f"num_samples should be smaller than or equal to K * Nr * Nt = {self.K * self.Nr * self.Nt}, because the average cannot be taken across different simulations. However, num_samples={num_samples} was given."
         self.reset()
         
         # 1. Compute the power spectral density (Bartlett's method).
 
-        # Generate enough realizations of the NLoS process using the specified method.
-        H_NLoS = self._generate_NLoS(method=self.NLoS_method)
-        H_NLoS_flat = H_NLoS.reshape(self.K*self.Nr*self.Nt, self.num_channel_realizations)
+        # Get enough realizations of the NLoS process using the specified method.
+        H_NLoS_flat = self._H_NLoS.reshape(self.K*self.Nr*self.Nt, self.Mch_max)
 
         # Compute the periodogram for each realization.
-        S_sim = np.zeros(self.num_channel_realizations, dtype=float)
+        S_sim = np.zeros(self.Mch_max, dtype=float)
         for sample_num in range(num_samples):
             h = H_NLoS_flat[sample_num, :]
-            S_sim_realization = (self.Ts / self.num_channel_realizations) * np.abs(np.fft.fft(h))**2
+            S_sim_realization = (self.Tc / self.Mch_max) * np.abs(np.fft.fft(h))**2
             S_sim += S_sim_realization
         S_sim /= num_samples
         
         # Shift to center zero frequency.
-        f_sim = np.fft.fftshift(np.fft.fftfreq(self.num_channel_realizations, d=self.Ts))
+        f_sim = np.fft.fftshift(np.fft.fftfreq(self.Mch_max, d=self.Tc))
         S_sim = np.fft.fftshift(S_sim)
  
         # 2. Compute the analytical PSD (avoid singularity at ±fD).
@@ -531,26 +625,32 @@ class NoiseModel(ABC):
 
         self.Nr = Nr
         self.K = K
+
+    def reset(self) -> None:
+        """
+        Reset the noise model to its initial state.
+        """
+        return
     
     @abstractmethod
-    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
+    def get_noise(self, snr: float, x: ComplexArray) -> ComplexArray:
         """
         Generate the noise vectors.
 
         Parameters
         ----------
         snr : float
-            The signal-to-noise ratio.
-        x : ComplexArray, shape (Nt, M)
+            The signal-to-noise (SNR) ratio.
+        x : ComplexArray, shape (Nt, Msv)
             The transmitted signals.
 
         Returns
         -------
-        n : ComplexArray, shape (K*Nr, M)
+        n : ComplexArray, shape (K*Nr, Msv)
             The generated noise vectors.
         """
         raise NotImplementedError
-
+    
     @staticmethod
     def apply(y_noiseless: ComplexArray, n: ComplexArray) -> ComplexArray:
         """
@@ -558,18 +658,29 @@ class NoiseModel(ABC):
 
         Parameters
         ----------
-        y_noiseless : ComplexArray, shape (K*Nr, M)
+        y_noiseless : ComplexArray, shape (K*Nr, Msv)
             The received signals without noise.
-        n : ComplexArray, shape (K*Nr, M)
+        n : ComplexArray, shape (K*Nr, Msv)
             The noise vectors.
         
         Returns
         -------
-        y : ComplexArray, shape (K*Nr, M)
+        y : ComplexArray, shape (K*Nr, Msv)
             The received signals with noise.
         """
         y = y_noiseless + n
         return y
+
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, NoiseModel):
+            return NotImplemented
+        
+        return (
+            type(self) == type(other) and
+            self.Nr == other.Nr and
+            self.K == other.K
+        )
 
 class NeutralNoiseModel(NoiseModel):
     """
@@ -583,7 +694,7 @@ class NeutralNoiseModel(NoiseModel):
         """ Return a string representation of the noise model. """
         return "Zero Noise"
 
-    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
+    def get_noise(self, snr: float, x: ComplexArray) -> ComplexArray:
         n = np.zeros((self.K * self.Nr, x.shape[1]), dtype=complex)
         return n
 
@@ -598,7 +709,7 @@ class CSAWGNNoiseModel(NoiseModel):
         """ Return a string representation of the noise model. """
         return "CS Additive White Gaussian Noise"
     
-    def generate(self, snr: float, x: ComplexArray) -> ComplexArray:
+    def get_noise(self, snr: float, x: ComplexArray) -> ComplexArray:
         
         # Compute the noise power based on the current SNR and the signal power of x.
         p_signal = np.mean( np.sum( np.abs(x)**2, axis=0 ) )

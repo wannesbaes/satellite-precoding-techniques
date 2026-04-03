@@ -221,7 +221,7 @@ class Mapper(ABC):
 
         Parameters
         ----------
-        b : list[BitArray], shape (Ns_total, ibr[s] * M)
+        b : list[BitArray], shape (Ns_total, ibr[s] * Msv)
             The compound bitstream vector.
         ibr : IntArray, shape (K*Nr,)
             The information bit rate for each data stream.
@@ -232,7 +232,7 @@ class Mapper(ABC):
 
         Returns
         -------
-        a : ComplexArray, shape (Ns_total, M)
+        a : ComplexArray, shape (Ns_total, Msv)
             The compound data symbol vector.
         """
         raise NotImplementedError
@@ -267,18 +267,18 @@ class GrayCodeMapper(Mapper):
         ibr  = ibr[ibr > 0]
 
         Ns_total = np.sum(Ns)
-        M = len(b[np.argmax(ibr)]) // np.max(ibr) if len(ibr) > 0 else 0
+        Msv = len(b[np.argmax(ibr)]) // np.max(ibr) if len(ibr) > 0 else 0
 
         c_types = [c_types[k] for k in range(K) for _ in range(Ns[k])]
         
         # Convert the binary bitstreams, interpret as Gray code numbers, to their corresponding decimal representations.
-        d = np.empty((Ns_total, M), dtype=int)
+        d = np.empty((Ns_total, Msv), dtype=int)
         for a_s in range(Ns_total):
-            for m in range(M):
+            for m in range(Msv):
                 d[a_s, m] = NumberRepresentation.gray_to_decimal(b[a_s][m*ibr[a_s] : (m+1)*ibr[a_s]])
 
         # Map the decimal numbers to their corresponding constellation points.
-        a = np.empty((Ns_total, M), dtype=complex)
+        a = np.empty((Ns_total, Msv), dtype=complex)
         for a_s in range(Ns_total):
             constellation_points = Constellation(type=c_types[a_s], size=2**ibr[a_s]).points
             a[a_s] = constellation_points[d[a_s]]
@@ -301,14 +301,14 @@ class Demapper(ABC):
 
         Parameters
         ----------
-        cpi_k_hat : IntArray, shape (Ns_k, M)
+        cpi_k_hat : IntArray, shape (Ns_k, Msv)
             The indices of the constellation points (decimal integers) corresponding to the reconstructed data symbols, for each data stream of this user terminal.
         ibr_k : IntArray, shape (Nr,)
             The information bit rate for each data stream of this user terminal.
         
         Returns
         -------
-        b_k_hat : BitArray, shape (Ns_k, ibr_k[s] * M)
+        b_k_hat : BitArray, shape (Ns_k, ibr_k[s] * Msv)
             The list of reconstructed bitstreams of this user terminal.
         """
         raise NotImplementedError
@@ -342,14 +342,14 @@ class GrayCodeDemapper(Demapper):
     def apply(cpi_k_hat: IntArray, ibr_k: IntArray) -> list[BitArray]:
 
         # Determine the number of data streams and the number of symbol vectors.
-        M = cpi_k_hat.shape[1]
+        Msv = cpi_k_hat.shape[1]
         ibr_k = ibr_k[ibr_k > 0]
         Ns_k = np.sum(ibr_k > 0)
         
         # Convert the decimal index numbers to their Gray code representations.
-        b_k_hat = [np.empty(ibr_k[a_s]*M) for a_s in range(Ns_k)]
+        b_k_hat = [np.empty(ibr_k[a_s]*Msv) for a_s in range(Ns_k)]
         for a_s in range(Ns_k):
-            for m in range(M):
+            for m in range(Msv):
                 b_k_hat[a_s][m*ibr_k[a_s] : (m+1)*ibr_k[a_s]] = NumberRepresentation.decimal_to_gray(cpi_k_hat[a_s, m], length=ibr_k[a_s])
         
         return b_k_hat
@@ -371,7 +371,7 @@ class Equalizer():
 
         Parameters
         ----------
-        z_k : ComplexArray, shape (Ns_k, M)
+        z_k : ComplexArray, shape (Ns_k, Msv)
             The combined signal for this UT.
         C_eq_k : ComplexArray, shape (Nr,)
             The equalization coefficients for each data stream of this UT.
@@ -381,7 +381,7 @@ class Equalizer():
         
         Returns
         -------
-        u_k : ComplexArray, shape (Ns_k, M)
+        u_k : ComplexArray, shape (Ns_k, Msv)
             The decision variable streams for this UT.
         """
         u_k = z_k / C_eq_k[ibr_k > 0][:, np.newaxis]
@@ -407,7 +407,7 @@ class Detector(ABC):
 
         Parameters
         ----------
-        u_k : ComplexArray, shape (Ns_k, M)
+        u_k : ComplexArray, shape (Ns_k, Msv)
             The decision variable streams of this user terminal.
         ibr_k : IntArray, shape (Nr,)
             The information bit rate for each data stream of this user terminal.
@@ -416,7 +416,7 @@ class Detector(ABC):
         
         Returns
         -------
-        cpi_k_hat : IntArray, shape (Ns_k, M)
+        cpi_k_hat : IntArray, shape (Ns_k, Msv)
             The indices of the constellation points (decimal integers) corresponding to the reconstructed data symbols, for each data stream of this user terminal.
         """
         raise NotImplementedError
@@ -447,14 +447,14 @@ class MDDetector(Detector):
     def apply(u_k: ComplexArray, ibr_k: IntArray, c_type_k: ConstType) -> IntArray:
 
         # Determine the number of symbol vectors.
-        M = u_k.shape[1]
+        Msv = u_k.shape[1]
         ibr_k = ibr_k[ibr_k > 0]
         Ns_k = np.sum(ibr_k > 0)
 
         # Decide the constellation points that are most likely transmitted by finding the constellation points that are closest to the decision variables. Then, retrieve the corresponding constellation point indices (decimal integers) of the decided constellation points.
-        cpi_k_hat = np.empty((Ns_k, M), dtype=int)
+        cpi_k_hat = np.empty((Ns_k, Msv), dtype=int)
         for a_s in range(Ns_k):
             constellation_points = Constellation(type=c_type_k, size=2**ibr_k[a_s]).points
-            cpi_k_hat[a_s] = np.argmin( np.abs(np.tile(constellation_points, (M, 1)) - u_k[a_s][:, np.newaxis]), axis=1)
+            cpi_k_hat[a_s] = np.argmin( np.abs(np.tile(constellation_points, (Msv, 1)) - u_k[a_s][:, np.newaxis]), axis=1)
 
         return cpi_k_hat

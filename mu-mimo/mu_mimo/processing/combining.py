@@ -40,7 +40,7 @@ class Combiner(ABC):
 
         Parameters
         ----------
-        y_k : ComplexArray, shape (Nr, M)
+        y_k : ComplexArray, shape (Nr, Msv)
             The received signal for the this UT.
         G_k : ComplexArray, shape (Nr, Nr)
             The combining matrix for the this UT.
@@ -49,7 +49,7 @@ class Combiner(ABC):
 
         Returns
         -------
-        z_k : ComplexArray, shape (Ns_k, M)
+        z_k : ComplexArray, shape (Ns_k, Msv)
             The combined signal for the this UT.
         """
         z_k = G_k[ibr_k > 0, :] @ y_k

@@ -125,6 +125,14 @@ class ChannelConfig:
     channel_model: "ChannelModel"
     noise_model: "NoiseModel"
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ChannelConfig):
+            return NotImplemented
+        return (
+            self.channel_model == other.channel_model and
+            self.noise_model == other.noise_model
+        )
+
 @dataclass()
 class SystemConfig:
     """
@@ -255,23 +263,23 @@ class SimConfig:
         The SNR values in dB.
     snr_values : RealArray
         The SNR values in linear scale. It is derived from snr_dB_values.
-    num_channel_realizations : int
-        The minimum number of channel realizations per SNR value.
     num_bit_errors : int
         The minimum number of bit errors per SNR value.
     num_bit_errors_scope : Literal["system-wide", "uts", "streams"]
         The scope over which the minimum number of bit errors are considered.
-    M : int
+    Mch_min : int
+        The minimum number of channel realizations per SNR value.
+    Msv : int
         The number of symbol vector transmissions for each channel realization.
     name : str
         The name of the simulation configuration.
     """
 
     snr_dB_values: RealArray
-    num_channel_realizations: int
     num_bit_errors: int
     num_bit_errors_scope: Literal["system-wide", "uts", "streams"]
-    M: int
+    Mch_min: int
+    Msv: int
 
     name: str
 
@@ -292,19 +300,19 @@ class SimConfig:
         lines: list[str] = []
 
         lines.append(f"  {self.name}:\n")
-        lines.append(f"  SNR range                  : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
-        lines.append(f"  Min channel realizations   : {self.num_channel_realizations}")
-        lines.append(f"  Min bit errors             : {self.num_bit_errors} ({self.num_bit_errors_scope})")
-        lines.append(f"  M                          : {self.M} transmissions per channel")
+        lines.append(f"  SNR range                              : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
+        lines.append(f"  Min channel realizations               : {self.Mch_min}")
+        lines.append(f"  Min bit errors per channel realization : {self.num_bit_errors} ({self.num_bit_errors_scope})")
+        lines.append(f"  Transmissions per channel realization  : {self.Msv}")
         lines.append("-" * 60)
 
         str_display = "\n".join(lines)
         return str_display
 
     def __post_init__(self):
-        if self.num_channel_realizations <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
+        if self.Mch_min <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
         if self.num_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
-        if self.M <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization must be a positive integer.")
+        if self.Msv <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization must be a positive integer.")
 
     def __eq__(self, other: object) -> bool:
         
@@ -313,10 +321,10 @@ class SimConfig:
         
         return (
             np.array_equal(self.snr_dB_values, other.snr_dB_values) and
-            self.num_channel_realizations == other.num_channel_realizations and
+            self.Mch_min == other.Mch_min and
             self.num_bit_errors == other.num_bit_errors and
             self.num_bit_errors_scope == other.num_bit_errors_scope and
-            self.M == other.M
+            self.Msv == other.Msv
         )
 
 
@@ -379,10 +387,10 @@ def setup_sim_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SimCo
 
         sim_config = SimConfig(
             snr_dB_values               = np.array(config_settings["SNR values (in dB)"], dtype=float),
-            num_channel_realizations    = int(config_settings["Channel realizations per SNR value"]),
-            num_bit_errors              = int(config_settings["Bit errors per SNR value"]),
+            Mch_min                     = int(config_settings["Minimum channel realizations per SNR value"]),
+            num_bit_errors              = int(config_settings["Minimum bit errors per SNR value"]),
             num_bit_errors_scope        = str(config_settings["Scope of bit errors"]),
-            M                           = int(config_settings["Transmissions per channel realization"]),
+            Msv                         = int(config_settings["Transmissions per channel realization"]),
             name                        = "Sim Config " + str(config_settings["Ref. Number"]),
         )
 
@@ -505,8 +513,8 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         channel_model_mapping = {
             "Neutral": NeutralChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
             "IID Rayleigh Fading": IIDRayleighFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
-            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 9.265),
-            "Satellite": None,
+            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 4, mode='terrestrial'),
+            "Satellite": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 4, mode='satellite'),
         }
 
         noise_model_mapping = {

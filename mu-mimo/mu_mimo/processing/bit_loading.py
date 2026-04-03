@@ -51,7 +51,7 @@ class BitLoader(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def apply(ibr: IntArray, M: int, Ns: IntArray) -> tuple[list[list[BitArray]], list[BitArray]]:
+    def apply(ibr: IntArray, Msv: int, Ns: IntArray) -> tuple[list[list[BitArray]], list[BitArray]]:
         """
         Apply the bit loader.
 
@@ -62,23 +62,23 @@ class BitLoader(ABC):
         ----------
         ibr : IntArray, shape (K*Nr,)
             The information bit rate for each data stream of each UT.
-        M : int
+        Msv : int
             The number of symbol vectors to be transmitted at once.
         Ns : IntArray, shape (K,)
             The number of active data streams for each UT.
         
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns[k], ibr[k][s]*M)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns[k], ibr[k][s]*Msv)
             The list of allocated bits for each data stream of each UT.
-        b : list[BitArray], shape (Ns_total, ibr[s]*M)
+        b : list[BitArray], shape (Ns_total, ibr[s]*Msv)
             The concatenated list of allocated bits for all data streams.
         """
         
         b = []
         for s in range(len(ibr)):
             if ibr[s] > 0:
-                b_s = np.random.randint(0, 2, size=(ibr[s] * M,), dtype=np.uint8)
+                b_s = np.random.randint(0, 2, size=(ibr[s] * Msv,), dtype=np.uint8)
                 b.append(b_s)
         
         Ns_cumulative = np.concatenate(([0], np.cumsum(Ns)))

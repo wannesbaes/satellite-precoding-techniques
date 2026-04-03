@@ -19,11 +19,10 @@ Each core component delegates its signal processing to abstract processing class
 
 
 Each simulation run iterates over a range of SNR values, with multiple channel realizations per SNR point.
-Every iteration progresses through three phases:
+Every iteration progresses through two phases:
 
-1. **Reset:** The system state is cleared and a new channel realization is generated.
-2. **Configuration:** Precoding and combining matrices are computed from the current channel state, alongside the resource allocation according to the specified strategy.
-3. **Data Transmission:** The base station transmits data, the channel propagates it, and each user terminal detects and decodes its received signal.
+1. **Configuration:** Precoding and combining matrices are updated based on the current channel state, alongside the resource allocation according to the specified strategy.
+2. **Data Transmission:** The base station transmits data, the channel propagates it, and each user terminal detects and decodes its received signal.
 
 After every single iteration, performance metrics are computed and stored for analysis later on.
 

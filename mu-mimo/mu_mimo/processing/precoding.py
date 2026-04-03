@@ -53,7 +53,7 @@ class Precoder(ABC):
 
         Parameters
         ----------
-        a : ComplexArray, shape (Ns_total, M)
+        a : ComplexArray, shape (Ns_total, Msv)
             The data symbol streams for all UTs.
         F : ComplexArray, shape (Nt, K*Nr)
             The compound precoding matrix for all UTs.
@@ -62,7 +62,7 @@ class Precoder(ABC):
 
         Returns
         -------
-        x : ComplexArray, shape (Nt, M)
+        x : ComplexArray, shape (Nt, Msv)
             The precoded signal to be transmitted by the BS.
         """
 

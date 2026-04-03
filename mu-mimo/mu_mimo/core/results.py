@@ -54,17 +54,17 @@ class SingleSnrSimResult:
     ut_ars_avg : float
         Average UT activation rate.
     
-    M : int
+    Msv : int
         The number of symbol vector transmissions for each channel realization.
-    num_channel_realizations : int
-        The number of channel realizations that were simulated.
+    Mch : int
+        The number of channel realizations.
     
     stream_bers : list[RealArray] (list of K arrays, each shape (Nr,)) | None
-        Per-UT per-stream bit error rates. None if num_channel_realizations == 1.
+        Per-UT per-stream bit error rates. None if Mch == 1.
     ut_bers : RealArray, shape (K,) | None
-        Per-UT bit error rates. None if num_channel_realizations == 1.
+        Per-UT bit error rates. None if Mch == 1.
     ber : float | None
-        System-wide bit error rate. None if num_channel_realizations == 1.
+        System-wide bit error rate. None if Mch == 1.
     """
     
     snr_dB: float
@@ -87,8 +87,8 @@ class SingleSnrSimResult:
     stream_ars_avg : float
     ut_ars_avg : float
 
-    M : int
-    num_channel_realizations : int
+    Msv : int
+    Mch : int
 
 
     stream_bers : list[RealArray] | None = None
@@ -97,20 +97,20 @@ class SingleSnrSimResult:
 
     def __post_init__(self):
 
-        if self.num_channel_realizations > 1:
+        if self.Mch > 1:
 
             K = len(self.stream_ibrs)
 
             self.stream_bers = []
             for k in range(K):
-                denom = self.stream_ibrs[k] * self.M * self.num_channel_realizations
+                denom = self.stream_ibrs[k] * self.Msv * self.Mch
                 ber_k = np.where(denom > 0, self.stream_becs[k] / denom, np.nan)
                 self.stream_bers.append(ber_k)
             
-            ut_denom = self.ut_ibrs * self.M * self.num_channel_realizations
+            ut_denom = self.ut_ibrs * self.Msv * self.Mch
             self.ut_bers = np.where(ut_denom > 0, self.ut_becs / ut_denom, np.nan)
             
-            total_denom = self.ibr * self.M * self.num_channel_realizations
+            total_denom = self.ibr * self.Msv * self.Mch
             self.ber = self.bec / total_denom if total_denom > 0 else np.nan
 
 @dataclass
@@ -266,6 +266,10 @@ class SimResultManager:
         
         # Validate that the loaded simulation results match the current simulation and system configuration.
         if sim_configs != sim_result.sim_configs or system_configs != sim_result.system_configs:
+            print("\nCurrent simulation configuration: \n", sim_configs.display())
+            print("Loaded simulation configuration: \n", sim_result.sim_configs.display(), "\n\n")
+            print("Current system configuration: \n", system_configs.display())
+            print("Loaded system configuration: \n", sim_result.system_configs.display(), "\n\n")
             raise ValueError("The loaded simulation results do not match the current simulation and system configuration. However their filename suggests that they should. Please check the filename and the contents of the loaded simulation results to resolve this issue.")
         
         return sim_result
@@ -414,6 +418,11 @@ class SimResultManager:
 
         if label_type == "default":
             label = reference_number
+        
+        elif label_type == "CH":
+            CH_mapping = {"1": "Rayleigh", "2": "Ricean (Terrestrial)", "3": "Ricean (Satellite)"}
+            CH_number = reference_number.split(".")[0]
+            label = CH_mapping.get(CH_number, None)
         
         elif label_type == "PT":
             PT_mapping = {"1": "ZF", "2": "ZF+LSV", "3": "BD", "4": "WMMSE"}
