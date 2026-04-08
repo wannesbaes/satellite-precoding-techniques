@@ -18,7 +18,7 @@ Documentation
    .. autosummary::
       :nosignatures:
 
-      ~BaseStation.reset_state
+      ~BaseStation.clear_state
       ~BaseStation.transmit_pilots
       ~BaseStation.receive_feedback
       ~BaseStation.transmit_feedforward

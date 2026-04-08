@@ -18,7 +18,7 @@ Documentation
    .. autosummary::
       :nosignatures:
 
-      ~UserTerminal.reset_state
+      ~UserTerminal.clear_state
       ~UserTerminal.receive_pilots
       ~UserTerminal.transmit_feedback
       ~UserTerminal.receive_feedforward

@@ -18,8 +18,8 @@ Documentation
    .. autosummary::
       :nosignatures:
 
-      ~Channel.set
       ~Channel.reset
+      ~Channel.proceed
       ~Channel.propagate_pilots
       ~Channel.propagate_feedback
       ~Channel.propagate_feedforward

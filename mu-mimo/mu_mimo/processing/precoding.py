@@ -206,7 +206,369 @@ class BDPrecoder(Precoder):
         return FP, G, C_eq
 
 class WMMSEPrecoder(Precoder):
-    pass
+    """
+    Weighted Minimum Mean Squared Error (WMMSE) Precoder.
+
+    The goal of this precoding technique is to maximize the weighted sum-rate.
+    """
+    
+    @staticmethod
+    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+
+        H = csi.H_eff
+        snr = csi.snr
+
+        # Initialization.
+        MAX_ITER = 10
+        nu = (1/K) * np.ones(K)
+        F_iter = WMMSEPrecoder._init_precoders(H, snr, Pt, K, mode='MF')
+
+        # Iteration.
+        for _ in range(MAX_ITER):
+            G_iter = WMMSEPrecoder._update_combiners_fast(H, snr, Pt, K, F_iter)
+            W_iter = WMMSEPrecoder._update_MSE_weights_fast(H, snr, Pt, K, F_iter, nu)
+            F_iter = WMMSEPrecoder._update_precoders(H, snr, Pt, K, G_iter, W_iter)
+
+        # Termination.
+        F = F_iter
+        G = G_iter
+        C_eq = np.diag( G @ H @ F )
+
+        return F, G, C_eq
+    
+    
+    @staticmethod
+    def _init_precoders(H: ComplexArray, snr: float, Pt: float, K: int, mode: str = 'MF') -> ComplexArray:
+        r"""
+        Initialize the precoding matrices for each UT.
+
+        Depending on selected initialization strategy, this can be done in different ways.
+        The possible options are:
+
+            - Random initialization (mode = 'random').
+            - Matched filter initialization (mode = 'MF').
+            - Existing precoding strategy initialization (mode = 'ZF', 'BD').
+        
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        Pt : float
+            The total transmit power available at the BS.
+        K : int
+            The total number of user terminals (UTs).
+        mode : str, optional
+            The initialization strategy for the precoding matrices. The default is 'MF'.
+        
+        Returns
+        -------
+        F : ComplexArray, shape (Nt, K*Nr)
+            The initialized compound precoding matrix for all UTs.
+        """
+        
+        if mode == 'random':
+            Nr = H.shape[0] // K
+            Nt = H.shape[1]
+            F = np.random.randn(Nt, K*Nr) + 1j * np.random.randn(Nt, K*Nr)
+            F = np.sqrt(Pt / (K * Nr)) * (F / np.linalg.norm(F, axis=0))
+
+        elif mode == 'MF':
+            F = H.conj().T
+            F = np.sqrt(Pt) * (F / np.linalg.norm(F, axis=0))
+
+        elif mode == 'ZF':
+            F = ZFPrecoder.compute(csi=ChannelStateInformation(H_eff=H, snr=snr), Pt=Pt, K=K)[0]
+
+        elif mode == 'BD':
+            F = BDPrecoder.compute(csi=ChannelStateInformation(H_eff=H, snr=snr), Pt=Pt, K=K)[0]
+
+        else:
+            raise ValueError(f"Unknown initialization mode: '{mode}'. Choose between 'random', 'MF', 'ZF' and 'BD'.")
+
+        return F
+
+    @staticmethod
+    def _update_combiners(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray) -> ComplexArray:
+        r"""
+        Compute the MMSE combiner matrices for each UT based on the channel matrix and the precoder matrix of the previous iteration.
+
+        .. math::
+            \begin{aligned}
+                \mathbf{G}^{\text{MMSE}}_k &= \arg \, \underset{\mathbf{G}_k}{\text{min}} \, \mathbb{E} \left[ \| \mathbf{G}_k^H \mathbf{y}_k - \mathbf{a}_k \|^2 \right] \\
+                &= \mathbf{F}_k^H \, \mathbf{H}_k^H \; \left( \mathbf{H}_k \, \mathbf{F}_k \; \mathbf{F}_k^H \, \mathbf{H}_k^H + \mathbf{R}_{\tilde{n}_k, \tilde{n}_k} \right)^{-1}
+            \end{aligned}
+
+        .. math::
+            \text{with} \quad \mathbf{R}_{\tilde{n}_k, \tilde{n}_k} = N_0 \, \mathbf{I} + \sum_{\substack{k' = 1 \\ k' \neq k}}^{K} \mathbf{H}_k \, \mathbf{F}_{k'} \, \mathbf{F}_{k'}^H \, \mathbf{H}_k^H
+
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        Pt : float
+            The total transmit power.
+        K : int
+            The total number of user terminals (UTs).
+        F : ComplexArray, shape (Nt, K*Nr)
+            The compound precoding matrix from the previous iteration.
+        
+        Returns
+        -------
+        G : ComplexArray, shape (K*Nr, K*Nr)
+            The updated block diagonal compound combining matrix for all UTs.
+        """
+
+        # Initialization.
+        Nr = H.shape[0] // K
+        R_n_tilde = WMMSEPrecoder.__compute_interference_plus_noise_covariance_matrix(H=H, F=F, Pt=Pt, snr=snr, K=K)
+        
+        G = np.zeros((K*Nr, K*Nr), dtype=complex)
+        
+        # Iteration.
+        for k in range(K):
+
+            H_k = H[k*Nr : (k+1)*Nr, :]
+            F_k = F[:, k*Nr : (k+1)*Nr]
+            
+            G_k = F_k.conj().T @ H_k.conj().T @ ( np.linalg.inv( H_k @ F_k @ F_k.conj().T @ H_k.conj().T + R_n_tilde[k] ) )
+            G[k*Nr : (k+1)*Nr, k*Nr : (k+1)*Nr] = G_k
+
+        # Termination.
+        return G
+
+    @staticmethod
+    def _update_MSE_weights(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray, nu: RealArray) -> ComplexArray:
+        r"""
+        Compute the MSE-weights for each data stream based on the channel matrix and the precoder matrix of the previous iteration.
+
+        .. math::
+            \mathbf{W}_k = \nu_k \, \text{diag}\left(e_{k, 1}^{-1}, \ldots, e_{k, N_r}^{-1}\right)
+
+        .. math::
+            \text{with} \quad \mathbf{E}_k = \left( \mathbf{I} + \mathbf{F}_k^H \, \mathbf{H}_k^H \, \mathbf{R}_{\tilde{n}_k, \tilde{n}_k}^{-1} \, \mathbf{H}_k \, \mathbf{F}_k \right)^{-1} \quad \text{and} \quad \mathbf{R}_{\tilde{n}_k, \tilde{n}_k} = N_0 \, \mathbf{I} + \sum_{\substack{k' = 1 \\ k' \neq k}}^{K} \mathbf{H}_k \, \mathbf{F}_{k'} \, \mathbf{F}_{k'}^H \, \mathbf{H}_k^H
+
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        Pt : float
+            The total transmit power.
+        K : int
+            The total number of user terminals (UTs).
+        F : ComplexArray, shape (Nt, K*Nr)
+            The compound precoding matrix from the previous iteration.
+        nu : RealArray, shape (K,)
+            The weights of each UT.
+        
+        Returns
+        -------
+        W : ComplexArray, shape (K*Nr, K*Nr)
+            The updated block diagonal compound MSE-weight matrix for all UTs.
+        """
+        
+        # Initialization.
+        Nr = H.shape[0] // K
+        E = WMMSEPrecoder.__compute_MMSE_error_covariance_matrix(H=H, F=F, Pt=Pt, snr=snr, K=K)
+        
+        W_diag = np.zeros(K*Nr)
+
+        # Iteration.
+        for k in range(K):
+            nu_k = nu[k]
+            E_k = E[k]
+            W_diag_k = nu_k * (1 / np.diag(E_k))
+            W_diag[k*Nr : (k+1)*Nr] = W_diag_k
+        
+        # Termination.
+        W = np.diag(W_diag)
+        return W
+
+    @staticmethod
+    def _update_precoders(H: ComplexArray, snr: float, Pt: float, K: int, G: ComplexArray, W: ComplexArray) -> ComplexArray:
+        r"""
+        Compute the updated precoding matrices for each UT based on the channel matrix and the combiner matrix of the current iteration.
+
+        .. math::
+            \mathbf{F} = p \; \mathbf{\tilde{F}}
+
+        .. math::
+            \begin{aligned}
+                \text{with} \quad \mathbf{\tilde{F}} &= \left( \mathbf{H}^H \, \mathbf{G}^H \, \mathbf{W} \, \mathbf{G} \, \mathbf{H} + \frac{1}{\text{SNR}} \, \text{tr}\left[\mathbf{W} \, \mathbf{G} \, \mathbf{G}^H\right] \, \mathbf{I} \right)^{-1} \cdot \mathbf{H}^H \, \mathbf{G}^H \, \mathbf{W} \\
+                \text{and} \quad p &= \sqrt{\frac{P_t}{\left\| \mathbf{\tilde{F}} \right\|_F^2}}
+            \end{aligned}
+        
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        Pt : float
+            The total transmit power.
+        G : ComplexArray, shape (K*Nr, K*Nr)
+            The block diagonal compound combining matrix for all UTs from the current iteration.
+        W : ComplexArray, shape (K*Nr, K*Nr)
+            The block diagonal compound MSE-weight matrix for all UTs from the current iteration.
+
+        
+        Returns
+        -------
+        F : ComplexArray, shape (Nt, K*Nr)
+            The updated compound precoding matrix for all UTs.
+        """
+
+        # Computation.
+        F_tilde = np.linalg.inv( H.conj().T @ G.conj().T @ W @ G @ H + (1/snr) * np.trace(W @ G @ G.conj().T) * np.eye(H.shape[1]) ) @ H.conj().T @ G.conj().T @ W
+        p = np.sqrt(Pt / np.linalg.norm(F_tilde, 'fro')**2)
+        F = p * F_tilde
+        
+        # Termination.
+        return F
+
+    @staticmethod
+    def __compute_interference_plus_noise_covariance_matrix(H: ComplexArray, F: ComplexArray, Pt: float, snr: float, K: int) -> ComplexArray:
+        r"""
+        Compute the interference plus noise covariance matrix :math:`\mathbf{R}_{\tilde{n}_k, \tilde{n}_k}` for all UTs.
+
+        .. math::
+            \mathbf{R}_{\tilde{n}_k, \tilde{n}_k} = N_0 \, \mathbf{I} + \sum_{\substack{k' = 1 \\ k' \neq k}}^{K} \mathbf{H}_k \, \mathbf{F}_{k'} \, \mathbf{F}_{k'}^H \, \mathbf{H}_k^H
+
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        F : ComplexArray, shape (Nt, K*Nr)
+            The compound precoding matrix from the previous iteration.
+        Pt : float
+            The total transmit power.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        K : int
+            The number of UTs.
+        
+        Returns
+        -------
+        R : ComplexArray, shape (K, Nr, Nr)
+            The interference plus noise covariance matrix for all UTs.
+        """
+
+        # Initialization.
+        Nr = H.shape[0] // K
+        N0 = Pt / snr
+
+        R = np.zeros((K, Nr, Nr), dtype=complex)
+
+        # Iteration.
+        for k in range(K):
+            
+            H_k = H[k*Nr:(k+1)*Nr, :]
+            F_k = F[:, k*Nr:(k+1)*Nr]
+
+            R_k = N0 * np.eye(Nr, dtype=complex)
+            for k_accent in range(K):
+                if k_accent != k:
+                    F_kp = F[:, k_accent*Nr:(k_accent+1)*Nr]
+                    R_k += H_k @ F_kp @ F_kp.conj().T @ H_k.conj().T
+            
+            R[k] = R_k
+        
+        # Termination.
+        return R
+
+    @staticmethod
+    def __compute_MMSE_error_covariance_matrix(H: ComplexArray, F: ComplexArray, Pt: float, snr: float, K: int) -> ComplexArray:
+        r"""
+        Compute the MMSE error covariance matrix :math:`\mathbf{E}_k` for all UTs.
+
+        .. math::
+            \mathbf{E}_k = \left( \mathbf{I} + \mathbf{F}_k^H \, \mathbf{H}_k^H \, \mathbf{R}_{\tilde{n}_k, \tilde{n}_k}^{-1} \, \mathbf{H}_k \, \mathbf{F}_k \right)^{-1}
+
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        F : ComplexArray, shape (Nt, K*Nr)
+            The compound precoding matrix from the previous iteration.
+        Pt : float
+            The total transmit power.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        K : int
+            The number of UTs.
+        
+        Returns
+        -------
+        E : ComplexArray, shape (K, Nr, Nr)
+            The MMSE error covariance matrix for all UTs.
+        """
+        
+        # Initialization.
+        Nr = H.shape[0] // K
+        R_n_tilde = WMMSEPrecoder.__compute_interference_plus_noise_covariance_matrix(H=H, F=F, Pt=Pt, snr=snr, K=K)
+        
+        E = np.zeros((K, Nr, Nr), dtype=complex)
+
+        # Iteration.
+        for k in range(K):
+            
+            H_k = H[k*Nr:(k+1)*Nr, :]
+            F_k = F[:, k*Nr:(k+1)*Nr]
+
+            E_k = np.linalg.inv( np.eye(Nr, dtype=complex)  +  F_k.conj().T @ H_k.conj().T @ np.linalg.inv(R_n_tilde[k]) @ H_k @ F_k )
+            E[k] = E_k
+
+        # Termination.
+        return E
+
+
+    @staticmethod
+    def _update_combiners_fast(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray) -> ComplexArray:
+        """
+        Fast implementation of the `_update_combiners` method.
+        """
+        
+        # Initialization.
+        Nr = H.shape[0] // K
+        N0 = Pt / snr
+
+        H_b = H.reshape(K, Nr, -1)
+        F_b = F.T.reshape(K, Nr, -1).transpose(0, 2, 1)
+
+        # Computation.
+        G_b = (F_b.conj().transpose(0, 2, 1) @ H_b.conj().transpose(0, 2, 1)) @ np.linalg.inv( N0 * np.eye(Nr) + H_b @ (F @ F.conj().T) @ H_b.conj().transpose(0, 2, 1) )
+        G = sp.linalg.block_diag(*G_b)
+
+        # Termination.
+        return G
+
+    @staticmethod
+    def _update_MSE_weights_fast(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray, nu: RealArray) -> ComplexArray:
+        """
+        Fast implementation of the `_update_MSE_weights` method.
+        """
+        
+        # Initialization.
+        Nr = H.shape[0] // K
+        N0 = Pt / snr
+
+        H_b = H.reshape(K, Nr, -1)
+        F_b = F.T.reshape(K, Nr, -1).transpose(0, 2, 1)
+
+        # Computation.
+        HF_b = H_b @ F_b
+        R_b = N0*np.eye(Nr) + H_b @ (F @ F.conj().T) @ H_b.conj().transpose(0, 2, 1) - HF_b @ HF_b.conj().transpose(0, 2, 1)
+        E_b = np.linalg.inv(np.eye(Nr) +  HF_b.conj().transpose(0, 2, 1) @ np.linalg.inv(R_b) @ HF_b)
+        e_diag = E_b[:, np.arange(Nr), np.arange(Nr)]
+        W = np.diag((nu[:, np.newaxis] / e_diag).flatten())
+
+        # Termination.
+        return W
 
 
 def waterfilling_v1(gamma: RealArray, pt: float) -> RealArray:

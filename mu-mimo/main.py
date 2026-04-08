@@ -49,14 +49,11 @@ if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["2.2"]
-
-    sys_ref_numbers_rayleigh = [f"1.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
-    sys_ref_numbers_terrestrial = [f"2.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
-    sys_ref_numbers_satellite = [f"3.{i}.{j}.{k}" for i in range(1,4) for j in range(1, 5) for k in range(1, 4)]
+    system_ref_numbers = [f"1.4.{i}.{j}" for i in range(1, 5) for j in range(1, 4)]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, ["2.3.1.1", "3.3.1.1"])
+    results = main(sim_ref_numbers, system_ref_numbers)
 
     # PLOT THE RESULTS HERE.
-    SimResultManager.plot_system_performance_comparison(results, label_type="CH")
+    # SimResultManager.plot_system_performance_comparison(results, label_type="PT")
     # SimResultManager.plot_ut_performance_comparison(results, label_type="default")
