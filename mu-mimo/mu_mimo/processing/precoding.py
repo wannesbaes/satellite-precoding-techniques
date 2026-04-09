@@ -217,22 +217,28 @@ class WMMSEPrecoder(Precoder):
 
         H = csi.H_eff
         snr = csi.snr
+        R = 0
 
-        # Initialization.
-        MAX_ITER = 10
-        nu = (1/K) * np.ones(K)
-        F_iter = WMMSEPrecoder._init_precoders(H, snr, Pt, K, mode='MF')
+        for mode in ['ZF', 'MF', 'random', 'random']:
 
-        # Iteration.
-        for _ in range(MAX_ITER):
-            G_iter = WMMSEPrecoder._update_combiners_fast(H, snr, Pt, K, F_iter)
-            W_iter = WMMSEPrecoder._update_MSE_weights_fast(H, snr, Pt, K, F_iter, nu)
-            F_iter = WMMSEPrecoder._update_precoders(H, snr, Pt, K, G_iter, W_iter)
+            # Initialization.
+            MAX_ITER = 10
+            nu = (1/K) * np.ones(K)
+            F_iter = WMMSEPrecoder._init_precoders(H, snr, Pt, K, mode=mode)
 
-        # Termination.
-        F = F_iter
-        G = G_iter
-        C_eq = np.diag( G @ H @ F )
+            # Iteration.
+            for _ in range(MAX_ITER):
+                G_iter = WMMSEPrecoder._update_combiners_fast(H, snr, Pt, K, F_iter)
+                W_iter = WMMSEPrecoder._update_MSE_weights_fast(H, snr, Pt, K, F_iter, nu)
+                F_iter = WMMSEPrecoder._update_precoders(H, snr, Pt, K, G_iter, W_iter)
+
+            # Termination.
+            R_new = WMMSEPrecoder.__compute_achievable_rate_fast(K, W_iter, nu)
+            if R_new > R:
+                R = R_new
+                F = F_iter
+                G = G_iter
+                C_eq = np.diag( G @ H @ F )
 
         return F, G, C_eq
     
@@ -525,6 +531,78 @@ class WMMSEPrecoder(Precoder):
 
         # Termination.
         return E
+
+    @staticmethod
+    def __compute_achievable_rate(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray, nu: RealArray) -> float:
+        """
+        Compute the achievable weighted sum-rate of the system for the current precoder matrix.
+
+        .. math::
+            R = \sum_{k=1}^{K} \nu_k \, \log_2 \left( \det\left( \mathbf{I} + \mathbf{F}_k^H \, \mathbf{H}_k^H \, \mathbf{R}_{\tilde{n}_k, \tilde{n}_k}^{-1} \, \mathbf{H}_k \, \mathbf{F}_k \right) \right)
+        
+        Parameters
+        ----------
+        H : ComplexArray, shape (K*Nr, Nt)
+            The compound channel matrix.
+        snr : float
+            The signal-to-noise ratio (SNR).
+        Pt : float
+            The total transmit power.
+        K : int
+            The number of UTs.
+        F : ComplexArray, shape (Nt, K*Nr)
+            The compound precoding matrix from the previous iteration.
+        nu : RealArray, shape (K,)
+            The weights of each UT.
+        
+        Returns
+        -------
+        R : float
+            The achievable weighted sum-rate of the system.
+        """
+
+        R = np.zeros(K)
+        Nr = H.shape[0] // K
+        R_n_tilde = WMMSEPrecoder.__compute_interference_plus_noise_covariance_matrix(H=H, F=F, Pt=Pt, snr=snr, K=K)
+        
+        for k in range(K):
+            
+            H_k = H[k*Nr:(k+1)*Nr, :]
+            F_k = F[:, k*Nr:(k+1)*Nr]
+
+            E_k_inv = np.eye(Nr) +  F_k.conj().T @ H_k.conj().T @ np.linalg.inv(R_n_tilde[k]) @ H_k @ F_k
+            R[k] = np.log2(np.linalg.det(E_k_inv))
+        
+        R = np.sum(nu * R)
+        return R
+
+    @staticmethod
+    def __compute_achievable_rate_fast(K: int, W: ComplexArray, nu: RealArray) -> float:
+        """
+        Fast implementation of the `__compute_achievable_rate` method.
+
+        .. math::
+            R = \sum_{k=1}^{K} \nu_k \, \sum_{nr=1}^{N_r} \log_2 \left( e_{k,nr}^{-1} \right)
+
+        Parameters
+        ----------
+        K : int
+            The number of UTs.
+        W : ComplexArray, shape (K*Nr, K*Nr)
+            The block diagonal compound MSE-weight matrix for all UTs.
+        nu : RealArray, shape (K,)
+            The weights of each UT.
+        
+        Returns
+        -------
+        R : float
+            The achievable weighted sum-rate of the system.
+        """
+
+        Nr = W.shape[0] // K
+        nu_repeated = np.repeat(nu, Nr)
+        R = np.sum(nu_repeated * np.log2(np.diag(np.real(W)) / nu_repeated))
+        return R
 
 
     @staticmethod
