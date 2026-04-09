@@ -402,6 +402,7 @@ class SimResultManager:
 
             Possible options:
                 - 'default': Default label type, which is the name of the system.
+                - 'CH': The channel model used in the system. (e.g. 'Rayleigh')
                 - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
                 - 'BL': The bit loader configurations. (e.g. '4-QAM')
                 - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
@@ -793,6 +794,7 @@ class SimResultManager:
 
             Possible options:
                 - 'default': Default label type, which is the name of the system.
+                - 'CH': The channel model used in the system. (e.g. 'Rayleigh')
                 - 'PT': The precoding technique used in the system. (e.g. 'WMMSE')
                 - 'BL': The bit loader configurations. (e.g. '4-QAM')
                 - 'SD': The system dimensions. (e.g. 'Nt=8, Nr=2, K=2')
@@ -833,7 +835,7 @@ class SimResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(1e-5, 1)
+            ax_ber.set_ylim(0.5e-5, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()
