@@ -48,12 +48,11 @@ def main_ch_stats(sys_ref_numbers: list[str]) -> None:
 if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
-    sim_ref_numbers = ["1.0"]
+    sim_ref_numbers = []
     system_ref_numbers = []
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, ["1.1.2.3", "1.2.2.3", "1.3.2.3", "1.4.2.3"])
-    # results = main_ch_stats(["1.1.2.3", "1.2.2.3", "1.3.2.3", "1.4.2.3"])
-
+    results = main(sim_ref_numbers, system_ref_numbers)
+    
     # PLOT THE RESULTS HERE.
-    SimResultManager.plot_system_performance_comparison(results, label_type="PT")
+    SimResultManager.plot_system_performance_comparison(results, label_type="default")

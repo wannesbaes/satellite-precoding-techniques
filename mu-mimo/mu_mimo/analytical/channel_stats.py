@@ -92,7 +92,7 @@ class ChannelStatistics:
         # 0. Try to load the channel statistics from an existing .npz file. If the file does not yet exist, compute the channel statistics.
         self.channel_statistics_data = self._load_channel_statistics()
         if self.channel_statistics_data is not None:
-            print(f"\nChannel statistics loaded successfully from:\n    {self._generate_filename().with_suffix('.npz')}\n")
+            print(f"\nChannel statistics loaded successfully from:\n    {Path(str(self._generate_filename()) + str('.npz'))}\n")
             return self.channel_statistics_data
 
         # 1. Compute the corresponding channel gains statistics of the virtual independent parallel streamchannels.
@@ -107,14 +107,14 @@ class ChannelStatistics:
         # 3. Store the computed channel statistics.
         self.channel_statistics_data = channel_statistics_data
         self._store_channel_statistics()
-        print(f"Channel statistics computed successfully and stored to:\n    {self._generate_filename().with_suffix('.npz')}")
+        print(f"Channel statistics computed successfully and stored to:\n    {Path(str(self._generate_filename()) + str('.npz'))}")
 
         # 4. Plot the channel statistics.
         if plot:
             print("Plotting channel statistics...")
             self.plot_streamchannel_gains_pdf(num_uts=min(self.system_config.K, 1), seperate_plots=True)
             self.plot_streamchannel_gains_ecdf(num_uts=min(self.system_config.K, 1), seperate_plots=True)
-            print(f"Channel statistics plots generated successfully and stored to:\n    {self._generate_filename().with_suffix('.png')}\n\n")
+            print(f"Channel statistics plots generated successfully and stored to:\n    {Path(str(self._generate_filename()) + str('.png'))}\n\n")
 
         return channel_statistics_data
 
@@ -211,12 +211,8 @@ class ChannelStatistics:
             The generated channel matrix.
         """
         
-        K = self.system_config.K
-        Nr = self.system_config.Nr
-        Nt = self.system_config.Nt
         channel_model: ChannelModel = self.system_config.channel_configs.channel_model
-        
-        H = channel_model.generate(K * Nr, Nt)
+        H = channel_model.proceed()
         return H
 
     def _compute_streamchannel_gains(self, H: ComplexArray) -> RealArray:

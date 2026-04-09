@@ -510,7 +510,7 @@ class RiceanFadingChannelModel(ChannelModel):
         plt.tight_layout()
  
         plot_Rh_filename = f"Rh {component} process ({self.NLoS_method}) ({num_samples} samples).png"
-        plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots"
+        plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "satellite channel autocorrelation"
         plot_Rh_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_Rh_dir / plot_Rh_filename, dpi=300, bbox_inches="tight")
         return fig, ax
@@ -596,7 +596,7 @@ class RiceanFadingChannelModel(ChannelModel):
         plt.tight_layout()
  
         plot_psd_filename = f"PSD NLoS process ({self.NLoS_method}) ({num_samples} samples).png"
-        plot_psd_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots"
+        plot_psd_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "satellite channel PSD"
         plot_psd_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_psd_dir / plot_psd_filename, dpi=300, bbox_inches="tight")
         return fig, ax
