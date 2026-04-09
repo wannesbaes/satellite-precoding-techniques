@@ -219,7 +219,7 @@ class WMMSEPrecoder(Precoder):
         snr = csi.snr
         R = 0
 
-        for mode in ['ZF', 'MF', 'random', 'random']:
+        for mode in ['MF', 'random', 'random', 'random']:
 
             # Initialization.
             MAX_ITER = 10

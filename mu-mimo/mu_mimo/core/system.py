@@ -490,6 +490,7 @@ class MuMimoSystem:
 
         # Compute the SINR for each data stream.
         sinr = p_useful / (p_interference + p_noise)
+        # sinr = np.where((p_useful == 0) & (p_interference + p_noise == 0), 0, p_useful / (p_interference + p_noise))
 
         # Compute the achievable bit rates.
         capacity = 2*B * np.log2(1 + sinr)
