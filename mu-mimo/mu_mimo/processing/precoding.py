@@ -534,7 +534,7 @@ class WMMSEPrecoder(Precoder):
 
     @staticmethod
     def __compute_achievable_rate(H: ComplexArray, snr: float, Pt: float, K: int, F: ComplexArray, nu: RealArray) -> float:
-        """
+        r"""
         Compute the achievable weighted sum-rate of the system for the current precoder matrix.
 
         .. math::
@@ -578,7 +578,7 @@ class WMMSEPrecoder(Precoder):
 
     @staticmethod
     def __compute_achievable_rate_fast(K: int, W: ComplexArray, nu: RealArray) -> float:
-        """
+        r"""
         Fast implementation of the `__compute_achievable_rate` method.
 
         .. math::
