@@ -517,13 +517,13 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 Nt=int(config_settings['Nt']), 
                 Nr=int(config_settings['Nr']),
                 K=int(config_settings['K']),
-            ),
+            ) if config_settings['Channel Model'] == "Neutral" else None,
 
             "IID Rayleigh Fading": IIDRayleighFadingChannelModel(
                 Nt=int(config_settings['Nt']), 
                 Nr=int(config_settings['Nr']), 
                 K=int(config_settings['K']),
-            ),
+            ) if config_settings['Channel Model'] == "IID Rayleigh Fading" else None,
             
             "Ricean Fading": RiceanFadingChannelModel(
                 Nt=int(config_settings['Nt']), 
@@ -532,7 +532,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 K_rice=5, 
                 Trtt_2_Tc=float(config_settings['Round Trip Time To Coherence Time Ratio']) if config_settings['Round Trip Time To Coherence Time Ratio'] != "terrestrial" else 0.49,
                 Mch_max=2000,       # hard coded to max number of channel realizations for now. Should actually be derived from the simulation configuration settings (Mch_min).
-            ),
+            ) if config_settings['Channel Model'] == "Ricean Fading" else None,
         }
 
 
@@ -541,12 +541,12 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
             "Neutral": NeutralNoiseModel(
                 Nr=int(config_settings['Nr']), 
                 K=int(config_settings['K']),
-            ),
+            ) if config_settings['Noise Model'] == "Neutral" else None,
             
             "AWGN": CSAWGNNoiseModel(
                 Nr=int(config_settings['Nr']), 
                 K=int(config_settings['K']),
-            ),
+            ) if config_settings['Noise Model'] == "AWGN" else None,
         }
 
         

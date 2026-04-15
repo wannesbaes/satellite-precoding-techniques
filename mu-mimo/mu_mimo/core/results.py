@@ -415,13 +415,13 @@ class SimResultManager:
         
         label = None
         system_name = system_configs.name
-        reference_number = system_name[-7:]
+        reference_number = system_name[12:]
 
         if label_type == "default":
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2t": "Ricean (Terrestrial)", "2s1": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 1$)", "2s2": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 2$)", "2s4": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 4$)", "2s8": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 8$)"}
+            CH_mapping = {"1": "Rayleigh", "2t": "Terrestrial", "2s1": r"Satellite, $\frac{T_{RTT}}{T_c} = 1$", "2s2": r"Satellite, $\frac{T_{RTT}}{T_c} = 2$", "2s4": r"Satellite, $\frac{T_{RTT}}{T_c} = 4$", "2s8": r"Satellite, $\frac{T_{RTT}}{T_c} = 8$"}
             CH_number = reference_number.split(".")[0]
             label = CH_mapping.get(CH_number, None)
         
