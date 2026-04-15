@@ -50,9 +50,16 @@ if __name__ == "__main__":
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = []
     system_ref_numbers = []
+
+    system_ref_numbers_ZF_fixed    = [f"2{ch}.1.1.{sd}" for ch in ['t', 's1', 's2', 's4', 's8'] for sd in ['1', '2', '3']]
+    system_ref_numbers_ZF_adaptive = [f"2{ch}.1.3.{sd}" for ch in ['t', 's1', 's2', 's4', 's8'] for sd in ['1', '2', '3']]
+
+    system_ref_numbers_WMMSE_fixed    = [f"2{ch}.4.1.{sd}" for ch in ['t', 's1', 's2', 's4', 's8'] for sd in ['1', '2', '3']]
+    system_ref_numbers_WMMSE_adaptive = [f"2{ch}.4.3.{sd}" for ch in ['t', 's1', 's2', 's4', 's8'] for sd in ['1', '2', '3']]
+
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, system_ref_numbers)
+    results = main(["1.0"], system_ref_numbers)
     
     # PLOT THE RESULTS HERE.
-    SimResultManager.plot_system_performance_comparison(results, label_type="default")
+    # SimResultManager.plot_system_performance_comparison(results, label_type="default")
