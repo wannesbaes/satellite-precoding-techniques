@@ -510,16 +510,43 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
             "Neutral": None,
         }
 
+
         channel_model_mapping = {
-            "Neutral": NeutralChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
-            "IID Rayleigh Fading": IIDRayleighFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K'])),
-            "Ricean Fading": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 4, mode='terrestrial'),
-            "Satellite": RiceanFadingChannelModel(int(config_settings['Nt']), int(config_settings['Nr']), int(config_settings['K']), K_rice = 5, fD = 4, mode='satellite'),
+
+            "Neutral": NeutralChannelModel(
+                Nt=int(config_settings['Nt']), 
+                Nr=int(config_settings['Nr']),
+                K=int(config_settings['K']),
+            ),
+
+            "IID Rayleigh Fading": IIDRayleighFadingChannelModel(
+                Nt=int(config_settings['Nt']), 
+                Nr=int(config_settings['Nr']), 
+                K=int(config_settings['K']),
+            ),
+            
+            "Ricean Fading": RiceanFadingChannelModel(
+                Nt=int(config_settings['Nt']), 
+                Nr=int(config_settings['Nr']), 
+                K=int(config_settings['K']), 
+                K_rice=5, 
+                Trtt_2_Tc=float(config_settings['Round Trip Time To Coherence Time Ratio']) if config_settings['Round Trip Time To Coherence Time Ratio'] != "terrestrial" else 0.49,
+                Mch_max=2000,       # hard coded to max number of channel realizations for now. Should actually be derived from the simulation configuration settings (Mch_min).
+            ),
         }
 
+
         noise_model_mapping = {
-            "Neutral": NeutralNoiseModel(int(config_settings['Nr']), int(config_settings['K'])),
-            "AWGN": CSAWGNNoiseModel(int(config_settings['Nr']), int(config_settings['K'])),
+            
+            "Neutral": NeutralNoiseModel(
+                Nr=int(config_settings['Nr']), 
+                K=int(config_settings['K']),
+            ),
+            
+            "AWGN": CSAWGNNoiseModel(
+                Nr=int(config_settings['Nr']), 
+                K=int(config_settings['K']),
+            ),
         }
 
         

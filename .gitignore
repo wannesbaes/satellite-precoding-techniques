@@ -27,5 +27,7 @@ docs/build/
 */report/plots/
 
 /mu-mimo/report/analytical_results/channel_statistics/plots/
+/mu-mimo/report/analytical_results/ZF_precoder_visualization/
+
 su-mimo/su_mimo/report/simulation_results/
 su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/

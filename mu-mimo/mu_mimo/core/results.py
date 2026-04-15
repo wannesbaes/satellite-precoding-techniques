@@ -421,7 +421,7 @@ class SimResultManager:
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2": "Ricean (Terrestrial)", "3": "Ricean (Satellite)"}
+            CH_mapping = {"1": "Rayleigh", "2t": "Ricean (Terrestrial)", "2s1": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 1$)", "2s2": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 2$)", "2s4": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 4$)", "2s8": r"Ricean (Satellite, $\frac{T_{RTT}}{T_c} = 8$)"}
             CH_number = reference_number.split(".")[0]
             label = CH_mapping.get(CH_number, None)
         
