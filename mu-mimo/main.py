@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(["1.0"], system_ref_numbers)
+    results = main(["1.0"], system_ref_numbers_WMMSE_adaptive)
     
     # PLOT THE RESULTS HERE.
     # SimResultManager.plot_system_performance_comparison(results, label_type="default")
