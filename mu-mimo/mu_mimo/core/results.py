@@ -421,7 +421,7 @@ class SimResultManager:
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2t": "Terrestrial", "2s1": r"Satellite, $\frac{T_{RTT}}{T_c} = 1$", "2s2": r"Satellite, $\frac{T_{RTT}}{T_c} = 2$", "2s4": r"Satellite, $\frac{T_{RTT}}{T_c} = 4$", "2s8": r"Satellite, $\frac{T_{RTT}}{T_c} = 8$"}
+            CH_mapping = {"1": "Rayleigh", "2t": "Perfect CSI", "2s1": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 1$", "2s2": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 2$", "2s4": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 4$", "2s8": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 8$"}
             CH_number = reference_number.split(".")[0]
             label = CH_mapping.get(CH_number, None)
         
@@ -436,7 +436,7 @@ class SimResultManager:
             label = BL_mapping.get(BL_number, None)
 
         elif label_type == "SD":
-            SD_mapping = {"1": "Nt=8, Nr=2, K=2", "2": "Nt=8, Nr=4, K=2", "3": "Nt=8, Nr=2, K=4"}
+            SD_mapping = {"1": "Underloaded (8x2x2)", "2": "Fully loaded (2 UTs) (8x4x2)", "3": "Fully loaded (4 UTs) (8x2x4)"}
             SD_number = reference_number.split(".")[3]
             label = SD_mapping.get(SD_number, None)
 
