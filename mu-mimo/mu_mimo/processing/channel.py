@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FuncFormatter
 from scipy.special import j0
 from scipy.special import i0, i1
+from scipy.optimize import brentq
 
 from ..types import ComplexArray, RealArray, IntArray
 
@@ -45,20 +46,49 @@ class ChannelModel(ABC):
         # The current channel matrix H.
         self._H = None
 
-        # The current time index m_ch
-        self._m_ch = -1
+        # The current time index m.
+        self._m = 0
     
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
         return "Channel Model (abstract base class)"
     
-    def reset(self) -> None:
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, ChannelModel):
+            return NotImplemented
+        
+        return (
+            type(self) == type(other) and
+            self.Nt == other.Nt and
+            self.Nr == other.Nr and
+            self.K == other.K
+        )
+    
+    def reset(self, Mch_max: int, Msv: int) -> None:
         """
-        Reset the channel model to its initial state.
+        Reset the channel model state to its initial state.
+
+        Parameters
+        ----------
+        Mch_max : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the maximum number of channel realizations per SNR value.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the (maximum) number of coherence periods of the channel.
+        Msv : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the Coherence Time To Symbol Period Ratio (:math:`\frac{T_c}{T{\text{symbol}}}`).
+            In other words, the number of symbol vectors per block when using full block-level precoding (:math:`T_c = T{\text{block}}`).
+        
+        Returns
+        -------
+        Mblocks_max : int
+            The maximum number of blocks to transmit during the simulation for this SNR value.
+        Msvpb : int
+            The number of symbol vectors per block.
         """
         self._H = None
-        self._m_ch = -1
-        return
+        self._m = 0
+        return Mch_max, Msv
     
     @abstractmethod
     def proceed(self) -> ComplexArray:
@@ -68,25 +98,21 @@ class ChannelModel(ABC):
         Returns
         -------
         H : ComplexArray, shape (K * Nr, Nt)
-            The new, current channel matrix.
+            The new, current channel matrix for the consecutive symbol block.
         """
-        
-        # Update the time index.
-        self._m_ch += 1
-
-        return
+        raise NotImplementedError
     
     @abstractmethod
     def get_channel(self) -> ComplexArray:
         """
         Retrieve the channel matrix.
         
-        If there is a delay on the CSI, it will return a previous version of the channel matrix!
+        If there is a delay on the available CSI at the BS, it will return the most up-to-date channel estimate (matrix) available at the BS.
 
         Returns
         -------
         H : ComplexArray, shape (K * Nr, Nt)
-            The channel matrix (corresping to the current CSI).
+            The channel matrix corresponding to the most up-to-date CSI available at the BS.
         """
         raise NotImplementedError
     
@@ -104,20 +130,25 @@ class ChannelModel(ABC):
         y : ComplexArray, shape (K*Nr, Msv)
             The received signals.
         """
-        y = self._H @ x
-        return y
+        
+        # case 1: uncorrelated fading channel / symbol-level precoding with instantaneous CSI.
+        if len(self._H.shape) == 2:
+            y = self._H @ x
+        
+        # case 2.1: correlated fading channel, symbol-level precoding with instantaneous CSI.
+        elif (len(self._H.shape) == 3 and self._H.shape[0] == 1):
+            y = self._H[0] @ x
+        
+        # case 2: correlated fading channel, block-level precoding.
+        elif len(self._H.shape) == 3:
+            
+            assert self._H.shape[0] == x.shape[1], f"The number of channel realizations within one block must be equal to the number of symbol vector transmissions. Please take a closer look at these parameters.\nNumber of channel realizations within one block: {self._H.shape[0]}\nNumber of symbol vector transmissions: {x.shape[1]}"
+            
+            y = np.empty((self.K*self.Nr, x.shape[1]), dtype=complex)
+            for m in range(x.shape[1]):
+                y[:, m] = self._H[m] @ x[:, m]
 
-    def __eq__(self, other: object) -> bool:
-        
-        if not isinstance(other, ChannelModel):
-            return NotImplemented
-        
-        return (
-            type(self) == type(other) and
-            self.Nt == other.Nt and
-            self.Nr == other.Nr and
-            self.K == other.K
-        )
+        return y
 
 class NeutralChannelModel(ChannelModel):
     """
@@ -134,7 +165,7 @@ class NeutralChannelModel(ChannelModel):
     def proceed(self) -> ComplexArray:
         
         # Update the time index.
-        super().proceed()
+        self._m += 1
 
         # Update the current channel matrix.
         H = np.eye(self.K*self.Nr, self.Nt, dtype=complex)
@@ -163,7 +194,7 @@ class IIDRayleighFadingChannelModel(ChannelModel):
     def proceed(self) -> ComplexArray:
         
         # Update the time index.
-        super().proceed()
+        self._m += 1
 
         # Update the current channel matrix.
         H = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt) + 1j * np.random.randn(self.K*self.Nr, self.Nt))
@@ -179,7 +210,7 @@ class IIDRayleighFadingChannelModel(ChannelModel):
 
 class RiceanFadingChannelModel(ChannelModel):
     r"""
-    The Ricean fading channel model.
+    The ricean time-correlated fading channel.
 
     The LoS component is modeled as a deterministic component independent of time and across users.
     The NLoS component follows Jake's model.
@@ -200,7 +231,7 @@ class RiceanFadingChannelModel(ChannelModel):
 
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, Trtt_2_Tc: float, Mch_max: int = 2000):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, Trtt_2_Tc: float, Rh_Tc: float = 0.5):
         """
         Instantiate the channel model.
 
@@ -216,63 +247,110 @@ class RiceanFadingChannelModel(ChannelModel):
         K_rice : float
             The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
         Trtt_2_Tc : float
-            The ratio between the round trip time :math:`T_{rtt}` and the coherence time :math:`T_c`. It quantifies the delay on the CSI.
-        
-        Mch_max : int
-            The maximum number of channel realizations (or blocks). Needed for methods that require pre-generating the NLoS component for all time instants.
+            The ratio between the round trip time :math:`T_{rtt}` and the coherence time :math:`T_c`.\\
+            It quantifies the block period and the delay on the CSI.
+        Rh_Tc : float
+            The channel correlation at a lag equal to the coherence time :math:`T_c`.\\
+            It quantifies the product between the maximum Doppler frequency and the channel coherence time :math:`f_D \cdot T_c`.
         """
         
         # Initialize the base class.
         super().__init__(Nt, Nr, K)
+
+        # Validate the parameters.
+        assert K_rice >= 0, f"The Rice factor K_rice must be non-negative.\nCurrent value: {K_rice}"
+        assert Trtt_2_Tc >= 0, f"The round trip time to coherence time ratio Trtt_2_Tc must be non-negative.\nCurrent value: {Trtt_2_Tc}"
+        assert 0.5 <= Rh_Tc <= 1, f"The minimum channel correlation at a lag equal to the coherence time is 0.5, the maximum is 1 (0.5 <= R_h(Tc) <= 1).\nCurrent value: {Rh_Tc}"
         
-        # Set the Rice factor.
+        # Store the Rice factor, the the round trip time to the coherence time ratio and the channel correlation at a lag equal to the coherence time.
         self.K_rice = K_rice
+        self.Trtt_2_Tc = Trtt_2_Tc
+        self.Rh_Tc = Rh_Tc
 
-        # Compute and store the block period and the delay on the CSI.
-        self.T_block = self._compute_T_block(Trtt_2_Tc)
-        self.CSI_delay = self._compute_CSI_delay(Trtt_2_Tc)
-
-        # Set the maximum number of channel realizations (or thus blocks).
-        self.Mch_max = Mch_max + self.CSI_delay
+        # Initialize the channel time period parameters.
+        self.Tsymbol_2_Tc : float | None = None
+        self.Tblock_2_Tsymbol : int | None = None
+        self.CSI_fb_delay : int | None = None
+        self.fD_times_Tc : float | None = None
 
         # Initialize the channel state.
-        self._theta = None
-        self._H_NLoS = None
-        self._m_ch += self.CSI_delay
+        self.SYMBOL_LEVEL : bool | None = None
+        self._theta : RealArray | None = None
+        self._H_NLoS : ComplexArray | None = None
 
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
-        return f"Ricean Fading Channel (K_rice = {self.K_rice}), " + ("terrestrial mode" if self.CSI_delay == 0 else (f"satellite mode: T_block = {round(self.T_block, 2)} * Tc, CSI delay = {self.CSI_delay} * T_block"))
+        return f"Ricean Time-Correlated Fading Channel (K_rice = {self.K_rice}, Trtt_2_Tc = {np.round(self.Trtt_2_Tc, 2)}, Rh(Tc) = {np.round(self.Rh_Tc, 2)})"
     
-    def reset(self) -> None:
-        """
-        Reset the channel model to its initial state.
+    def __eq__(self, other):
+        
+        if not isinstance(other, RiceanFadingChannelModel):
+            return NotImplemented
+        
+        return (
+            self.Nt == other.Nt and
+            self.Nr == other.Nr and
+            self.K == other.K and
+            self.K_rice == other.K_rice and
+            self.Trtt_2_Tc == other.Trtt_2_Tc and
+            self.Rh_Tc == other.Rh_Tc
+        )
+    
+    def reset(self, N_Tc_max: int, Tc_2_Tsymbol: int) -> None:
+        r"""
+        Reset the channel model to its initial state.\\
+        Then, compute the channel time period parameters.\\
+        Finally, generate the channel matrices for the upcoming simulation.
 
-        Then, generate the channel matrices for the upcoming simulation.
+        Parameters
+        ----------
+        N_Tc_max : int
+            The maximum number of coherence periods of the channel to simulate.
+        Tc_2_Tsymbol : int
+            The Coherence Time To Symbol Period Ratio.
+            In other words, the number of symbol vectors that can be transmitted during one coherence period.
+        
+        Returns
+        -------
+        M_bl_max : int
+            The maximum number of blocks to transmit during the simulation for this SNR value.
+        M_svpb : int
+            The number of symbol vectors per block.
+        
+        Notes
+        -----
+        - Computation of block period to coherence time ratio :math:`\frac{T_{\text{block}}}{T_c}`.
+        .. math::
+            T_{\text{block}} = T_c - T_{\text{RTT}} \quad \text{if } T_{\text{RTT}} \leq T_c \text{  (semi block-level precoding)}\\
+            T_{\text{block}} = T_c \quad \text{if } T_{\text{RTT}} > T_c \text{  (full block-level precoding)}
+        
         """
         
-        # Reset the channel model to its initial state.
-        super().reset()
+        # 1. Reset the channel model to its initial state.
+        super().reset(N_Tc_max, Tc_2_Tsymbol)
         self._theta = None
         self._H_NLoS = None
-        self._m_ch += self.CSI_delay
 
-        # Generate the channel matrices for the upcoming simulation.
-        self._generate()
+        # 2. Compute the channel time period parameters.
+        num_channel_realizations, M_bl_max, M_svpb = self._compute_parameters(N_Tc_max, Tc_2_Tsymbol)
+ 
+        # 3. Generate the channel matrices for the upcoming simulation.
+        self._generate(num_channel_realizations)
 
-        return
+        return M_bl_max, M_svpb
 
     def proceed(self) -> ComplexArray:
         
-        # Update and validate the time index. It cannot exceed the maximum number of channel realizations Mch_max.
-        super().proceed()
+        # Update the time index.
+        self._m += self.Tblock_2_Tsymbol
 
-        if self._m_ch >= self.Mch_max:
-            raise IndexError(f"The time index `m_ch` cannot exceed the maximum number of channel realizations 2*Mch_max = {self.Mch_max}. However, m_ch = {self._m_ch} was given. Please take a closer look at these parameters.")
+        # Validate the time index. It cannot exceed the maximum number of channel realizations.
+        if self._m >= self._H_NLoS.shape[0]:
+            raise IndexError(f"The time index `m` cannot exceed the maximum number of channel realizations. Please take a closer look at these parameters.\nCurrent time index `m`: {self._m}\nMaximum number of channel realizations: {self._H_NLoS.shape[0]}")
 
         # Update the current channel matrix.
         theta = np.repeat(self._theta, self.Nr*self.Nt).reshape(self.K*self.Nr, self.Nt)
-        H_NLoS = self._H_NLoS[:, :, self._m_ch]
+        H_NLoS = self._H_NLoS[self._m : self._m + self.Tblock_2_Tsymbol]
 
         H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
         self._H = H
@@ -283,86 +361,80 @@ class RiceanFadingChannelModel(ChannelModel):
 
         # Get the LoS and NLoS component.
         theta = np.repeat(self._theta, self.Nr*self.Nt).reshape(self.K*self.Nr, self.Nt)
-        H_NLoS = self._H_NLoS[:, :, self._m_ch - self.CSI_delay]
+        H_NLoS = self._H_NLoS[self._m - self.CSI_fb_delay]
 
-        # Return the channel corresonding to the CSI.
+        # Return the channel corresponding to the most up-to-date CSI available at the BS.
         H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
         return H
-        
-    def _compute_T_block(self, Trtt_2_Tc: float) -> float:
-        r"""
-        Compute the block period :math:`T_{\text{block}}` as a fraction of the coherence time :math:`T_c`, based on the round trip time to coherence time ratio :math:`\frac{T_{RTT}}{T_c}`.
-
-        If :math:`\frac{T_{RTT}}{T_c} \leq \frac{1}{2}`, then there is no delay on the CSI. This is the terrestrial communication scenario.
-        In this case, we set the block period :math:`T_{\text{block}}` equal to the largest fraction of half the coherence time :math:`T_c` that is an integer multiple of the round trip time :math:`T_{RTT}`.
-        
-        .. math::
-            T_{\text{block}} = \left\lfloor \frac{1/2}{\frac{T_{RTT}}{T_c}} \right\rfloor \, \frac{T_{RTT}}{T_c} \cdot T_c \text{ (in seconds)}
-
-        If :math:`\frac{T_{RTT}}{T_c} > \frac{1}{2}`, then there is a delay on the CSI. This is a satellite communication scenario.
-        In this case, we set the block period :math:`T_{\text{block}}` equal to the largest fraction of the coherence time :math:`T_c` that is a divisor of the round trip time to coherence time ratio :math:`\frac{T_{RTT}}{T_c}`.
-        
-        .. math::
-            T_{\text{block}} = \frac{\frac{T_{RTT}}{T_c}}{\left\lceil \frac{T_{RTT}}{T_c} \right\rceil} \cdot T_c \text{ (in seconds)}
-        
-        Parameters
-        ----------
-        Trtt_2_Tc : float
-            The round trip time to coherence time ratio :math:`\frac{T_{RTT}}{T_c}`.
-        
-        Returns
-        -------
-        Tb : float (0 < Tb <= 1)
-            The block period :math:`T_{\text{block}}`, expressed as a fraction of the coherence time :math:`T_c`!
-        
-        Note
-        ----
-         - To get the block period in seconds, multiply the return value by the coherence time :math:`T_c`.
-         - The block period is equal to the sample period of the channel gain process. During one sample period (:math:`< T_c`), the channel is assumed to be constant (block fading).
-        """
-        
-        # terrestrial communication scenario.
-        if Trtt_2_Tc <= 0.5: 
-            T_block = int(np.floor(0.5 / Trtt_2_Tc)) * Trtt_2_Tc
-        
-        # satellite communication scenario.
-        else: 
-            T_block = Trtt_2_Tc / int(np.ceil(Trtt_2_Tc))
-
-        # return the block period.
-        return T_block
     
-    def _compute_CSI_delay(self, Trtt_2_Tc: float) -> int:
-        r"""
-        Compute the delay on the CSI, expressed as an integer multiple of the block period :math:`T_{\text{block}}`.
 
-        In the satellite communication scenario (:math:`\frac{T_{RTT}}{T_c} > \frac{1}{2}`), there is a delay on the CSI:
-        
-        .. math::
-            \text{delay} = \lceil \frac{T_{RTT}}{T_c} \rceil \cdot T_{\text{block}} \text{ (in seconds)}
-        
-        Parameters
-        ----------
-        Trtt_2_Tc : float
-            The round trip time to coherence time ratio :math:`\frac{T_{RTT}}{T_c}`.
-        
-        Returns
-        -------
-        delay : int
-            The delay on the CSI, expressed as an integer multiple of the block period :math:`T_{\text{block}}`.
+    def _compute_parameters(self, N_Tc_max: int, Tc_2_Tsymbol: int):
 
-        Note
-        ----
-         - To get the delay in seconds, multiply the return value by the block period :math:`T_{\text{block}}`.
-         - In the terrestrial communication scenario, there is no delay on the CSI, so the delay equals zero.
-        """
-        delay = int(np.ceil(Trtt_2_Tc)) if Trtt_2_Tc > 0.5 else 0
-        return delay
+        # block-level precoding.
+        if self.Rh_Tc < 1.0:
+
+            # [Tblock_2_Tsymbol] Compute and store the number of symbol vectors that can be transmitted during one block period.
+            Tblock_2_Tc = (1.0 - self.Trtt_2_Tc) if self.Trtt_2_Tc <= 1 else 1.0
+            M_sv = int(max(np.round(Tblock_2_Tc * Tc_2_Tsymbol), 1))
+            self.Tblock_2_Tsymbol = M_sv
+
+            # [CSI_fb_delay] Compute and store the delay on the CSI feedback, in number of symbol vector transmissions.
+            CSI_fb_delay = int(max(np.ceil(self.Trtt_2_Tc * Tc_2_Tsymbol), 0))
+            self.CSI_fb_delay = CSI_fb_delay
+            self._m += self.CSI_fb_delay
+
+            # [Tsymbol_2_Tc] Compute and store the symbol period to coherence time ratio.
+            self.Tsymbol_2_Tc = (1 / Tc_2_Tsymbol)
+
+            # [fD_times_Tc] Compute and store the product between the maximum Doppler frequency and the coherence time.
+            self.fD_times_Tc = (1 / (2*np.pi)) * brentq(lambda z: j0(z) - self.Rh_Tc, 0, 2.5)
+            
+            # Compute the number of channel samples to generate and the maximum number of blocks to transmit during the simulation.
+            num_channel_realizations = N_Tc_max * Tc_2_Tsymbol
+            M_blch_max = int(np.floor((N_Tc_max * Tc_2_Tsymbol) / M_sv))
+
+            self.SYMBOL_LEVEL = False
+        
+
+        # symbol-level precoding.
+        else:
+
+            # [Tblock_2_Tsymbol] Compute and store the number of symbol vectors that can be transmitted during one block period.
+            self.Tblock_2_Tsymbol = 1
+            
+            # [CSI_fb_delay] Compute and store the delay on the CSI feedback, in number of symbol vector transmissions.
+            CSI_fb_delay = int(max(np.ceil(self.Trtt_2_Tc * Tc_2_Tsymbol), 0))
+            self.CSI_fb_delay = CSI_fb_delay
+            self._m += self.CSI_fb_delay
+
+            # [Tsymbol_2_Tc] Compute and store the symbol period to coherence time ratio.
+            self.Tsymbol_2_Tc = 1
+
+            # [fD_times_Tc] Compute and store the product between the maximum Doppler frequency and the coherence time.
+            RH_TC = 0.5
+            self.fD_times_Tc = (1 / (2*np.pi)) * brentq(lambda z: j0(z) - RH_TC, 0, 2.5)
+            
+            # Compute the number of channel samples to generate, number of channel realizations for the simulation and the number of symbol vectors to transmit per channel realization.
+            num_channel_realizations = N_Tc_max
+            M_blch_max = N_Tc_max
+            M_sv = Tc_2_Tsymbol
+
+            self.SYMBOL_LEVEL = True
+
+
+        return num_channel_realizations, M_blch_max, M_sv
     
-    def _generate(self) -> tuple[RealArray, ComplexArray]:
+
+    def _generate(self, num_channel_realizations: int) -> tuple[RealArray, ComplexArray]:
         """
         Generate the channel matrices for all users and all future time instances.
         Store them in the channel state.
+
+        Parameters
+        ----------
+        num_channel_realizations : int
+            The total number of channel realizations to generate.
+            This is equal to the total number of symbol vectors that will be transmitted during the simulation.
 
         Returns
         -------
@@ -378,17 +450,20 @@ class RiceanFadingChannelModel(ChannelModel):
         self._theta = theta
 
         # Generate the NLoS component.
-        H_NLoS = self._generate_NLoS(method="Cholesky-decomposition method")
+        H_NLoS = self._generate_NLoS(num_channel_realizations, method="Cholesky-decomposition method")
         self._H_NLoS = H_NLoS
 
         return theta, H_NLoS
     
-    def _generate_NLoS(self, method: str) -> ComplexArray:
+    def _generate_NLoS(self, num_channel_realizations: int, method: str) -> ComplexArray:
         """
         Generate the NLoS component for all users and all time instants, using the specified method.
 
         Parameters
         ----------
+        num_channel_realizations : int
+            The total number of channel realizations to generate.
+            This is equal to the total number of symbol vectors that will be transmitted during the simulation.
         method : str
             The method to use for generating the NLoS component. Choose between: 'Cholesky-decomposition method', 'spectral method', 'FIR filter method'.
 
@@ -398,21 +473,27 @@ class RiceanFadingChannelModel(ChannelModel):
             The generated NLoS component of the channel, for all time instants.
         """
         
-        if method == "Cholesky-decomposition method":
-            H_NLoS = self._generate_NLoS_cholesky()
-        
-        elif method == "spectral method":
-            H_NLoS = self._generate_NLoS_spectral()
-        
-        elif method == "FIR filter method":
-            H_NLoS = self._generate_NLoS_FIR_filter()
+        if not self.SYMBOL_LEVEL:
+
+            if method == "Cholesky-decomposition method":
+                H_NLoS = self._generate_NLoS_cholesky(num_channel_realizations)
+            
+            elif method == "spectral method":
+                H_NLoS = self._generate_NLoS_spectral(num_channel_realizations)
+            
+            elif method == "FIR filter method":
+                H_NLoS = self._generate_NLoS_FIR_filter(num_channel_realizations)
+            
+            else:
+                raise ValueError(f"Unknown method '{method}' for generating the Ricean channel matrix. Valid options are: 'Cholesky-decomposition method', 'spectral method', 'FIR filter method'.")
         
         else:
-            raise ValueError(f"Unknown method '{method}' for generating the Ricean channel matrix. Valid options are: 'Cholesky-decomposition method', 'spectral method', 'FIR filter method'.")
-        
+            
+            H_NLoS = self._generate_SL_NLoS(num_channel_realizations)
+
         return H_NLoS
 
-    def _generate_NLoS_cholesky(self) -> ComplexArray:
+    def _generate_NLoS_cholesky(self, num_channel_realizations: int) -> ComplexArray:
         r"""
         Generate the NLoS component for user k using the Cholesky decomposition method for generating a Gaussian process with a specified auto-correlation function.
 
@@ -421,26 +502,32 @@ class RiceanFadingChannelModel(ChannelModel):
         - **Step 1:** Build the :math:`N \times N` covariance matrix :math:`\mathbf{C}` with entries :math:`C_{i,j} = R_h((i-j) \, T_{\text{sample}})`.
         - **Step 2:** Compute the Cholesky decomposition of the covariance matrix :math:`\mathbf{C} = \mathbf{L}\mathbf{L}^H`, where :math:`\mathbf{L}` is a lower triangular matrix.
         - **Step 3:** Generate a column vector :math:`\mathbf{w}` of :math:`N` i.i.d. white complex Gaussian random variables with zero mean and unit variance.
-        - **Step 4:** Find the desired Gaussian process as :math:`\mathbf{h} = \mathbf{L}\mathbf{w}`.
+        - **Step 4:** Find the desired Gaussian process as :math:`\mathbf{h} = \mathbf{L} \, \mathbf{w}`.
 
+        Parameters
+        ----------
+        num_channel_realizations : int
+            The total number of channel realizations to generate.
+            This is equal to the total number of symbol vectors that will be transmitted during the simulation.
+        
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
+        H_NLoS : ComplexArray, shape (num_channel_realizations, K * Nr, Nt)
             The generated NLoS component for all propagation links and all time instants.
         
         Note
         ----
         For Jake's model, where the PSD of the Gaussian processes equals the Doppler spectrum, the autocorrelation function :math:`R_h(\tau)` corresponds to a zeroth-order Bessel function of the first kind :math:`J_0(2\pi f_D \tau)`.
 
-        The sample period :math:`T_{\text{sample}}` of the channel realizations is equal to the block period :math:`T_{\text{block}} (< T_c)`.
-        Because the block period attribute `self.T_block` is expressed as a fraction of the coherence time, we can compute the covariance matrix in function of this fraction only:
+        The sample period :math:`T_{\text{sample}}` of the channel realizations is equal to the symbol period :math:`T_{\text{symbol}}`.
+        We can compute the covariance matrix in function of the symbol period to coherence time ratio:
         
         .. math::
             R_h((i-j) \, T_{\text{sample}}) 
-            &= R_h((i-j) \, T_{\text{block}}) \\
-            &= J_0(2\pi \, f_D \cdot (i-j) \, T_{\text{block}}) \\
-            &= J_0(2\pi \, (0.242) \frac{1}{T_c} \cdot (i-j) \cdot \text{self.T\_block} \cdot T_c) \\
-            &= J_0(2\pi \, (0.242) \, (i-j) \ \text{self.T\_block}) \\
+            &= R_h((i-j) \, T_{\text{symbol}}) \\
+            &= J_0(2\pi \, f_D \cdot (i-j) \, T_{\text{symbol}}) \\
+            &= J_0(2\pi \, (0.242) \frac{1}{T_c} \cdot (i-j) \, T_{\text{symbol}})) \\
+            &= J_0(2\pi \, (0.242) \, (i-j) \cdot \frac{T_{\text{symbol}}}{T_c}) \\
             
         where we used
         
@@ -450,29 +537,34 @@ class RiceanFadingChannelModel(ChannelModel):
         """
 
         # STEP 1.
-        i = np.arange(self.Mch_max).reshape(-1,1)
-        j = np.arange(self.Mch_max)
-        C = j0(2*np.pi * (0.242097596) * (i-j) * self.T_block)
-        C += (10e-10)*np.eye(self.Mch_max)
+        i = np.arange(num_channel_realizations).reshape(-1,1)
+        j = np.arange(num_channel_realizations)
+        C = j0(2*np.pi * self.fD_times_Tc * (i-j) * self.Tsymbol_2_Tc)
+        C += (10e-10)*np.eye(num_channel_realizations)
 
         # STEP 2.
         L = np.linalg.cholesky(C)
 
         # STEP 3.
-        w = (1 / np.sqrt(2)) * (np.random.randn(self.K*self.Nr, self.Nt, self.Mch_max) + 1j * np.random.randn(self.K*self.Nr, self.Nt, self.Mch_max))
+        w = (1 / np.sqrt(2)) * (np.random.randn(num_channel_realizations, self.K*self.Nr*self.Nt) + 1j * np.random.randn(num_channel_realizations, self.K*self.Nr*self.Nt))
 
         # STEP 4.
-        H_NLoS = w @ L.T
+        H_NLoS = (L @ w).reshape(num_channel_realizations, self.K*self.Nr, self.Nt)
 
         return H_NLoS
 
-    def _generate_NLoS_spectral(self) -> ComplexArray:
+    def _generate_NLoS_spectral(self, num_channel_realizations: int) -> ComplexArray:
         """
         Generate the NLoS component for all users using the spectral method for generating a Gaussian process with a specified power spectral density (PSD) function.
 
+        Parameters
+        ----------
+        num_channel_realizations : int
+            The total number of channel realizations to generate.
+
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, num_channel_realizations)
             The generated NLoS component for all propagation links and all time instants.
         
         Note
@@ -482,13 +574,18 @@ class RiceanFadingChannelModel(ChannelModel):
         """
         raise NotImplementedError("The spectral method for generating the NLoS component is not implemented yet.")
 
-    def _generate_NLoS_FIR_filter(self) -> ComplexArray:
+    def _generate_NLoS_FIR_filter(self, num_channel_realizations: int) -> ComplexArray:
         """
         Generate the NLoS component for all users using the FIR filter method for generating a Gaussian process with a specified power spectral density (PSD) function.
         
+        Parameters
+        ----------
+        num_channel_realizations : int
+            The total number of channel realizations to generate.
+
         Returns
         -------
-        H_NLoS : ComplexArray, shape (K * Nr, Nt, Mch_max)
+        H_NLoS : ComplexArray, shape (K * Nr, Nt, num_channel_realizations)
             The generated NLoS component for all propagation links and all time instants.
         
         Note
@@ -498,21 +595,34 @@ class RiceanFadingChannelModel(ChannelModel):
         """
         raise NotImplementedError("The FIR filter method for generating the NLoS component is not implemented yet.")
 
-    def plot_channel_gain_process(self, Mch: int = 10, samples_per_block: int = 100, component: str = "NLoS", expected_value_ref: bool = True, uncorrelated_ref: bool = False, assumption_ref: bool = False, prop_link_idx: tuple[int, int] = (0, 0)) -> tuple[plt.Figure, plt.Axes]:
+    def _generate_SL_NLoS(self, num_channel_realizations: int) -> ComplexArray:
+        """
+        WIP
+        Generate the NLoS component for all channel realizations.
+
+        Both the actual channel and the corresponding CSI available at the BS will be returned.
+        """
+
+        H_NLoS = np.empty((num_channel_realizations, self.K*self.Nr, self.Nt), dtype=complex)
+        H_NLoS_CSI = np.empty((num_channel_realizations, self.K*self.Nr, self.Nt), dtype=complex)
+
+        for m_ch in range(num_channel_realizations):
+
+            H_NLoS_process = self._generate_NLoS_cholesky(self.CSI_fb_delay)
+            H_NLoS[m_ch] = H_NLoS_process[-1]
+            H_NLoS_CSI[m_ch] = H_NLoS_process[0]
+        
+        return H_NLoS, H_NLoS_CSI
+
+
+    def plot_channel_gain_process(self, N_Tc: int = 5, component: str = "NLoS", expected_value_ref: bool = True, uncorrelated_ref: bool = False, assumption_ref: bool = False, prop_link_idx: tuple[int, int] = (0, 0)) -> tuple[plt.Figure, plt.Axes]:
         r"""
-        Plot the channel gain process of a single propagation link over time.
-
-        The magnitude of the complex channel gain process is plotted in dB:
-
-        .. math::
-            |h(t)| \; [\text{dB}] = 20 \log_{10}(|h[m]|), \quad m = 0, 1, \ldots, M-1
+        Plot the magnitude of the channel gain process of a single propagation link over time.
 
         Parameters
         ----------
-        Mch : int
-            The number of channel realizations to plot. One channel realization corresponds to one block. The duration of a block is at most equal to the coherence time :math:`T_c`. Default is 15.
-        samples_per_block : int
-            The number of samples to plot per block. This is for visualization purposes, to get a smoother curve. Default is 100.
+        N_Tc : int
+            The number of coherence periods to plot. Default is 5.
         component : str
             The component of the channel to plot. Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.
         
@@ -532,71 +642,59 @@ class RiceanFadingChannelModel(ChannelModel):
             The figure object containing the plot.
         ax : matplotlib.axes.Axes
             The axes object containing the plot.
-
-        Notes
-        -----
-        The time axis is expressed in units of the coherence time :math:`T_c`.
-        The reference line at 0 dB corresponds to unit amplitude (average power = 1).
-
-        This function resets the channel model before plotting, so any previously generated channel state is discarded.
         """
 
-        assert prop_link_idx[0] < self.Nt and prop_link_idx[1] < self.K * self.Nr, ( f"`prop_link_idx` must be smaller than (Nt, K * Nr) = ({self.Nt}, {self.K * self.Nr}). However, `prop_link_idx` = {prop_link_idx} was given." )
-        assert Mch*samples_per_block <= self.Mch_max, ( f"`Mch * samples_per_block` must be smaller than or equal to the maximum number of channel realizations per simulation. (`Mch_max` = {self.Mch_max}). However, `Mch` = {Mch} and `samples_per_block` = {samples_per_block} were given." )
-
-        # 0. Reset the channel model.
-
-        self.T_block /= samples_per_block
-        self.CSI_delay *= samples_per_block
-        self.reset()
-
+        # Validation.
+        assert self._H_NLoS is not None, "The channel model must be reset before plotting the channel gain process. Please call the `reset` method of the channel model before plotting."
+        
+        Msvptc = int(round(1 / self.Tsymbol_2_Tc))
+        assert N_Tc * Msvptc <= self._H_NLoS.shape[0], ( f"`N_Tc` must be smaller than or equal to the maximum number of coherence periods per simulation. However, `N_Tc` = {N_Tc} and `N_Tc_max` = {self._H_NLoS.shape[0] * self.Tsymbol_2_Tc} were given." )
+        assert prop_link_idx[0] < self.K * self.Nr and prop_link_idx[1] < self.Nt, ( f"`prop_link_idx` must be an index element of the channel matrix (shape: (Nt, K * Nr) = ({self.Nt}, {self.K * self.Nr})). However, `prop_link_idx` = {prop_link_idx} was given." )
+        
         # 1. Extract the channel gain process and compute the magnitude.
         
         if component == "LoS":
-            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(Mch*samples_per_block)
-
+            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(N_Tc * Msvptc)
         elif component == "NLoS":
-            h = self._H_NLoS[prop_link_idx[0], prop_link_idx[1], :]
-
+            h = self._H_NLoS[0 : N_Tc * Msvptc, prop_link_idx[0], prop_link_idx[1]]
         elif component == "LoS + NLoS":
-            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * self._H_NLoS[prop_link_idx[0], prop_link_idx[1], :])
-
+            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * self._H_NLoS[0 : N_Tc * Msvptc, prop_link_idx[0], prop_link_idx[1]])
         else:
             raise ValueError(f"Unknown component '{component}' for plotting the channel gain process. Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.")
 
-        h_magnitude = np.abs(h[:Mch*samples_per_block])
-        t_norm = np.arange(Mch*samples_per_block) * self.T_block
+        h_magnitude = np.abs(h)
+        t = np.arange(N_Tc * Msvptc)
 
         # 2. Plot.
 
         fig, ax = plt.subplots(figsize=(12, 4))
-        ax.plot(t_norm, h_magnitude, color="tab:blue", linewidth=2, label="Clark's Fading Model")
+        ax.plot(t, h_magnitude, color="tab:blue", linewidth=2, label="Clark's Fading Model")
 
         # plot an uncorrelated channel gain process with the same average power and the same number of samples for comparison if asked.
         if uncorrelated_ref:
             
             if component == "LoS": 
-                h_uncorrelated = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(Mch*samples_per_block)
+                h_uncorrelated = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(N_Tc * Msvptc)
             elif component == "NLoS": 
-                h_uncorrelated = (1 / np.sqrt(2)) * (np.random.randn(Mch*samples_per_block) + 1j * np.random.randn(Mch*samples_per_block))
+                h_uncorrelated = (1 / np.sqrt(2)) * (np.random.randn(N_Tc * Msvptc) + 1j * np.random.randn(N_Tc * Msvptc))
             elif component == "LoS + NLoS":
-                h_uncorrelated = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * (1 / np.sqrt(2)) * (np.random.randn(Mch*samples_per_block) + 1j * np.random.randn(Mch*samples_per_block)))
+                h_uncorrelated = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * (1 / np.sqrt(2)) * (np.random.randn(N_Tc * Msvptc) + 1j * np.random.randn(N_Tc * Msvptc)))
 
             h_uncorrelated_magnitude = np.abs(h_uncorrelated)
-            ax.plot(t_norm, h_uncorrelated_magnitude, color="tab:red", linestyle="--", linewidth=1, label="Uncorrelated Fading")
+            ax.plot(t, h_uncorrelated_magnitude, color="tab:red", linestyle="--", linewidth=1, label="Uncorrelated Fading")
         
         # plot the channel gain process used in the simulations as a reference if asked. This is a channel gain process that is constant during one block period.
         if assumption_ref:
             
             if component == "LoS": 
-                h_assumption = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(Mch)
+                h_assumption = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(N_Tc)
             elif component == "NLoS": 
-                h_assumption = self._H_NLoS[prop_link_idx[0], prop_link_idx[1], np.arange(0, Mch*samples_per_block, samples_per_block)]
+                h_assumption = self._H_NLoS[np.arange(0, N_Tc * Msvptc, Msvptc), prop_link_idx[0], prop_link_idx[1]]
             elif component == "LoS + NLoS":
-                h_assumption = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * self._H_NLoS[prop_link_idx[0], prop_link_idx[1], np.arange(0, Mch*samples_per_block, samples_per_block)])
+                h_assumption = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * self._H_NLoS[np.arange(0, N_Tc * Msvptc, Msvptc), prop_link_idx[0], prop_link_idx[1]])
             
             h_assumption_magnitude = np.abs(h_assumption)
-            ax.step(t_norm[::samples_per_block], h_assumption_magnitude, where="post", color="slategray", linestyle="--", linewidth=1.5, label="Block Fading Assumption")
+            ax.step(t[::Msvptc], h_assumption_magnitude, where="post", color="slategray", linestyle="--", linewidth=1.5, label="Block Fading Assumption")
 
         # plot the expected value of the magnitude as a reference line.
         if expected_value_ref:
@@ -612,12 +710,12 @@ class RiceanFadingChannelModel(ChannelModel):
 
         # x-axis ticks and labels.
         def Tc_formatter(x, pos):
-            n = int(round(x))
+            n = int(round(x / Msvptc))
             if   n == 0:  return r"$0$"
             elif n == 1:  return r"$T_c$"
             elif n == -1: return r"$-T_c$"
             else:         return rf"${n} \, T_c$"
-        ax.xaxis.set_major_locator(MultipleLocator( max(1, int(np.round(t_norm[-1] / 10))) ))
+        ax.xaxis.set_major_locator(MultipleLocator(Msvptc))
         ax.xaxis.set_major_formatter(FuncFormatter(Tc_formatter))
 
         # plot settings.
@@ -629,26 +727,24 @@ class RiceanFadingChannelModel(ChannelModel):
         plt.tight_layout()
 
         # save the plot.
-        plot_filename = f"channel gain process {component} ({Mch} blocks, {samples_per_block} samples per block)" + (" (uncorrelated ref)" if uncorrelated_ref else "") + (" (block fading assumption ref)" if assumption_ref else "") + ".png"
-        plot_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "satellite channel gain process"
+        plot_filename = f"channel gain process {component} ({N_Tc} coherence periods)" + (" (uncorrelated ref)" if uncorrelated_ref else "") + (" (block fading assumption ref)" if assumption_ref else "") + ".png"
+        plot_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ricean time-correlated fading channel" / "channel gain process"
         plot_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_dir / plot_filename, dpi=300, bbox_inches="tight")
         
-        # restore the original block period and CSI delay.
-        self.T_block *= samples_per_block
-        self.CSI_delay //= samples_per_block
-
         return fig, ax
     
-    def plot_autocorrelation(self, max_lag: int = 20, num_samples: int = 1, component: str = "NLoS"):
+    def plot_autocorrelation(self, N_Tc: int = 10, component: str = "NLoS", prop_link_idx: tuple[int, int] = (0, 0)) -> tuple[plt.Figure, plt.Axes]:
         r"""
-        Plot the autocorrelation function of the generated channel gain process and compare it to the analytical expression.
+        Plot the empirical autocorrelation function of the generated channel gain process and compare it to the analytical expression.
 
-        The simulated autocorrelation is computed as the empirical autocorrelation, averaged over num_samples independent realizations of the NLoS process:
+        The simulated, empirical autocorrelation is calculated as follows:
         
         .. math::
 
-            \hat{R}_h(k) = \frac{1}{Msv} \sum_{m_{sv}=1}^{Msv} \cdot \frac{1}{N-k} \sum_{n=0}^{N-k-1} h_{m_{sv}}[n+k] h_{m_{sv}}^*[n], \quad k = 0, 1, \ldots, N-1
+            \hat{R}_h(k) = \frac{1}{\hat{R}_h(0)} \cdot \frac{1}{N} \sum_{n=0}^{N-k-1} h[n + k] \cdot h[n]^*
+        
+        where :math:`N` is the total number of channel realizations and :math:`k` is the lag, expressed in number of samples.
         
         The analytical autocorrelation equals the zero-order Bessel function of the first kind:
         
@@ -658,14 +754,13 @@ class RiceanFadingChannelModel(ChannelModel):
 
         Parameters
         ----------
-        max_lag : int
-            The maximum lag (in samples) to compute the autocorrelation for.
-        num_samples : int
-            The number of independent realizations of the NLoS process to average over. Default is 1.
-            Should be smaller than or equal to K * Nr * Nt, because the average cannot be taken accross different simulations.
+        N_Tc : int
+            The number of coherence periods to compute and plot the autocorrelation for.
         component : str
             The component of the channel to plot the autocorrelation for. 
             Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.
+        prop_link_idx : tuple[int, int]
+            The index of the propagation link to plot, in the form (k * Nr + nr, nt). Default is (0, 0).
 
         
         Returns
@@ -674,80 +769,48 @@ class RiceanFadingChannelModel(ChannelModel):
             The figure object containing the plot.
         ax : matplotlib.axes.Axes
             The axes object containing the plot.
-
-        Notes
-        -----
-        The plot is normalized in the sense that the lag axis is expressed in units of the coherence time :math:`T_c`.
-
-        This function is intended to be used for validating the generated NLoS process! It will reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted. Then, it will generate num_samples sequences of the NLoS process using the specified method, and compute the averaged empirical autocorrelation for both positive and negative lags. Finally, it will compute the analytical autocorrelation and plot both the empirical and analytical autocorrelation functions.
         """
  
-        assert num_samples <= self.K * self.Nr * self.Nt, f"num_samples should be smaller than or equal to K * Nr * Nt = {self.K * self.Nr * self.Nt}, because the average will be taken accross at most one simulation. However, {num_samples} num_samples were given."
+        # Validation.
+        assert self._H_NLoS is not None, "The channel model must be reset before plotting the autocorrelation. Please call the `reset` method of the channel model before plotting."
         
-        # 0. Reset the channel model.
-        self.reset()
-
-        # 1. Compute empirical autocorrelation.
-
-        # Generate the channel gain process (for the specified component) for each propagation link.
-
+        Msvptc = int(round(1 / self.Tsymbol_2_Tc))
+        tau = np.arange(-N_Tc//2 * Msvptc, N_Tc//2 * Msvptc)
+        assert N_Tc * Msvptc <= self._H_NLoS.shape[0], ( f"`N_Tc` must be smaller than or equal to the maximum number of coherence periods per simulation. However, `N_Tc` = {N_Tc} and `N_Tc_max` = {self._H_NLoS.shape[0] * self.Tsymbol_2_Tc} were given." )
+        assert prop_link_idx[0] < self.K * self.Nr and prop_link_idx[1] < self.Nt, ( f"`prop_link_idx` must be an index element of the channel matrix (shape: (Nt, K * Nr) = ({self.Nt}, {self.K * self.Nr})). However, `prop_link_idx` = {prop_link_idx} was given." )
+        
+        # 1. Extract the channel gain process and compute empirical autocorrelation.
+        
         if component == "LoS":
-            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.Mch_max)).reshape(self.K*self.Nr, self.Nt, self.Mch_max)
-            H = np.exp(1j * theta)
-        
+            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * np.ones(self._H_NLoS.shape[0])
         elif component == "NLoS":
-            H_NLoS = self._H_NLoS
-            H = H_NLoS
-        
+            h = self._H_NLoS[:, prop_link_idx[0], prop_link_idx[1]]
         elif component == "LoS + NLoS":
-            theta = np.broadcast_to(self._theta[:, None, None, None], (self.K, self.Nr, self.Nt, self.Mch_max)).reshape(self.K*self.Nr, self.Nt, self.Mch_max)
-            H_NLoS = self._H_NLoS
-            H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
-        
+            h = np.exp(1j * self._theta[prop_link_idx[0] // self.Nr]) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * self._H_NLoS[:, prop_link_idx[0], prop_link_idx[1]])
         else:
-            raise ValueError(f"Unknown component '{component}' for plotting the autocorrelation function. Valid options are: 'LoS', 'NLoS' and 'LoS + NLoS'.")
+            raise ValueError(f"Unknown component '{component}' for plotting the channel gain process. Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.")
 
-        H_flat = H.reshape(self.K*self.Nr*self.Nt, self.Mch_max)
+        Rh_simulation = (1 / len(h)) * np.correlate(h, h, mode='full')[(len(h)-1) - (N_Tc//2 * Msvptc) : (len(h)-1) + (N_Tc//2 * Msvptc)]
+        Rh_simulation /= Rh_simulation[N_Tc//2 * Msvptc]
 
 
-        # Compute the empirical autocorrelation for each realization. ( Normalized lag axis: tau_norm[k] = tau[k] / Tc = (k * T_sample) / Tc = (k * self.T_block * Tc) / Tc = k * self.T_block )
-        
-        tau_sim_norm = np.arange(-max_lag, max_lag + 1) * self.T_block
-        R_empirical = np.zeros(2 * max_lag + 1, dtype=complex)
-
-        for sample_num in range(num_samples):
-            
-            h = H_flat[sample_num, :]
-            R_realization = np.zeros(2 * max_lag + 1, dtype=complex)
-            R_realization[max_lag] = np.mean(np.abs(h)**2)
-            for lag in range(1, max_lag + 1):
-                R_realization[max_lag + lag] = np.mean(h[lag:] * np.conj(h[:-lag]))
-            R_realization[:max_lag] = np.conj(R_realization[max_lag + 1:])[::-1]
-
-            R_empirical += R_realization
-        
-        R_empirical /= num_samples
-
-        # 2. Compute the analytical autocorrelation in normalized units ( Normalized lag axis: 2pi * fD * tau[k] = 2pi * (0.242 / Tc) * tau[k] = 2pi * (0.242) * tau_norm[k] )
-        tau_analytical_norm = np.linspace(tau_sim_norm[0], tau_sim_norm[-1], 10_000)
-        R_analytical = j0(2 * np.pi * 0.242097596 * tau_analytical_norm)
+        # 2. Compute the analytical autocorrelation.
+        Rh_analytical = j0(2 * np.pi * self.fD_times_Tc * tau*self.Tsymbol_2_Tc)
 
         # 3. Plot.
         fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(tau_sim_norm, np.real(R_empirical), color="tab:blue", linewidth=2.5, label=r"$R_h(\tau)$ (Simulated)")
-        ax.plot(tau_analytical_norm, R_analytical, color="black", linestyle="--", linewidth=1.5, label=r"$R_h(\tau) = J_0(2\pi f_D \tau)$ (Analytical)")
-
-        #ax.axvline(1.0, color="tab:green", linestyle="-", lw=1)
-        #ax.axvline(-1.0, color="tab:green", linestyle="-", lw=1)
+        ax.plot(tau, np.real(Rh_simulation), color="tab:blue", linewidth=2.5, label=r"$R_h(\tau)$ (Simulated)")
+        ax.plot(tau, Rh_analytical, color="black", linestyle="--", linewidth=1.5, label=r"$R_h(\tau) = J_0(2\pi f_D \tau)$ (Analytical)")
+        if component == "LoS + NLoS": ax.axhline(self.K_rice / (self.K_rice + 1), color="slategray", linestyle="-", linewidth=1.5, label=r"$\frac{K}{K+1}$")
 
         # x-axis ticks and labels.
         def Tc_formatter(x, pos):
-            n = int(round(x))
+            n = int(round(x / Msvptc))
             if   n == 0:  return r"$0$"
             elif n == 1:  return r"$T_c$"
             elif n == -1: return r"$-T_c$"
             else:         return rf"${n} \, T_c$"
-        ax.xaxis.set_major_locator(MultipleLocator(max(1, int(np.round(tau_sim_norm[-1] / 5)))))
+        ax.xaxis.set_major_locator(MultipleLocator(((N_Tc * Msvptc) / 10)))
         ax.xaxis.set_major_formatter(FuncFormatter(Tc_formatter))
 
         # y-axis ticks and labels.
@@ -757,28 +820,28 @@ class RiceanFadingChannelModel(ChannelModel):
 
         ax.set_xlabel(r"$\tau \; [s]$")
         ax.set_ylabel(r"$R_h(\tau)$")
-        ax.set_title(f"Autocorrelation of a {component} process" if num_samples == 1 else f"Autocorrelation of a {component} process\n(averaged over {num_samples} realizations)" )
+        ax.set_title(f"Autocorrelation of a {component} process")
         ax.legend()
         ax.grid(True, which="both", linestyle="--")
         plt.tight_layout()
 
-        plot_Rh_filename = f"Rh {component} process ({max_lag} lags, {num_samples} samples).png"
-        plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "satellite channel autocorrelation"
+        plot_Rh_filename = f"Rh {component} process ({N_Tc} coherence periods).png"
+        plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ricean time-correlated fading channel" / "autocorrelation"
         plot_Rh_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_Rh_dir / plot_Rh_filename, dpi=300, bbox_inches="tight")
         return fig, ax
 
-    def plot_NLoS_PSD(self, num_samples: int = 1) -> None:
+    def plot_NLoS_PSD(self, num_segments: int = 1, prop_link_idx: tuple[int, int] | None = (0, 0)) -> tuple[plt.Figure, plt.Axes]:
         r"""
         Plot the power spectral density (PSD) of the generated NLoS process and compare it to the analytical expression.
 
-        The simulated PSD is calculated by averaging the periodograms of `num_samples` independent realizations (Bartlett's method):
+        The simulated PSD is calculated using Bartlett's method:
         
         .. math::
 
-            \hat{S}_h(f) = \frac{1}{M} \sum_{m=1}^{M} T_s \cdot \left| H_{m}(f) \right|^2
+            \hat{S}_h(f_k) = \frac{1}{M} \sum_{m=0}^{M-1} \hat{S}_h^{(m)}(f_k), \quad \text{with } \hat{S}_h^{(m)}(f_k) = \frac{T_{\text{sym}}}{L} \left| \sum_{n=0}^{L-1} h[mL + n] \, e^{-j 2\pi k n / L} \right|^2 \quad \text{and} \quad f_k = \frac{k}{L \cdot T_{\text{sym}}}
 
-        where M is the number of process realizations (`num_samples`).
+        where :math:`L = \lfloor N / M \rfloor` is the segment length, :math:`M` is the number of segments (`num_segments`), and :math:`N` is the total number of channel realizations.
         
         The analytical PSD is given by Jake's Doppler Spectrum:
         
@@ -788,43 +851,42 @@ class RiceanFadingChannelModel(ChannelModel):
 
         Parameters
         ----------
-        num_samples : int
-            The number of periodogram realizations to average over. Default is 1. 
-            Should be smaller than or equal to K * Nr * Nt, because the average cannot be taken across different simulations.
-
+        num_segments : int
+            The number of independent segments to average over when computing the simulated PSD using Bartlett's method. Default is 1 (no averaging).
+        prop_link_idx : tuple[int, int] | None
+            The index of the propagation link to plot, in the form (k * Nr + nr, nt).
+            If this is None, the PSDs will be averaged over all propagation links.
+        
+        
         Returns
         -------
         fig : matplotlib.figure.Figure
             The figure object containing the plot.
         ax : matplotlib.axes.Axes
             The axes object containing the plot.
-
-        Notes
-        -----
-        The plot is normalized in the sense that the frequency axis is expressed in units of the maximum Doppler frequency :math:`f_D`.
-
-        This function is intended to be used for validating the generated NLoS process! It will reset the channel model to ensure we start at time instant zero and that all pre-generated NLoS components are deleted. Then, it will generate num_samples sequences of the NLoS process using the specified method, compute the periodogram for each, and average them (Bartlett's method). Finally, it will compute the analytical PSD and plot both the empirical and analytical PSDs.
         """
  
-        assert num_samples <= self.K * self.Nr * self.Nt, (f"num_samples should be smaller than or equal to K * Nr * Nt = {self.K * self.Nr * self.Nt}, because the average cannot be taken across different simulations. However, num_samples={num_samples} was given.")
-        
-        # 0. Reset the channel model.
-        self.reset()
+        # Validation.
+        assert self._H_NLoS is not None, "The channel model must be reset before plotting the PSD. Please call the `reset` method of the channel model before plotting."
+        assert prop_link_idx is None or (prop_link_idx[0] < self.K * self.Nr and prop_link_idx[1] < self.Nt), ( f"`prop_link_idx` must be an index element of the channel matrix (shape: (Nt, K * Nr) = ({self.Nt}, {self.K * self.Nr})). However, `prop_link_idx` = {prop_link_idx} was given." )
+        assert num_segments > 0, "`num_segments` must be a positive integer."
 
         # 1. Compute the PSD (Bartlett's method).
-        H_NLoS_flat = self._H_NLoS.reshape(self.K*self.Nr*self.Nt, self.Mch_max)
-
-        # Compute the periodogram for each realization.
-        S_sim = np.zeros(self.Mch_max, dtype=float)
-        for sample_num in range(num_samples):
-            h = H_NLoS_flat[sample_num, :]
-            S_sim_realization = (self.T_block*(0.242097596) / self.Mch_max) * np.abs(np.fft.fft(h))**2
-            S_sim += S_sim_realization
-        S_sim /= num_samples
-
-        # Normalized frequency axis.
-        f_sim_norm = np.fft.fftshift(np.fft.fftfreq(self.Mch_max, d=self.T_block*(0.242097596)))
-        S_sim = np.fft.fftshift(S_sim)
+        length_segments = self._H_NLoS.shape[0] // num_segments
+        
+        if prop_link_idx is None: 
+            h = self._H_NLoS[:num_segments * length_segments]
+            h_segments = h.reshape(num_segments, length_segments, self.K*self.Nr, self.Nt)
+        else: 
+            h = self._H_NLoS[:num_segments * length_segments, prop_link_idx[0], prop_link_idx[1]]
+            h_segments = h.reshape(num_segments, length_segments)
+        
+        H_fft = np.fft.fft(h_segments, axis=1)
+        periodogram = (self.fD_times_Tc * self.Tsymbol_2_Tc / length_segments) * np.abs(H_fft)**2
+        
+        S_simulation = np.fft.fftshift(np.mean(periodogram, axis=(0 if prop_link_idx is not None else (0, 2, 3))))
+        f_simulation = np.fft.fftshift(np.fft.fftfreq(length_segments, d=self.fD_times_Tc * self.Tsymbol_2_Tc))
+        
 
         # 2. Compute the analytical PSD in normalized units.
         f_analytical_norm = np.linspace(-0.999, 0.999, 10_000)
@@ -833,7 +895,7 @@ class RiceanFadingChannelModel(ChannelModel):
         # 3. Plot.
         fig, ax = plt.subplots(figsize=(10, 4))
         
-        ax.plot(f_sim_norm, S_sim, color="tab:blue", linewidth=2.5, label=r"$S_h(f)$ (Simulated)")
+        ax.plot(f_simulation, S_simulation, color="tab:blue", linewidth=2.5, label=r"$S_h(f)$ (Simulated)")
         ax.plot(f_analytical_norm, S_analytical_norm, color="black", linestyle="--", linewidth=1.5, label=r"$S_h(f) = \frac{1}{\pi f_D \sqrt{1-(f/f_D)^2}}$ (Analytical)")
         
         ax.axvline(-1.0, color="gray", linestyle=":", lw=1)
@@ -865,13 +927,13 @@ class RiceanFadingChannelModel(ChannelModel):
         ax.set_ylabel(r"$S_h(f) \cdot f_D$")
         ax.set_xlim(-1.25, 1.25)
         ax.set_ylim(0, 4.0)
-        ax.set_title("PSD of the NLoS process" if num_samples == 1 else f"PSD of the NLoS process\n(averaged over {num_samples} realizations)")
+        ax.set_title("PSD of a NLoS process" + ("\naveraged across all propagation links" if prop_link_idx is None else ""))
         ax.legend()
         ax.grid(True, which="both", linestyle="--")
         plt.tight_layout()
 
-        plot_psd_filename = f"PSD NLoS process ({num_samples} samples).png"
-        plot_psd_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "satellite channel PSD"
+        plot_psd_filename = f"PSD NLoS process ({num_segments} segments)" + (" averaged" if prop_link_idx is None else "") + ".png"
+        plot_psd_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ricean time-correlated fading channel" / "PSD"
         plot_psd_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_psd_dir / plot_psd_filename, dpi=300, bbox_inches="tight")
         return fig, ax
@@ -1000,23 +1062,18 @@ class CSAWGNNoiseModel(NoiseModel):
 
 if __name__ == "__main__":
 
-    channel_model = RiceanFadingChannelModel(Nt=16, Nr=2, K=4, K_rice=10**(5/10), Trtt_2_Tc=0.5)
+    channel_model = RiceanFadingChannelModel(Nt=8, Nr=2, K=4, K_rice=10**(5/10), Trtt_2_Tc=0.5)
+    # channel_model.reset(1000, 20)
+
+    # channel_model.plot_channel_gain_process(N_Tc=5)
+    # channel_model.plot_channel_gain_process(N_Tc=20)
+    # channel_model.plot_channel_gain_process(N_Tc=5, uncorrelated_ref=True)
+    # channel_model.plot_channel_gain_process(N_Tc=5, assumption_ref=True)
     
-    # channel_model.plot_autocorrelation(max_lag=15, num_samples=1)
-    # channel_model.plot_autocorrelation(max_lag=15, num_samples=128)
-    # channel_model.plot_autocorrelation(max_lag=100, num_samples=1)
-    # channel_model.plot_autocorrelation(max_lag=100, num_samples=64)
-    # channel_model.plot_autocorrelation(max_lag=100, num_samples=128)
+    # channel_model.plot_autocorrelation(component="NLoS")
+    # channel_model.plot_autocorrelation(N_Tc=40, component="NLoS")
+    # channel_model.plot_autocorrelation(component="LoS + NLoS")
+    # channel_model.plot_autocorrelation(N_Tc=40, component="LoS + NLoS")
 
-    # channel_model.plot_autocorrelation(max_lag=15, num_samples=1, component="LoS + NLoS")
-    # channel_model.plot_autocorrelation(max_lag=15, num_samples=128, component="LoS + NLoS")
-    # channel_model.plot_autocorrelation(max_lag=100, num_samples=1, component="LoS + NLoS")
-    # channel_model.plot_autocorrelation(max_lag=100, num_samples=128, component="LoS + NLoS")
-
-    # channel_model.plot_NLoS_PSD(num_samples=1)
-    # channel_model.plot_NLoS_PSD(num_samples=64)
-    # channel_model.plot_NLoS_PSD(num_samples=128)
-
-    # channel_model.plot_channel_gain_process(Mch=10, samples_per_block=20, component="LoS + NLoS", uncorrelated_ref=True)
-    # channel_model.plot_channel_gain_process(Mch=10, samples_per_block=20, component="LoS + NLoS", assumption_ref=True)
-    # channel_model.plot_channel_gain_process(Mch=100, samples_per_block=20, component="LoS + NLoS")
+    # channel_model.plot_NLoS_PSD(num_segments=1, prop_link_idx=None)
+    # channel_model.plot_NLoS_PSD(num_segments=10, prop_link_idx=None)

@@ -32,15 +32,19 @@ class ChannelStateInformation:
 
 @dataclass()
 class ChannelState:
-    """
+    r"""
     The state of the channel.
 
     Parameters
     ----------
     snr : float
         The signal-to-noise ratio.
-    H : ComplexArray, shape (K * Nr, Nt)
-        The channel matrix.
+    H : ComplexArray, shape (K * Nr, Nt) or (Tblock_2_Tsymbol, K * Nr, Nt)
+        The channel matrix of the current symbol block.
+
+        In case of an uncorrelated channel (:math:`T_c = 0`), it only contains a single channel matrix, used for the transmission of all symbol vectors that should be transmitted at once.
+
+        In case of a correlated channel (:math:`T_c > 0`), it contains the channel matrices for the transmission of each symbol vector.
 
     Notes
     -----

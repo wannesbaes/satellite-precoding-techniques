@@ -62,29 +62,27 @@ class SimulationRunner:
 
             inner_loop_results: list[SingleSnrSimResult] = []
             bit_error_count = 0
-            channel_realization_count = 0
-            hard_stop = 0
+            block_count = 0
 
             # Reset.
-            self.mu_mimo_system.reset(snr)
+            M_chbl_max, M_sv = self.mu_mimo_system.reset(snr, self.sim_config.M_chbl_max, self.sim_config.M_sv)
 
             # Inner loop: Iterate over the channel realizations.
-            while (channel_realization_count < self.sim_config.Mch_min) or (bit_error_count < self.sim_config.num_bit_errors) and (hard_stop < 2 * self.sim_config.Mch_min):
+            while (block_count < self.sim_config.M_chbl_min or bit_error_count < self.sim_config.num_bit_errors) and block_count < M_chbl_max:
 
                 # Configuration.
                 stream_Rs = self.mu_mimo_system.configure()
 
                 # Communication.
-                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(self.sim_config.Msv)
+                tx_bits_list, rx_bits_list = self.mu_mimo_system.communicate(M_sv)
 
                 # Store inner loop results.
-                inner_loop_result = self._calculate_inner_loop_result(snr, stream_Rs, tx_bits_list, rx_bits_list)
+                inner_loop_result = self._calculate_inner_loop_result(tx_bits_list, rx_bits_list, stream_Rs, M_sv, snr)
                 inner_loop_results.append(inner_loop_result)
 
                 # Stopping criterion.
-                channel_realization_count += 1
+                block_count += 1
                 bit_error_count += self._calculate_bit_error_count_update(inner_loop_result)
-                hard_stop += 1
 
             # Store outer loop results.
             simulation_results.append(self._calculate_outer_loop_result(inner_loop_results))
@@ -128,20 +126,24 @@ class SimulationRunner:
         becu = int(becu) if not np.isnan(becu) else 0
         return becu
 
-    def _calculate_inner_loop_result(self, snr: float, stream_Rs: RealArray, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]]) -> SingleSnrSimResult:
+    def _calculate_inner_loop_result(self, tx_bits_list: list[list[BitArray]], rx_bits_list: list[list[BitArray]], stream_Rs: RealArray, M_sv: int, snr: float) -> SingleSnrSimResult:
         """
         Calculate the performance metrics for a simulation corresponding to a single channel realization and SNR value.
 
         Parameters
         ----------
-        snr : float
-            The SNR value for this simulation.
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M_sv)
+            The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M_sv)
+            The list of bitstreams for each UT k and each data stream s that were reconstructed by the UTs.
+        
         stream_Rs : RealArray, shape (K, Nr)
             The achievable rates of each UT and each stream for this channel realization (and SNR value and system configuration).
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
-            The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
-            The list of bitstreams for each UT k and each data stream s that were reconstructed by the UTs.
+        M_sv : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the number of symbol vector transmissions per block.
+        snr : float
+            The SNR value for this simulation.
         
         Returns
         -------
@@ -171,7 +173,7 @@ class SimulationRunner:
 
             for a_s in range(Ns[k]):
                 active_streams = np.where(ibr[k*Nr : (k+1)*Nr] > 0)[0]
-                stream_ibrs[k][active_streams[a_s]] = len(tx_bits_list[k][a_s]) // self.sim_config.Msv
+                stream_ibrs[k][active_streams[a_s]] = len(tx_bits_list[k][a_s]) // M_sv
                 stream_becs[k][active_streams[a_s]] = np.sum(tx_bits_list[k][a_s] != rx_bits_list[k][a_s])
                 stream_ars[k][active_streams[a_s]] = 1
             
@@ -211,8 +213,8 @@ class SimulationRunner:
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
 
-            Msv = self.sim_config.Msv,
-            Mch = 1
+            M_sv = M_sv,
+            M_chbl_tot = 1
         )
         return inner_loop_result
 
@@ -236,6 +238,9 @@ class SimulationRunner:
         snr_dB = inner_loop_results[0].snr_dB
         if not all(snr_dB == ilr.snr_dB for ilr in inner_loop_results):
             raise ValueError("The SNR values of the inner loop results are not all the same. Please check the inner loop results to resolve this issue.")
+        M_sv = inner_loop_results[0].M_sv
+        if not all(M_sv == ilr.M_sv for ilr in inner_loop_results):
+            raise ValueError("The number of symbol vector transmissions for each block / channel realization (M_sv) of the inner loop results are not all the same. Please check the inner loop results to resolve this issue.")
         
         K = self.system_config.K
         
@@ -321,8 +326,8 @@ class SimulationRunner:
             stream_ars_avg = stream_ars_avg,
             ut_ars_avg = ut_ars_avg,
 
-            Msv = self.sim_config.Msv,
-            Mch = len(inner_loop_results)
+            M_sv = M_sv,
+            M_chbl_tot = len(inner_loop_results)
         )
         return outer_loop_result
 
@@ -354,23 +359,39 @@ class MuMimoSystem:
         self.channel = Channel(K, Nr, Nt, system_config.channel_configs)
         self.uts = [UserTerminal(k, Nr, system_config.user_terminal_configs) for k in range(K)]
 
-    def reset(self, snr: float) -> None:
+    def reset(self, snr: float, M_chtc_max_sim_setting : int, M_sv_sim_setting : int) -> None:
         """
         Resets the MU-MIMO system. 
         
         Before starting the simulation for a new SNR value, the system must be resetted.
-        For more datail on the reset phase, we refer to the reset_state() methods of the channel.
+        For more datail on the reset phase, we refer to the reset_state() method of the channel.
 
         Parameters
         ----------
         snr : float
             The SNR value to reset the system to.
+        M_chtc_max_sim_setting : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the maximum number of channel realizations per SNR value.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the (maximum) number of coherence periods of the channel.
+        M_sv_sim_setting : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the coherence period to symbol period ratio (:math:`\frac{T_c}{T{\text{symbol}}}`).
+            In other words, the number of symbol vectors per block when using full block-level precoding (:math:`T_c = T{\text{block}}`).
+
+        Returns
+        -------
+        M_chbl_max : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the total number of channel realizations.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the total number of blocks.
+        M_sv : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the number of symbol vector transmissions per block.
         """
 
         # Reset the channel state.
-        self.channel.reset(snr)
+        M_chbl_max, M_sv = self.channel.reset(snr, M_chtc_max_sim_setting, M_sv_sim_setting)
 
-        return
+        return M_chbl_max, M_sv
 
     def configure(self) -> None:
         """
@@ -409,7 +430,7 @@ class MuMimoSystem:
 
         return self._compute_capacity()
 
-    def communicate(self, Msv: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
+    def communicate(self, M_sv: int) -> tuple[list[list[BitArray]], list[list[BitArray]]]:
         """
         Communication of the MU-MIMO system.
 
@@ -418,19 +439,19 @@ class MuMimoSystem:
 
         Parameters
         ----------
-        Msv : int
-            The number of symbol vector transmissions for this channel realization and SNR.
+        M_sv : int
+            The number of symbol vectors to transmit.
         
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M_sv)
             The list of bitstreams for each UT k and each data stream s that were transmitted by the BS.
-        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
+        rx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M_sv)
             The list of bitstreams for each UT k and each data stream s that were received by the UTs.
         """
 
         # Transmit from the BS.
-        tx_bits_list, x = self.bs.transmit(Msv)
+        tx_bits_list, x = self.bs.transmit(M_sv)
 
         # Propagate through the channel.
         y_k_list = self.channel.propagate(x)
@@ -463,15 +484,25 @@ class MuMimoSystem:
         """
 
         # Initialization.
+
+        # system parameters.
         Pt = self.system_config.Pt
         B = self.system_config.B
         Nr = self.system_config.Nr
         K = self.system_config.K
 
+        # SNR.
         snr = self.channel.state.snr
+        
+        # channel matrices.
         H = self.channel.state.H
+        if len(H.shape) == 2:
+            H = H[np.newaxis, :, :]
 
+        # compound precoding matrix.
         F = self.bs.state.F
+        
+        # compound combining matrix.
         if self.bs.state.G is not None:
             G = self.bs.state.G
         else:
@@ -480,21 +511,20 @@ class MuMimoSystem:
                 k = ut.ut_id
                 G[k*Nr: (k+1)*Nr, k*Nr: (k+1)*Nr] = ut.state.G_k
         
+        
         # Compute the transfer matrix T = G @ H @ F.
         T = G @ H @ F
-        
+
         # Compute the power of the noise, the interference, and the useful signal for each data stream.
-        p_noise = (Pt / snr) * np.sum( np.abs(G)**2, axis=1 )
-        p_interference = np.sum( np.abs( T - np.diag(np.diagonal(T)) )**2, axis=1 )
-        p_useful = np.abs( np.diagonal(T) )**2
+        p_noise = (Pt / snr) * np.sum(np.abs(G)**2, axis=1)
+        p_useful = np.abs(np.diagonal(T, axis1=-2, axis2=-1))**2
+        p_interference = np.sum(np.abs(T * (1 - np.eye(T.shape[-1])))**2, axis=-1)
 
         # Compute the SINR for each data stream.
         sinr = p_useful / (p_interference + p_noise)
-        # sinr = np.where((p_useful == 0) & (p_interference + p_noise == 0), 0, p_useful / (p_interference + p_noise))
 
         # Compute the achievable bit rates.
-        capacity = 2*B * np.log2(1 + sinr)
-        capacity = capacity.reshape((K, Nr))
+        capacity = np.mean(2*B * np.log2(1 + sinr), axis=0).reshape((K, Nr))
 
         return capacity
 
@@ -600,30 +630,30 @@ class BaseStation:
         tx_ff_msg = TransmitFeedforwardMessage(c_type=self.c_configs.types, C_eq=self.state.C_eq, ibr=self.state.ibr, G=self.state.G)
         return tx_ff_msg
 
-    def transmit(self, Msv: int) -> tuple[list[list[BitArray]], ComplexArray]:
+    def transmit(self, M_sv: int) -> tuple[list[list[BitArray]], ComplexArray]:
         """
         Simulate the transmit processing chain of the BS to obtain the transmitted signal x.
 
         The processing chain consists of the following steps:
 
-        1. Bit Allocation - generate the bitstreams b_s for each data stream s based on the information bit rates ibr and the number of symbols to be transmitted Msv.
-        2. Mapping - convert the bitstreams b_s to the corresponding data symbol streams a_s based on the modulation scheme (determined by the information bit rates ibr).
-        3. Precoding - apply the precoding matrix F to the symbol streams a_s to obtain the transmitted signal x.
+        1. Bit Allocation - generate the bitstreams `b_s` for each data stream `s` based on the information bit rates `ibr` and the number of symbols to be transmitted `M_sv`.
+        2. Mapping - convert the bitstreams `b_s` to the corresponding data symbol streams `a_s` based on the modulation scheme (determined by the information bit rates `ibr`).
+        3. Precoding - apply the precoding matrix `F` to the symbol streams `a_s` to obtain the transmitted signal `x`.
 
         Parameters
         ----------
-        Msv : int
-            The number of symbol vector transmissions for this channel realization and SNR.
+        M_sv : int
+            The number of symbol vectors to transmit.
 
         Returns
         -------
-        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * Msv)
+        tx_bits_list : list[list[BitArray]], shape (K, Ns_k, ibr_k_s * M_sv)
             The list of bitstreams for each UT k and each data stream s.
-        x : ComplexArray, shape (Nt, Msv)
+        x : ComplexArray, shape (Nt, M_sv)
             The transmitted signal.
         """
 
-        tx_bits_list, b = self.bit_loader.apply(self.state.ibr, Msv, self.state.Ns)
+        tx_bits_list, b = self.bit_loader.apply(self.state.ibr, M_sv, self.state.Ns)
         a = self.mapper.apply(b, self.state.ibr, self.c_configs.types, self.state.Ns)
         x = self.precoder.apply(a, self.state.F, self.state.ibr)
 
@@ -662,8 +692,8 @@ class Channel:
         # State.
         self.state: ChannelState | None = None
 
-    def reset(self, snr: float) -> None:
-        """
+    def reset(self, snr: float, M_chtc_max_sim_setting: int, M_sv_sim_setting: int) -> None:
+        r"""
         Resets the channel.
 
         First, the state of the channel is reset.
@@ -673,24 +703,39 @@ class Channel:
         Parameters
         ----------
         snr : float
-            The signal-to-noise ratio (SNR) to reset the channel to.
+            The SNR value to reset the system to.
+        M_chtc_max_sim_setting : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the maximum number of channel realizations per SNR value.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the (maximum) number of coherence periods of the channel.
+        M_sv_sim_setting : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the coherence period to symbol period ratio (:math:`\frac{T_c}{T{\text{symbol}}}`).
+            In other words, the number of symbol vectors per block when using full block-level precoding (:math:`T_c = T{\text{block}}`).
+
+        Returns
+        -------
+        M_chbl_max : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the total number of channel realizations.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the total number of blocks.
+        M_sv : int
+            In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+            In case of a correlated fading channel (:math:`T_c > 0`), the number of symbol vector transmissions per block.
         """
         
         # Reset the state of the channel.
         self.state = ChannelState(snr=snr, H=None)
 
         # Reset the channel model and noise model.
-        self.channel_model.reset()
+        M_chbl_max, M_sv = self.channel_model.reset(M_chtc_max_sim_setting, M_sv_sim_setting)
         self.noise_model.reset()
 
-        return
+        return M_chbl_max, M_sv
 
     def proceed(self) -> None:
         """
-        Proceed to the next channel realization.
+        Proceed to the next symbol block.
 
-        This method should be called when the coherence time of the channel is passed.
-        When this method is called, the system is ready to continue the configuration by sending the configuration messages.
+        This method should be called when block period is passed.
         """
         self.state.H = self.channel_model.proceed()
         return
@@ -793,12 +838,12 @@ class Channel:
 
         Parameters
         ----------
-        x : ComplexArray, shape (Nt, Msv)
+        x : ComplexArray, shape (Nt, M_sv)
             The transmitted signal.
         
         Returns
         -------
-        y_k_list : list[ComplexArray], shape (K, Nr, Msv)
+        y_k_list : list[ComplexArray], shape (K, Nr, M_sv)
             The list of received signals for each UT k.
         """
 
@@ -934,12 +979,12 @@ class UserTerminal:
 
         Parameters
         ----------
-        y_k : ComplexArray, shape (Nr, Msv)
+        y_k : ComplexArray, shape (Nr, M_sv)
             The received signal at this UT.
         
         Returns
         -------
-        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * Msv)
+        rx_bits_list : list[BitArray], shape (Ns_k, ibr_k_s * M_sv)
             The list of estimated bitstreams for each data stream s of this UT.
         """
 

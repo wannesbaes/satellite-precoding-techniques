@@ -4,55 +4,63 @@
   "configurations": [
 
         {
-            "Description":                                  "Standard Simulation Configurations",
-            "Ref. Number":                                  "1.0",
+            "Description":                                  "Standard Simulation Configurations 1",
+            "Ref. Number":                                  "1",
+            
             "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
-            "Minimum channel realizations per SNR value":   1000,
+            
             "Minimum bit errors per SNR value":             250,
             "Scope of bit errors":                          "system-wide",
-            "Transmissions per channel realization":        512
+            
+            "Minimum channel realizations / coherence periods per SNR value":            1000,
+            "Maximum channel realizations / coherence periods per SNR value":            2000,
+            
+            "Symbol vector transmissions per channel realization / coherence period":    512
         },
 
         {
-            "Description":                                  "Standard Simulation Configurations - UTs",
-            "Ref. Number":                                  "1.1",
-            "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
-            "Minimum channel realizations per SNR value":   1000,
-            "Minimum bit errors per SNR value":             250,
-            "Scope of bit errors":                          "uts",
-            "Transmissions per channel realization":        512
-
-        },
-
-        {
-            "Description":                                  "Standard Simulation Configurations - streams",
-            "Ref. Number":                                  "1.2",
-            "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
-            "Minimum channel realizations per SNR value":   1000,
-            "Minimum bit errors per SNR value":             250,
-            "Scope of bit errors":                          "streams",
-            "Transmissions per channel realization":        512
-
-        },
-
-        {
-            "Description":                                  "First Test Simulation Configurations",
-            "Ref. Number":                                  "2.1",
-            "SNR values (in dB)":                           [-10, 0, 10, 20, 30],
-            "Minimum channel realizations per SNR value":   10,
-            "Minimum bit errors per SNR value":             10,
-            "Scope of bit errors":                          "system-wide",
-            "Transmissions per channel realization":        1
-        },
-
-        {
-            "Description":                                  "Second Test Simulation Configurations",
-            "Ref. Number":                                  "2.2",
+            "Description":                                  "Test Simulation Configurations 1",
+            "Ref. Number":                                  "1.test",
+            
             "SNR values (in dB)":                           [-10, -5, 0, 5, 10, 15, 20, 25, 30],
-            "Minimum channel realizations per SNR value":   100,
+
+            "Minimum bit errors per SNR value":             100,
+            "Scope of bit errors":                          "system-wide",
+            
+            "Minimum channel realizations / coherence periods per SNR value":            100,
+            "Maximum channel realizations / coherence periods per SNR value":            200,
+            
+            "Symbol vector transmissions per channel realization / coherence period":     100
+        },
+        
+        {
+            "Description":                                  "Standard Simulation Configurations 2",
+            "Ref. Number":                                  "2",
+            
+            "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
+            
+            "Minimum bit errors per SNR value":             250,
+            "Scope of bit errors":                          "system-wide",
+            
+            "Minimum channel realizations / coherence periods per SNR value":            1000,
+            "Maximum channel realizations / coherence periods per SNR value":            1001,
+            
+            "Symbol vector transmissions per channel realization / coherence period":    60
+        },
+
+        {
+            "Description":                                  "Test Simulation Configurations 2",
+            "Ref. Number":                                  "2.test",
+            
+            "SNR values (in dB)":                           [-10, -5, 0, 5, 10, 15, 20, 25, 30],
+
             "Minimum bit errors per SNR value":             50,
             "Scope of bit errors":                          "system-wide",
-            "Transmissions per channel realization":        256
+            
+            "Minimum channel realizations / coherence periods per SNR value":            100,
+            "Maximum channel realizations / coherence periods per SNR value":            101,
+            
+            "Symbol vector transmissions per channel realization / coherence period":    6
         }
   ]
 

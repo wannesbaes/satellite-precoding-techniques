@@ -194,7 +194,7 @@ class SystemConfig:
         lines: list[str] = []
         
         lines.append(f"  {self.name}:\n")
-        lines.append(f"  K  = {self.K} UTs, Nr = {self.Nr}, Nt = {self.Nt}")
+        lines.append(f"  Nt = {self.Nt}, K  = {self.K} UTs, Nr = {self.Nr}")
         lines.append(f"  Pt = {self.Pt} W, B = {self.B} Hz")
         lines.append(f"  Precoder  : {self.base_station_configs.precoder.__name__}")
         lines.append(f"  Combiner  : {self.user_terminal_configs.combiner.__name__}")
@@ -263,14 +263,22 @@ class SimConfig:
         The SNR values in dB.
     snr_values : RealArray
         The SNR values in linear scale. It is derived from snr_dB_values.
+    
     num_bit_errors : int
         The minimum number of bit errors per SNR value.
     num_bit_errors_scope : Literal["system-wide", "uts", "streams"]
-        The scope over which the minimum number of bit errors are considered.
-    Mch_min : int
-        The minimum number of channel realizations per SNR value.
-    Msv : int
-        The number of symbol vector transmissions for each channel realization.
+        The scope over which the minimum number of bit errors are considered (not used anywhere).
+    M_chbl_min : int
+        In case of an uncorrelated fading channel (:math:`T_c = 0`), the minimum number of channel realizations per SNR value.\\
+        In case of a correlated fading channel (:math:`T_c > 0`), the minimum number of coherence periods of the channel (not used anywhere).
+    M_chbl_max : int
+        In case of an uncorrelated fading channel (:math:`T_c = 0`), the maximum number of channel realizations per SNR value.\\
+        In case of a correlated fading channel (:math:`T_c > 0`), the (maximum) number of coherence periods of the channel.
+    M_sv : int
+        In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+        In case of a correlated fading channel (:math:`T_c > 0`), the coherence-period-to-symbol-period-ratio (:math:`\frac{T_c}{T{\text{symbol}}}`).
+        In other words, the number of symbol vectors per block when using full block-level precoding (:math:`T_c = T{\text{block}}`).
+    
     name : str
         The name of the simulation configuration.
     """
@@ -278,8 +286,9 @@ class SimConfig:
     snr_dB_values: RealArray
     num_bit_errors: int
     num_bit_errors_scope: Literal["system-wide", "uts", "streams"]
-    Mch_min: int
-    Msv: int
+    M_chbl_min: int
+    M_chbl_max: int
+    M_sv: int
 
     name: str
 
@@ -300,19 +309,21 @@ class SimConfig:
         lines: list[str] = []
 
         lines.append(f"  {self.name}:\n")
-        lines.append(f"  SNR range                              : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
-        lines.append(f"  Min channel realizations               : {self.Mch_min}")
-        lines.append(f"  Min bit errors per channel realization : {self.num_bit_errors} ({self.num_bit_errors_scope})")
-        lines.append(f"  Transmissions per channel realization  : {self.Msv}")
+        lines.append(f"  SNR range : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
+        lines.append(f"  Min bit errors per channel realization       : {self.num_bit_errors} ({self.num_bit_errors_scope})")
+        lines.append(f"  Min channel realizations / coherence periods : {self.M_chbl_min}")
+        lines.append(f"  Max channel realizations / coherence periods : {self.M_chbl_max}")
+        lines.append(f"  Symbol vector transmissions per channel realization / coherence period : {self.M_sv}")
         lines.append("-" * 60)
 
         str_display = "\n".join(lines)
         return str_display
 
     def __post_init__(self):
-        if self.Mch_min <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
         if self.num_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
-        if self.Msv <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization must be a positive integer.")
+        if self.M_chbl_min <= 0: raise ValueError("The minimum number of channel realizations / coherence periods must be a positive integer.")
+        if self.M_chbl_max <= 0: raise ValueError("The maximum number of channel realizations / coherence periods must be a positive integer.")
+        if self.M_sv <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization / coherence period must be a positive integer.")
 
     def __eq__(self, other: object) -> bool:
         
@@ -321,10 +332,11 @@ class SimConfig:
         
         return (
             np.array_equal(self.snr_dB_values, other.snr_dB_values) and
-            self.Mch_min == other.Mch_min and
             self.num_bit_errors == other.num_bit_errors and
             self.num_bit_errors_scope == other.num_bit_errors_scope and
-            self.Msv == other.Msv
+            self.M_chbl_min == other.M_chbl_min and
+            self.M_chbl_max == other.M_chbl_max and
+            self.M_sv == other.M_sv
         )
 
 
@@ -387,10 +399,11 @@ def setup_sim_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SimCo
 
         sim_config = SimConfig(
             snr_dB_values               = np.array(config_settings["SNR values (in dB)"], dtype=float),
-            Mch_min                     = int(config_settings["Minimum channel realizations per SNR value"]),
             num_bit_errors              = int(config_settings["Minimum bit errors per SNR value"]),
             num_bit_errors_scope        = str(config_settings["Scope of bit errors"]),
-            Msv                         = int(config_settings["Transmissions per channel realization"]),
+            M_chbl_min                  = int(config_settings["Minimum channel realizations / coherence periods per SNR value"]),
+            M_chbl_max                  = int(config_settings["Maximum channel realizations / coherence periods per SNR value"]),
+            M_sv                        = int(config_settings["Symbol vector transmissions per channel realization / coherence period"]),
             name                        = "Sim Config " + str(config_settings["Ref. Number"]),
         )
 
@@ -514,24 +527,24 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         channel_model_mapping = {
 
             "Neutral": NeutralChannelModel(
-                Nt=int(config_settings['Nt']), 
-                Nr=int(config_settings['Nr']),
-                K=int(config_settings['K']),
+                Nt = int(config_settings['Nt']), 
+                Nr = int(config_settings['Nr']),
+                K = int(config_settings['K']),
             ) if config_settings['Channel Model'] == "Neutral" else None,
 
             "IID Rayleigh Fading": IIDRayleighFadingChannelModel(
-                Nt=int(config_settings['Nt']), 
-                Nr=int(config_settings['Nr']), 
-                K=int(config_settings['K']),
+                Nt = int(config_settings['Nt']), 
+                Nr = int(config_settings['Nr']), 
+                K = int(config_settings['K']),
             ) if config_settings['Channel Model'] == "IID Rayleigh Fading" else None,
             
             "Ricean Fading": RiceanFadingChannelModel(
-                Nt=int(config_settings['Nt']), 
-                Nr=int(config_settings['Nr']), 
-                K=int(config_settings['K']), 
-                K_rice=5, 
-                Trtt_2_Tc=float(config_settings['Round Trip Time To Coherence Time Ratio']) if config_settings['Round Trip Time To Coherence Time Ratio'] != "terrestrial" else 0.49,
-                Mch_max=2000,       # hard coded to max number of channel realizations for now. Should actually be derived from the simulation configuration settings (Mch_min).
+                Nt = int(config_settings['Nt']), 
+                Nr = int(config_settings['Nr']), 
+                K = int(config_settings['K']), 
+                K_rice = 5, 
+                Trtt_2_Tc = float(config_settings['Round Trip Time To Coherence Time Ratio']),
+                Rh_Tc = float(config_settings['Channel Correlation at Coherence Time Lag']),
             ) if config_settings['Channel Model'] == "Ricean Fading" else None,
         }
 

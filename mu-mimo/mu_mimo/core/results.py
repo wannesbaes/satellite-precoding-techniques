@@ -54,17 +54,19 @@ class SingleSnrSimResult:
     ut_ars_avg : float
         Average UT activation rate.
     
-    Msv : int
-        The number of symbol vector transmissions for each channel realization.
-    Mch : int
-        The number of channel realizations.
+    M_chbl_tot : int
+        In case of an uncorrelated fading channel (:math:`T_c = 0`), the total number of channel realizations.\\
+        In case of a correlated fading channel (:math:`T_c > 0`), the total number of blocks.
+    M_sv : int
+        In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
+        In case of a correlated fading channel (:math:`T_c > 0`), the number of symbol vector transmissions per block.
     
     stream_bers : list[RealArray] (list of K arrays, each shape (Nr,)) | None
-        Per-UT per-stream bit error rates. None if Mch == 1.
+        Per-UT per-stream bit error rates. None if M_chbl_tot == 1.
     ut_bers : RealArray, shape (K,) | None
-        Per-UT bit error rates. None if Mch == 1.
+        Per-UT bit error rates. None if M_chbl_tot == 1.
     ber : float | None
-        System-wide bit error rate. None if Mch == 1.
+        System-wide bit error rate. None if M_chbl_tot == 1.
     """
     
     snr_dB: float
@@ -87,8 +89,8 @@ class SingleSnrSimResult:
     stream_ars_avg : float
     ut_ars_avg : float
 
-    Msv : int
-    Mch : int
+    M_chbl_tot : int
+    M_sv : int
 
 
     stream_bers : list[RealArray] | None = None
@@ -97,20 +99,20 @@ class SingleSnrSimResult:
 
     def __post_init__(self):
 
-        if self.Mch > 1:
+        if self.M_chbl_tot > 1:
 
             K = len(self.stream_ibrs)
 
             self.stream_bers = []
             for k in range(K):
-                denom = self.stream_ibrs[k] * self.Msv * self.Mch
+                denom = self.stream_ibrs[k] * self.M_sv * self.M_chbl_tot
                 ber_k = np.where(denom > 0, self.stream_becs[k] / denom, np.nan)
                 self.stream_bers.append(ber_k)
             
-            ut_denom = self.ut_ibrs * self.Msv * self.Mch
+            ut_denom = self.ut_ibrs * self.M_sv * self.M_chbl_tot
             self.ut_bers = np.where(ut_denom > 0, self.ut_becs / ut_denom, np.nan)
             
-            total_denom = self.ibr * self.Msv * self.Mch
+            total_denom = self.ibr * self.M_sv * self.M_chbl_tot
             self.ber = self.bec / total_denom if total_denom > 0 else np.nan
 
 @dataclass
@@ -421,7 +423,7 @@ class SimResultManager:
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2t": "Perfect CSI", "2s1": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 1$", "2s2": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 2$", "2s4": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 4$", "2s8": r"Outdated CSI, $\frac{T_{RTT}}{T_c} = 8$"}
+            CH_mapping = {"1": "Rayleigh", "2_sl": "instant CSI (symbol-level)", "2_bl": "instant CSI (block-level)", "2_1": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{6}$", "2_2": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{3}$", "2_3": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{2}$", "2_4": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{2}{3}$", "2_5": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{5}{6}$"}
             CH_number = reference_number.split(".")[0]
             label = CH_mapping.get(CH_number, None)
         
@@ -431,7 +433,7 @@ class SimResultManager:
             label = PT_mapping.get(PT_number, None)
 
         elif label_type == "BL":
-            BL_mapping = {"1": "4-QAM", "2": "64-QAM", "3": r"$\approx R$-QAM", "4": r"$\approx \frac{3}{4}R$-QAM"}
+            BL_mapping = {"1": "4-QAM", "2": "64-QAM", "3": r"$\approx R$-QAM", "4": r"$\approx \frac{3}{4}R$-QAM", "5": "16-QAM"}
             BL_number = reference_number.split(".")[2]
             label = BL_mapping.get(BL_number, None)
 
