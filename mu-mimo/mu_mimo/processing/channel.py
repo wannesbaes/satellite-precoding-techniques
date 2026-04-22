@@ -277,6 +277,7 @@ class RiceanFadingChannelModel(ChannelModel):
         self.SYMBOL_LEVEL : bool | None = None
         self._theta : RealArray | None = None
         self._H_NLoS : ComplexArray | None = None
+        self._H_NLoS_CSI : ComplexArray | None = None
 
     def __str__(self) -> str:
         """ Return a string representation of the channel model. """
@@ -354,18 +355,22 @@ class RiceanFadingChannelModel(ChannelModel):
 
         H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
         self._H = H
-
+        
         return H
 
     def get_channel(self):
 
         # Get the LoS and NLoS component.
         theta = np.repeat(self._theta, self.Nr*self.Nt).reshape(self.K*self.Nr, self.Nt)
-        H_NLoS = self._H_NLoS[self._m - self.CSI_fb_delay]
+        if not self.SYMBOL_LEVEL:
+            H_NLoS = self._H_NLoS[self._m - self.CSI_fb_delay]
+        else:
+            H_NLoS = self._H_NLoS_CSI[self._m]
 
         # Return the channel corresponding to the most up-to-date CSI available at the BS.
-        H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
-        return H
+        H_CSI = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
+        
+        return H_CSI
     
 
     def _compute_parameters(self, N_Tc_max: int, Tc_2_Tsymbol: int):
@@ -405,10 +410,9 @@ class RiceanFadingChannelModel(ChannelModel):
             # [CSI_fb_delay] Compute and store the delay on the CSI feedback, in number of symbol vector transmissions.
             CSI_fb_delay = int(max(np.ceil(self.Trtt_2_Tc * Tc_2_Tsymbol), 0))
             self.CSI_fb_delay = CSI_fb_delay
-            self._m += self.CSI_fb_delay
 
             # [Tsymbol_2_Tc] Compute and store the symbol period to coherence time ratio.
-            self.Tsymbol_2_Tc = 1
+            self.Tsymbol_2_Tc = 1 / Tc_2_Tsymbol
 
             # [fD_times_Tc] Compute and store the product between the maximum Doppler frequency and the coherence time.
             RH_TC = 0.5
@@ -451,7 +455,11 @@ class RiceanFadingChannelModel(ChannelModel):
 
         # Generate the NLoS component.
         H_NLoS = self._generate_NLoS(num_channel_realizations, method="Cholesky-decomposition method")
-        self._H_NLoS = H_NLoS
+        if not self.SYMBOL_LEVEL:
+            self._H_NLoS = H_NLoS
+        else:
+            self._H_NLoS = H_NLoS["actual"]
+            self._H_NLoS_CSI = H_NLoS["CSI"]
 
         return theta, H_NLoS
     
@@ -595,9 +603,8 @@ class RiceanFadingChannelModel(ChannelModel):
         """
         raise NotImplementedError("The FIR filter method for generating the NLoS component is not implemented yet.")
 
-    def _generate_SL_NLoS(self, num_channel_realizations: int) -> ComplexArray:
+    def _generate_SL_NLoS(self, num_channel_realizations: int) -> dict[str, ComplexArray]:
         """
-        WIP
         Generate the NLoS component for all channel realizations.
 
         Both the actual channel and the corresponding CSI available at the BS will be returned.
@@ -608,11 +615,11 @@ class RiceanFadingChannelModel(ChannelModel):
 
         for m_ch in range(num_channel_realizations):
 
-            H_NLoS_process = self._generate_NLoS_cholesky(self.CSI_fb_delay)
+            H_NLoS_process = self._generate_NLoS_cholesky(self.CSI_fb_delay + 1)
             H_NLoS[m_ch] = H_NLoS_process[-1]
             H_NLoS_CSI[m_ch] = H_NLoS_process[0]
         
-        return H_NLoS, H_NLoS_CSI
+        return {"actual": H_NLoS, "CSI": H_NLoS_CSI}
 
 
     def plot_channel_gain_process(self, N_Tc: int = 5, component: str = "NLoS", expected_value_ref: bool = True, uncorrelated_ref: bool = False, assumption_ref: bool = False, prop_link_idx: tuple[int, int] = (0, 0)) -> tuple[plt.Figure, plt.Axes]:
