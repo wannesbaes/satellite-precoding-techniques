@@ -19,7 +19,7 @@ class Precoder(ABC):
 
     @staticmethod
     @abstractmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int,) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int,) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
         """
         Compute the compound precoding matrix.\\
         In case of coordinated beamforming, the combining matrices for each UT are computed as well.
@@ -28,8 +28,10 @@ class Precoder(ABC):
         
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information (CSI) of the system.
+        snr : float
+            The signal-to-noise ratio (SNR) of the system.
+        H : ComplexArray, shape (Nr*K, Nt)
+            The compound channel matrix.
         Pt : float
             The total transmit power available at the BS.
         K : int
@@ -82,10 +84,10 @@ class NeutralPrecoder(Precoder):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
 
-        Nt = csi.H_eff.shape[1]
-        Nr = csi.H_eff.shape[0] // K
+        Nt = H.shape[1]
+        Nr = H.shape[0] // K
 
         F = np.eye(Nt, K*Nr)
         G = np.eye(K*Nr)
@@ -101,26 +103,26 @@ class SVDPrecoder(Precoder):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
 
         # Validate that the SVD precoding strategy is only applied in single-user systems.
         if K > 1:
             raise ValueError("The SVD precoding strategy is only available for single-user systems. Please choose a different precoding strategy for multi-user systems.")
         
         # Execute the SVD of the effective channel matrix.
-        U, Sigma, Vh = np.linalg.svd(csi.H_eff, full_matrices=False)
+        U, Sigma, Vh = np.linalg.svd(H, full_matrices=False)
 
         # Determine the precoder and combiner matrices.
         F = Vh.conj().T
         G = U.conj().T
 
         # Determine the optimal power allocation across all the data streams.
-        gamma = (Sigma**2) * (csi.snr / Pt)
+        gamma = (Sigma**2) * (snr / Pt)
         P = waterfilling_v1(gamma=gamma, pt=Pt)
         FP = F @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = np.diag( G @ csi.H_eff @ FP )
+        C_eq = np.diag( G @ H @ FP )
 
         return FP, G, C_eq
 
@@ -135,22 +137,22 @@ class ZFPrecoder(Precoder):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
 
         # The combining matrix is not computed in the ZF precoding strategy.
         G = None
 
         # The precoding matrix is computed as the pseudo-inverse of the effective channel matrix.
-        F = np.linalg.pinv(csi.H_eff)
+        F = np.linalg.pinv(H)
         F_norm = F / np.linalg.norm(F, axis=0)
 
         # The power allocation across the data streams is computed using the waterfilling algorithm to maximize the sum rate under the total power constraint Pt.
-        gamma = (1 / np.linalg.norm(F, axis=0)) * (csi.snr / Pt)
+        gamma = (1 / np.linalg.norm(F, axis=0)) * (snr / Pt)
         P = waterfilling_v1(gamma=gamma, pt=Pt)
         FP = F_norm @ np.diag(np.sqrt(P))
 
         # Compute the equalization coefficients.
-        C_eq = np.diag( csi.H_eff @ FP )
+        C_eq = np.diag( H @ FP )
 
         return FP, G, C_eq
     
@@ -164,10 +166,9 @@ class BDPrecoder(Precoder):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
         
         # Parameter initialization.
-        H = csi.H_eff
         Nr = H.shape[0] // K
         Nt = H.shape[1]
 
@@ -196,7 +197,7 @@ class BDPrecoder(Precoder):
         # STEP 3: the power allocation.
         F = F1 @ F2
         T = G @ H @ F
-        gamma = np.abs(np.diagonal(T))**2 * (csi.snr / Pt)
+        gamma = np.abs(np.diagonal(T))**2 * (snr / Pt)
         P = waterfilling_v1(gamma=gamma, pt=Pt)
         FP = F @ np.diag(np.sqrt(P))
 
@@ -213,10 +214,8 @@ class WMMSEPrecoder(Precoder):
     """
     
     @staticmethod
-    def compute(csi: ChannelStateInformation, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
+    def compute(snr: float, H: ComplexArray, Pt: float, K: int) -> tuple[ComplexArray, ComplexArray | None, ComplexArray]:
 
-        H = csi.H_eff
-        snr = csi.snr
         R = 0
 
         for mode in ['MF', 'random', 'random', 'random']:

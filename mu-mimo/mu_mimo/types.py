@@ -21,39 +21,29 @@ class ChannelStateInformation:
     ----------
     snr : float
         The signal-to-noise ratio. (optional, default None)
-    H_eff : ComplexArray, shape (K * Nr, Nt) or (Ns_total, Nt)
-        The effective channel matrix. (optional, default None)
-
-        In case of coordinated beamforming, the effective channel matrix equals the actual channel matrix.
-        In case of non-coordinated beamforming, the effective channel matrix equals the the actual channel matrix followed by the compound combining matrix (G * H).
+    H_hat : ComplexArray, shape (p, K * Nr, Nt)
+        The p most up-to-date channel estimates.
     """
     snr: float | None = None
-    H_eff: ComplexArray | None = None
+    H_hat: ComplexArray | None = None
 
 @dataclass()
 class ChannelState:
-    r"""
+    """
     The state of the channel.
 
     Parameters
     ----------
-    snr : float
-        The signal-to-noise ratio.
-    H : ComplexArray, shape (K * Nr, Nt) or (Tblock_2_Tsymbol, K * Nr, Nt)
-        The channel matrix of the current symbol block.
-
-        In case of an uncorrelated channel (:math:`T_c = 0`), it only contains a single channel matrix, used for the transmission of all symbol vectors that should be transmitted at once.
-
-        In case of a correlated channel (:math:`T_c > 0`), it contains the channel matrices for the transmission of each symbol vector.
-
-    Notes
-    -----
-    How does the channel state differ from the channel state information (CSI)?
-
-    The channel state contains the actual channel matrix and current SNR value. The channel state information (CSI), however, contains the effective channel matrix instead of the actual channel matrix. So, in case of coordinated beamforming, there is no difference. But in case of non-coordinated beamforming, the effective channel matrix is the actual channel matrix followed by the compound combining matrix (G * H).
+    H : ComplexArray, shape (K * Nr, Nt) or (Msv, K * Nr, Nt)
+        The channel matrix.\\
+        In case of a static channel, the channel matrix has shape (K * Nr, Nt).
+        In case of a time-varying channel, the channel matrix has shape (Msv, K * Nr, Nt), where Msv is the number of channel uses for a single data transmission block.
+    csi : ChannelStateInformation
+        The channel state information (CSI) corresponding to this channel state.\\
+        Depending on the delay on the CSI feedback message, the CSI may be outdated! 
     """
-    snr: float | None = None
     H: ComplexArray | None = None
+    csi: ChannelStateInformation | None = None
 
 @dataclass()
 class BaseStationState:
@@ -86,8 +76,10 @@ class UserTerminalState:
 
     Parameters
     ----------
-    H_k : ComplexArray, shape (Nr, Nt)
-        The channel matrix of this UT.
+    snr_k : float
+        The signal-to-noise ratio for this UT.
+    H_k_hathat : ComplexArray, shape (Nr, Nt)
+        The estimated and/or predicted most up-to-date channel matrix for this UT.
     G_k : ComplexArray, shape (Nr, Nr)
         The combining matrix of this UT.
     c_type_k : ConstType
@@ -99,7 +91,8 @@ class UserTerminalState:
     Ns_k : int
         The number of data streams for this UT.
     """
-    H_k: ComplexArray
+    snr_k: float
+    H_k_hathat: ComplexArray
     G_k: ComplexArray
     c_type_k: ConstType | None
     C_eq_k: ComplexArray | None
@@ -118,14 +111,17 @@ class ReceivePilotMessage:
     """
     The pilot message received by the UT.
 
-    Normally, the received pilot message would contain the received pilot symbols. However, since we consider channel estimation out of scope for this framework, we directly include the channel matrix in the received pilot message.
-
     Parameters
     ----------
-    H_k : ComplexArray, shape (Nr, Nt)
-        The channel matrix of this UT.
+    csi_k : ChannelStateInformation
+        The channel state information (CSI) corresponding to the CSI in UT k after receiving the pilot messages and estimating the channel.
+    
+    Note
+    ----
+    Normally, the received pilot message would contain the received pilot symbols.
+    However, since channel estimation is not yet considered in this framework, the CSI is directly included in the received pilot message.
     """
-    H_k: ComplexArray
+    csi_k: ChannelStateInformation
 
 @dataclass()
 class TransmitFeedbackMessage:
@@ -136,10 +132,13 @@ class TransmitFeedbackMessage:
     ----------
     ut_id : int
         The ID of the UT that transmits this feedback message.
+    snr_k : float
+        The signal-to-noise ratio for this UT.
     H_eff_k : ComplexArray, shape (Nr, Nt)
-        The effective channel matrix of this UT.
+        The effective channel matrix for this UT.
     """
     ut_id: int
+    snr_k: float
     H_eff_k: ComplexArray
 
 @dataclass()
@@ -149,10 +148,13 @@ class ReceiveFeedbackMessage:
 
     Parameters
     ----------
-    csi : ChannelStateInformation
-        The channel state information (CSI).
+    snr : float
+        The signal-to-noise ratio.
+    H_eff : ComplexArray, shape (K * Nr, Nt)
+        The compound effective channel matrix.
     """
-    csi: ChannelStateInformation
+    snr : float
+    H_eff : ComplexArray
 
 @dataclass()
 class TransmitFeedforwardMessage:

@@ -54,19 +54,17 @@ class SingleSnrSimResult:
     ut_ars_avg : float
         Average UT activation rate.
     
-    M_chbl_tot : int
-        In case of an uncorrelated fading channel (:math:`T_c = 0`), the total number of channel realizations.\\
-        In case of a correlated fading channel (:math:`T_c > 0`), the total number of blocks.
-    M_sv : int
-        In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
-        In case of a correlated fading channel (:math:`T_c > 0`), the number of symbol vector transmissions per block.
+    Msv : int
+        The number of symbol vector transmissions per channel realization.
+    Mch_tot : int
+        The total number of channel realizations generated during the simulation for this SNR value.
     
     stream_bers : list[RealArray] (list of K arrays, each shape (Nr,)) | None
-        Per-UT per-stream bit error rates. None if M_chbl_tot == 1.
+        Per-UT per-stream bit error rates. None if Mch_tot == 1.
     ut_bers : RealArray, shape (K,) | None
-        Per-UT bit error rates. None if M_chbl_tot == 1.
+        Per-UT bit error rates. None if Mch_tot == 1.
     ber : float | None
-        System-wide bit error rate. None if M_chbl_tot == 1.
+        System-wide bit error rate. None if Mch_tot == 1.
     """
     
     snr_dB: float
@@ -89,8 +87,8 @@ class SingleSnrSimResult:
     stream_ars_avg : float
     ut_ars_avg : float
 
-    M_chbl_tot : int
-    M_sv : int
+    Msv : int
+    Mch_tot : int
 
 
     stream_bers : list[RealArray] | None = None
@@ -99,20 +97,20 @@ class SingleSnrSimResult:
 
     def __post_init__(self):
 
-        if self.M_chbl_tot > 1:
+        if self.Mch_tot > 1:
 
             K = len(self.stream_ibrs)
 
             self.stream_bers = []
             for k in range(K):
-                denom = self.stream_ibrs[k] * self.M_sv * self.M_chbl_tot
+                denom = self.stream_ibrs[k] * self.Msv * self.Mch_tot
                 ber_k = np.where(denom > 0, self.stream_becs[k] / denom, np.nan)
                 self.stream_bers.append(ber_k)
             
-            ut_denom = self.ut_ibrs * self.M_sv * self.M_chbl_tot
+            ut_denom = self.ut_ibrs * self.Msv * self.Mch_tot
             self.ut_bers = np.where(ut_denom > 0, self.ut_becs / ut_denom, np.nan)
             
-            total_denom = self.ibr * self.M_sv * self.M_chbl_tot
+            total_denom = self.ibr * self.Msv * self.Mch_tot
             self.ber = self.bec / total_denom if total_denom > 0 else np.nan
 
 @dataclass

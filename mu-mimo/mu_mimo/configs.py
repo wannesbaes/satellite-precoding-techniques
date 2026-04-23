@@ -96,6 +96,10 @@ class UserTerminalConfig:
 
     Parameters
     ----------
+    estimator : type[ChannelEstimator]
+        The type of the channel estimator (the concrete channel estimator class).
+    predictor : type[ChannelPredictor]
+        The type of the channel predictor (the concrete channel predictor class).
     combiner : type[Combiner]
         The type of the combiner (the concrete combiner class).
     equalizer : type[Equalizer]
@@ -105,6 +109,8 @@ class UserTerminalConfig:
     demapper : type[Demapper]
         The type of the demapper (the concrete demapper class).
     """
+    estimator: type["ChannelEstimator"]
+    predictor: type["ChannelPredictor"]
     combiner: type["Combiner"]
     equalizer: type["Equalizer"]
     detector: type["Detector"]
@@ -196,9 +202,12 @@ class SystemConfig:
         lines.append(f"  {self.name}:\n")
         lines.append(f"  Nt = {self.Nt}, K  = {self.K} UTs, Nr = {self.Nr}")
         lines.append(f"  Pt = {self.Pt} W, B = {self.B} Hz")
+        lines.append(f"  BitLoader : {self.base_station_configs.bit_loader.__name__}")
         lines.append(f"  Precoder  : {self.base_station_configs.precoder.__name__}")
         lines.append(f"  Combiner  : {self.user_terminal_configs.combiner.__name__}")
-        lines.append(f"  BitLoader : {self.base_station_configs.bit_loader.__name__}")
+        if "Fading" in str(self.channel_configs.channel_model):
+            lines.append(f"  Estimator : {self.user_terminal_configs.estimator.__name__}")
+            lines.append(f"  Predictor : {self.user_terminal_configs.predictor.__name__}")
         lines.append(f"  Channel   : {str(self.channel_configs.channel_model)}")
         lines.append(f"  Noise     : {str(self.channel_configs.noise_model)}")
         lines.append("-" * 60)
@@ -264,31 +273,27 @@ class SimConfig:
     snr_values : RealArray
         The SNR values in linear scale. It is derived from snr_dB_values.
     
-    num_bit_errors : int
+    min_bit_errors : int
         The minimum number of bit errors per SNR value.
-    num_bit_errors_scope : Literal["system-wide", "uts", "streams"]
+    min_bit_errors_scope : Literal["system-wide", "uts", "streams"]
         The scope over which the minimum number of bit errors are considered (not used anywhere).
-    M_chbl_min : int
-        In case of an uncorrelated fading channel (:math:`T_c = 0`), the minimum number of channel realizations per SNR value.\\
-        In case of a correlated fading channel (:math:`T_c > 0`), the minimum number of coherence periods of the channel (not used anywhere).
-    M_chbl_max : int
-        In case of an uncorrelated fading channel (:math:`T_c = 0`), the maximum number of channel realizations per SNR value.\\
-        In case of a correlated fading channel (:math:`T_c > 0`), the (maximum) number of coherence periods of the channel.
-    M_sv : int
-        In case of an uncorrelated fading channel (:math:`T_c = 0`), the number of symbol vector transmissions for each channel realization.\\
-        In case of a correlated fading channel (:math:`T_c > 0`), the coherence-period-to-symbol-period-ratio (:math:`\frac{T_c}{T{\text{symbol}}}`).
-        In other words, the number of symbol vectors per block when using full block-level precoding (:math:`T_c = T{\text{block}}`).
+    Mch_min : int
+        The minimum number of channel realizations per SNR value.
+    Mch_max : int
+        The maximum number of channel realizations per SNR value.
+    Msv : int
+        The number of symbol vector transmissions for each channel realization.
     
     name : str
         The name of the simulation configuration.
     """
 
     snr_dB_values: RealArray
-    num_bit_errors: int
-    num_bit_errors_scope: Literal["system-wide", "uts", "streams"]
-    M_chbl_min: int
-    M_chbl_max: int
-    M_sv: int
+    min_bit_errors: int
+    min_bit_errors_scope: Literal["system-wide", "uts", "streams"]
+    Mch_min: int
+    Mch_max: int
+    Msv: int
 
     name: str
 
@@ -310,20 +315,20 @@ class SimConfig:
 
         lines.append(f"  {self.name}:\n")
         lines.append(f"  SNR range : {self.snr_dB_values[0]} - {self.snr_dB_values[-1]} dB")
-        lines.append(f"  Min bit errors per channel realization       : {self.num_bit_errors} ({self.num_bit_errors_scope})")
-        lines.append(f"  Min channel realizations / coherence periods : {self.M_chbl_min}")
-        lines.append(f"  Max channel realizations / coherence periods : {self.M_chbl_max}")
-        lines.append(f"  Symbol vector transmissions per channel realization / coherence period : {self.M_sv}")
+        lines.append(f"  Min bit errors per channel realization  : {self.min_bit_errors} ({self.min_bit_errors_scope})")
+        lines.append(f"  Min channel realizations  : {self.Mch_min}")
+        lines.append(f"  Max channel realizations  : {self.Mch_max}")
+        lines.append(f"  Symbol vector transmissions per channel realization : {self.Msv}")
         lines.append("-" * 60)
 
         str_display = "\n".join(lines)
         return str_display
 
     def __post_init__(self):
-        if self.num_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
-        if self.M_chbl_min <= 0: raise ValueError("The minimum number of channel realizations / coherence periods must be a positive integer.")
-        if self.M_chbl_max <= 0: raise ValueError("The maximum number of channel realizations / coherence periods must be a positive integer.")
-        if self.M_sv <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization / coherence period must be a positive integer.")
+        if self.min_bit_errors <= 0: raise ValueError("The minimum number of bit errors per SNR value must be a positive integer.")
+        if self.Mch_min <= 0: raise ValueError("The minimum number of channel realizations must be a positive integer.")
+        if self.Mch_max <= 0: raise ValueError("The maximum number of channel realizations must be a positive integer.")
+        if self.Msv <= 0: raise ValueError("The minimum number of symbol vector transmissions for each channel realization must be a positive integer.")
 
     def __eq__(self, other: object) -> bool:
         
@@ -332,11 +337,11 @@ class SimConfig:
         
         return (
             np.array_equal(self.snr_dB_values, other.snr_dB_values) and
-            self.num_bit_errors == other.num_bit_errors and
-            self.num_bit_errors_scope == other.num_bit_errors_scope and
-            self.M_chbl_min == other.M_chbl_min and
-            self.M_chbl_max == other.M_chbl_max and
-            self.M_sv == other.M_sv
+            self.min_bit_errors == other.min_bit_errors and
+            self.min_bit_errors_scope == other.min_bit_errors_scope and
+            self.Mch_min == other.Mch_min and
+            self.Mch_max == other.Mch_max and
+            self.Msv == other.Msv
         )
 
 
@@ -357,62 +362,32 @@ def setup_sim_configs(ref_numbers: list[str], filepath: Path) -> dict[str, SimCo
         A dictionary mapping each reference number to its corresponding SimConfig object.
     """
     
-    def _load_sim_config(filepath: Path, ref_number: str) -> dict:
-        """
-        Load the simulation configuration for a given reference number from a JSON file.
-
-        Parameters
-        ----------
-        filepath : Path
-            The path to the JSON file containing the simulation configurations.
-        ref_number : str
-            The reference number of the simulation configuration to load.
-
-        Returns
-        -------
-        config_settings : dict
-            The configuration settings for the specified reference number.\\
-            The keys of the dictionary correspond to the parameter names, and the values correspond to the effective configuration values.
-        """
+    sim_configs = {}
+    for ref_number in ref_numbers:
         
+        # Load the simulation configuration for a given reference number from a JSON file.
         with open(filepath, 'r') as f:
             data = json.load(f)
         
-        for config_settings in data['configurations']:
-            if config_settings["Ref. Number"] == ref_number:
-                return config_settings
-
-    def _create_sim_config(config_settings: dict) -> SimConfig:
-        """
-        Create a SimConfig object from the given configuration settings.
-
-        Parameters
-        ----------
-        config_settings : dict
-            The configuration settings for the simulation.
-
-        Returns
-        -------
-        sim_config : SimConfig
-            The SimConfig object created from the configuration settings.
-        """
-
+        for config_settings_iter in data['configurations']:
+            if config_settings_iter["Ref. Number"] == ref_number:
+                config_settings = config_settings_iter
+                break
+        else:
+            raise ValueError(f"The simulation configuration with ref. number '{ref_number}' not found.")
+        
+        # Create a SimConfig object from the given configuration settings.
         sim_config = SimConfig(
             snr_dB_values               = np.array(config_settings["SNR values (in dB)"], dtype=float),
-            num_bit_errors              = int(config_settings["Minimum bit errors per SNR value"]),
-            num_bit_errors_scope        = str(config_settings["Scope of bit errors"]),
-            M_chbl_min                  = int(config_settings["Minimum channel realizations / coherence periods per SNR value"]),
-            M_chbl_max                  = int(config_settings["Maximum channel realizations / coherence periods per SNR value"]),
-            M_sv                        = int(config_settings["Symbol vector transmissions per channel realization / coherence period"]),
+            min_bit_errors              = int(config_settings["Minimum bit errors per SNR value"]),
+            min_bit_errors_scope        = str(config_settings["Scope of bit errors"]),
+            Mch_min                     = int(config_settings["Minimum channel realizations per SNR value"]),
+            Mch_max                     = int(config_settings["Maximum channel realizations per SNR value"]),
+            Msv                         = int(config_settings["Symbol vector transmissions per channel realization"]),
             name                        = "Sim Config " + str(config_settings["Ref. Number"]),
         )
 
-        return sim_config
-
-    sim_configs = {}
-    for ref_number in ref_numbers:
-        config_settings = _load_sim_config(filepath, ref_number)
-        sim_config = _create_sim_config(config_settings)
+        # Store the SimConfig object in the sim_configs dictionary with the reference number as the key.
         sim_configs[ref_number] = sim_config
 
     return sim_configs
@@ -434,34 +409,6 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         A dictionary mapping each reference number to its corresponding SystemConfig object.
     """
     
-    def _load_sys_config(filepath: Path, ref_number: str) -> dict:
-        """
-        Load the system configuration for a given reference number from a JSON file.
-
-        Parameters
-        ----------
-        filepath : Path
-            The path to the JSON file containing the system configurations.
-        ref_number : str
-            The reference number of the system configuration to load.
-
-        Returns
-        -------
-        config_settings : dict
-            The configuration settings for the specified reference number.\\
-            The keys of the dictionary correspond to the parameter names, and the values correspond to the effective configuration values.
-        """
-        
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-        
-        for row in data['configurations']:
-            if row[data["configuration_format"]["Ref. Number"]] == ref_number:
-                config_settings = {name: row[idx] for name, idx in data['configuration_format'].items()}
-                return config_settings
-        
-        raise ValueError(f"The simulation configuration with ref. number '{ref_number}' not found.")
-
     def _create_sys_config(config_settings: dict) -> SystemConfig:
         """
         Create a SystemConfig object from the given configuration settings.
@@ -479,84 +426,104 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         
 
         bitloader_mapping = {
-            "Neutral": NeutralBitLoader,
-            "Fixed": FixedBitLoader,
-            "Adaptive": AdaptiveBitLoader,
+            None        : NeutralBitLoader,
+            "Neutral"   : NeutralBitLoader,
+            "Fixed"     : FixedBitLoader,
+            "Adaptive"  : AdaptiveBitLoader,
         }
 
         
         precoder_mapping = {
-            "Neutral": NeutralPrecoder,
-            "SVD": SVDPrecoder,
-            "ZF": ZFPrecoder,
-            "BD": BDPrecoder,
-            "WMMSE": WMMSEPrecoder,
+            None      : NeutralPrecoder,
+            "Neutral" : NeutralPrecoder,
+            "SVD"     : SVDPrecoder,
+            "ZF"      : ZFPrecoder,
+            "BD"      : BDPrecoder,
+            "WMMSE"   : WMMSEPrecoder,
         }
 
         combiner_mapping = {
-            "Neutral": NeutralCombiner,
-            "LSV": LSVCombiner,
+            None      : NeutralCombiner,
+            "Neutral" : NeutralCombiner,
+            "LSV"     : LSVCombiner,
         }
 
 
         mapper_mapping = {
-            "Neutral": NeutralMapper,
-            "Gray Code": GrayCodeMapper,
+            None        : NeutralMapper,
+            "Neutral"   : NeutralMapper,
+            "Gray Code" : GrayCodeMapper,
         }
 
         demapper_mapping = {
-            "Neutral": NeutralDemapper,
-            "Gray Code": GrayCodeDemapper,
+            None        : NeutralDemapper,
+            "Neutral"   : NeutralDemapper,
+            "Gray Code" : GrayCodeDemapper,
         }
 
         detector_mapping = {
-            "Neutral": NeutralDetector,
-            "Symbol MD": MDDetector,
+            None        : NeutralDetector,
+            "Neutral"   : NeutralDetector,
+            "Symbol MD" : MDDetector,
         }
 
-
-        channel_predictor_mapping = {
-            "Neutral": None,
-        }
 
         channel_estimator_mapping = {
-            "Neutral": None,
+            None      : NeutralChannelEstimator,
+            "Neutral" : NeutralChannelEstimator,
+        }
+
+        channel_predictor_mapping = {
+            None      : NeutralChannelPredictor,
+            "Neutral" : NeutralChannelPredictor,
         }
 
 
         channel_model_mapping = {
 
-            "Neutral": NeutralChannelModel(
+            None: NeutralChannel(
+                Nt = int(config_settings['Nt']), 
+                Nr = int(config_settings['Nr']),
+                K = int(config_settings['K']),
+            ) if config_settings['Channel Model'] == None else None,
+
+            "Neutral": NeutralChannel(
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']),
                 K = int(config_settings['K']),
             ) if config_settings['Channel Model'] == "Neutral" else None,
 
-            "IID Rayleigh Fading": IIDRayleighFadingChannelModel(
+            "IID Rayleigh": IIDRayleighChannel(
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']), 
                 K = int(config_settings['K']),
-            ) if config_settings['Channel Model'] == "IID Rayleigh Fading" else None,
+            ) if config_settings['Channel Model'] == "IID Rayleigh" else None,
             
-            "Ricean Fading": RiceanFadingChannelModel(
+            "Ricean IID Fading": RiceanIIDFadingChannel(
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']), 
                 K = int(config_settings['K']), 
                 K_rice = 5, 
                 Trtt_2_Tc = float(config_settings['Round Trip Time To Coherence Time Ratio']),
-                Rh_Tc = float(config_settings['Channel Correlation at Coherence Time Lag']),
-            ) if config_settings['Channel Model'] == "Ricean Fading" else None,
+                Msv = 50, # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
+                Tc_scale = float(config_settings['Coherence Time Scaling Factor']),
+            ) if config_settings['Channel Model'] == "Ricean IID Fading" else None,
         }
 
 
         noise_model_mapping = {
+
+            None: NeutralNoise(
+                Nr=int(config_settings['Nr']), 
+                K=int(config_settings['K']),
+            ) if config_settings['Noise Model'] == None else None,
             
-            "Neutral": NeutralNoiseModel(
+            "Neutral": NeutralNoise(
                 Nr=int(config_settings['Nr']), 
                 K=int(config_settings['K']),
             ) if config_settings['Noise Model'] == "Neutral" else None,
             
-            "AWGN": CSAWGNNoiseModel(
+            "AWGN": CSAWGNNoise(
                 Nr=int(config_settings['Nr']), 
                 K=int(config_settings['K']),
             ) if config_settings['Noise Model'] == "AWGN" else None,
@@ -585,6 +552,8 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
 
         # user terminal configerations.
         user_terminal_configs = UserTerminalConfig(
+            estimator             = channel_estimator_mapping[config_settings['Channel Estimator']],
+            predictor             = channel_predictor_mapping[config_settings['Channel Predictor']],
             combiner              = combiner_mapping[config_settings['Combiner']],
             equalizer             = Equalizer,
             detector              = detector_mapping[config_settings['Detector']],
@@ -610,8 +579,22 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
 
     system_configs = {}
     for ref_number in ref_numbers:
-        config_settings = _load_sys_config(filepath, ref_number)
+
+        # Load the system configuration for a given reference number from a JSON file.
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
+        for row in data['configurations']:
+            if row[data["configuration_format"]["Ref. Number"]] == ref_number:
+                config_settings = {name: row[idx] for name, idx in data['configuration_format'].items()}
+                break
+        else:
+            raise ValueError(f"The system configuration with ref. number '{ref_number}' not found.")
+        
+        # Create a SystemConfig object from the given configuration settings.
         system_config = _create_sys_config(config_settings)
+
+        # Store the SystemConfig object in the system_configs dictionary with the reference number as the key.
         system_configs[ref_number] = system_config
 
     return system_configs

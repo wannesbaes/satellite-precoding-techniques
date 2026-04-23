@@ -12,10 +12,10 @@
             "Minimum bit errors per SNR value":             250,
             "Scope of bit errors":                          "system-wide",
             
-            "Minimum channel realizations / coherence periods per SNR value":            1000,
-            "Maximum channel realizations / coherence periods per SNR value":            2000,
+            "Minimum channel realizations per SNR value":   1000,
+            "Maximum channel realizations per SNR value":   2000,
             
-            "Symbol vector transmissions per channel realization / coherence period":    512
+            "Symbol vector transmissions per channel realization":   500
         },
 
         {
@@ -27,10 +27,10 @@
             "Minimum bit errors per SNR value":             100,
             "Scope of bit errors":                          "system-wide",
             
-            "Minimum channel realizations / coherence periods per SNR value":            100,
-            "Maximum channel realizations / coherence periods per SNR value":            200,
+            "Minimum channel realizations per SNR value":   100,
+            "Maximum channel realizations per SNR value":   200,
             
-            "Symbol vector transmissions per channel realization / coherence period":     100
+            "Symbol vector transmissions per channel realization":   100
         },
         
         {
@@ -42,10 +42,10 @@
             "Minimum bit errors per SNR value":             250,
             "Scope of bit errors":                          "system-wide",
             
-            "Minimum channel realizations / coherence periods per SNR value":            1000,
-            "Maximum channel realizations / coherence periods per SNR value":            1001,
+            "Minimum channel realizations per SNR value":   1000,
+            "Maximum channel realizations per SNR value":   1001,
             
-            "Symbol vector transmissions per channel realization / coherence period":    60
+            "Symbol vector transmissions per channel realization":   500
         },
 
         {
@@ -57,10 +57,10 @@
             "Minimum bit errors per SNR value":             50,
             "Scope of bit errors":                          "system-wide",
             
-            "Minimum channel realizations / coherence periods per SNR value":            100,
-            "Maximum channel realizations / coherence periods per SNR value":            101,
+            "Minimum channel realizations per SNR value":   100,
+            "Maximum channel realizations per SNR value":   101,
             
-            "Symbol vector transmissions per channel realization / coherence period":    6
+            "Symbol vector transmissions per channel realization":   50
         }
   ]
 

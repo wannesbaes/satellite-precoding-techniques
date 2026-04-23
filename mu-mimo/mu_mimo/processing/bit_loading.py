@@ -17,7 +17,7 @@ class BitLoader(ABC):
 
     @staticmethod
     @abstractmethod
-    def compute(csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
+    def compute(snr: float, H: ComplexArray, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
         """
         Implementation of the bit loading strategy.
 
@@ -27,8 +27,10 @@ class BitLoader(ABC):
 
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information.
+        snr : float
+            The signal-to-noise ratio (SNR) of the system.
+        H : ComplexArray, shape (K*Nr, Nt)
+            The channel matrix.
         F : ComplexArray, shape (Nt, K*Nr)
             The compound precoding matrix.
         G : ComplexArray | None, shape (K*Nr, K*Nr)
@@ -95,11 +97,11 @@ class NeutralBitLoader(BitLoader):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
+    def compute(snr: float, H: ComplexArray, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
         
         # Determine the number of data streams for each UT and the number of receive antennas at each UT.
         K = len(c_configs.types)
-        Nr = csi.H_eff.shape[0] // K
+        Nr = H.shape[0] // K
         
         # Define the information bit rate for each data stream and the number of data streams for each UT.
         ibr = np.ones(K * Nr, dtype=int)
@@ -117,7 +119,7 @@ class FixedBitLoader(BitLoader):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
+    def compute(snr: float, H: ComplexArray, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
 
         # Validate the constellation sizes for each UT.
         if c_configs.sizes is None:
@@ -125,7 +127,7 @@ class FixedBitLoader(BitLoader):
         
         # Determine the number of data streams for each UT and the number of receive antennas at each UT.
         K = len(c_configs.sizes)
-        Nr = csi.H_eff.shape[0] // K
+        Nr = H.shape[0] // K
 
         # Determine the number of data streams for each UT.
         Ns = np.full(K, Nr, dtype=int)
@@ -144,7 +146,7 @@ class AdaptiveBitLoader(BitLoader):
     """
 
     @staticmethod
-    def compute(csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
+    def compute(snr: float, H: ComplexArray, F: ComplexArray, G: ComplexArray | None, c_configs: ConstConfig, Pt: float, B: float) -> tuple[IntArray, IntArray]:
 
         # Validate the capacity fractions for each UT.
         if c_configs.capacity_fractions is None:
@@ -152,10 +154,10 @@ class AdaptiveBitLoader(BitLoader):
 
         # Determine the number of receive antennas at each UT.
         K = len(c_configs.capacity_fractions)
-        Nr = csi.H_eff.shape[0] // K
+        Nr = H.shape[0] // K
 
         # Computes the achievable rates for each UT.
-        ch_capacities = AdaptiveBitLoader._compute_achievable_rates(csi, F, G, Pt, B)
+        ch_capacities = AdaptiveBitLoader._compute_achievable_rates(snr, H, F, G, Pt, B)
 
         # Determine the information bit rates as a fraction of the achievable rates, and the number of data streams for each UT.
         ibr = np.empty(K*Nr, dtype=int)
@@ -174,14 +176,16 @@ class AdaptiveBitLoader(BitLoader):
         return ibr, Ns
     
     @staticmethod
-    def _compute_achievable_rates(csi: ChannelStateInformation, F: ComplexArray, G: ComplexArray | None, Pt: float, B: float) -> RealArray:
+    def _compute_achievable_rates(snr: float, H: ComplexArray, F: ComplexArray, G: ComplexArray | None, Pt: float, B: float) -> RealArray:
         """
         Compute the achievable rates (shannon capacity) for each stream of all UTs.
 
         Parameters
         ----------
-        csi : ChannelStateInformation
-            The channel state information.
+        snr : float
+            The signal-to-noise ratio.
+        H : ComplexArray, shape (Nt, K*Nr)
+            The channel matrix.
         F : ComplexArray, shape (Nt, K*Nr)
             The compound precoding matrix.
         G : ComplexArray | None, shape (K*Nr, K*Nr)
@@ -198,11 +202,11 @@ class AdaptiveBitLoader(BitLoader):
         """
         
         # Compute the transfer matrix T = G @ H @ F = H_eff @ F.
-        H_eff = csi.H_eff if G is None else (G @ csi.H_eff)
+        H_eff = H if G is None else (G @ H)
         T = H_eff @ F
         
         # Compute the power of the noise, the interference, and the useful signal for each data stream.
-        p_noise = (Pt / csi.snr) * np.sum( np.abs(G)**2, axis=1 ) if G is not None else (Pt / csi.snr)
+        p_noise = (Pt / snr) * np.sum( np.abs(G)**2, axis=1 ) if G is not None else (Pt / snr)
         p_interference = np.sum( np.abs( T - np.diag(np.diagonal(T)) )**2, axis=1 )
         p_useful = np.abs( np.diagonal(T) )**2
 
