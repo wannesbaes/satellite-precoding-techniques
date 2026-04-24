@@ -522,3 +522,24 @@ class ChannelStatistics:
         return
 
 
+def main_ch_stats(sys_ref_numbers: list[str]) -> None:
+
+    system_configs = setup_sys_configs(sys_ref_numbers, SYSTEM_CONFIG_PATH)
+
+    for sys_ref_number in sys_ref_numbers:
+
+        channel_statistics = ChannelStatistics(system_configs[sys_ref_number], num_channel_samples=1_000_000)
+        channel_statistics_data = channel_statistics.evaluate()
+
+        channel_statistics.plot_streamchannel_gains_pdf()
+        channel_statistics.plot_streamchannel_gains_ecdf()
+    
+    return
+
+if __name__ == "__main__":
+
+    # CHOOSE THE SIMULATION HERE.
+    system_ref_numbers = []
+
+    # RUN OR LOAD YOUR SIMULATIONS HERE.
+    main_ch_stats(system_ref_numbers)

@@ -89,6 +89,17 @@ class BaseStationConfig:
     mapper: type["Mapper"]
     precoder: type["Precoder"]
 
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, BaseStationConfig):
+            return NotImplemented
+        
+        return (
+            self.bit_loader == other.bit_loader and
+            self.mapper == other.mapper and
+            self.precoder == other.precoder
+        )
+
 @dataclass()
 class UserTerminalConfig:
     """
@@ -115,6 +126,20 @@ class UserTerminalConfig:
     equalizer: type["Equalizer"]
     detector: type["Detector"]
     demapper: type["Demapper"]
+
+    def __eq__(self, other: object) -> bool:
+        
+        if not isinstance(other, UserTerminalConfig):
+            return NotImplemented
+        
+        return (
+            self.estimator == other.estimator and
+            self.predictor == other.predictor and
+            self.combiner == other.combiner and
+            self.equalizer == other.equalizer and
+            self.detector == other.detector and
+            self.demapper == other.demapper
+        )
 
 @dataclass()
 class ChannelConfig:
@@ -505,7 +530,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 K = int(config_settings['K']), 
                 K_rice = 5, 
                 Trtt_2_Tc = float(config_settings['Round Trip Time To Coherence Time Ratio']),
-                Msv = 250, # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
+                Msv = 250,  # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
                 Tc_scale = float(config_settings['Coherence Time Scaling Factor']),
             ) if config_settings['Channel Model'] == "Ricean IID Fading" else None,
         }

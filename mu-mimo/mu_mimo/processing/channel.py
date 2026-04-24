@@ -475,7 +475,7 @@ class RiceanIIDFadingChannel(ChannelModel):
 
         return fig, ax
 
-    def plot_autocorrelation(self, N_Tc: int = 10, component: str = "NLoS") -> tuple[plt.Figure, plt.Axes]:
+    def plot_autocorrelation(self, N_Tc: int = 10, component: str = "NLoS", average: bool = False) -> tuple[plt.Figure, plt.Axes]:
         r"""
         Plot the empirical autocorrelation function of the generated channel gain process and compare it to the analytical expression.
 
@@ -500,6 +500,8 @@ class RiceanIIDFadingChannel(ChannelModel):
         component : str
             The component of the channel to plot the autocorrelation for. 
             Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.
+        average : bool
+            Whether to average the empirical autocorrelation over multiple realizations of the channel gain process. Default is False.
 
         Returns
         -------
@@ -517,22 +519,28 @@ class RiceanIIDFadingChannel(ChannelModel):
         num_samples = 10 * N_Tc * M_SVPTC
 
 
-        # 1. Generate channel gain process and compute empirical autocorrelation.
+        # 1.1 Generate channel gain process
         if component == "LoS":
             theta_k = np.random.uniform(low=-np.pi, high=np.pi)
-            h = np.exp(1j * theta_k) * np.ones(num_samples)
+            h = np.exp(1j * theta_k) * np.ones((self.K*self.Nr*self.Nt, num_samples))
         elif component == "NLoS":
-            h = self._generate_NLoS(num_samples)[:, 0, 0]
+            h = self._generate_NLoS(num_samples).reshape(num_samples, self.K*self.Nr*self.Nt).T
         elif component == "LoS + NLoS":
             theta_k = np.random.uniform(low=-np.pi, high=np.pi)
-            h_NLoS = self._generate_NLoS(num_samples)[:, 0, 0]
+            h_NLoS = self._generate_NLoS(num_samples).reshape(num_samples, self.K*self.Nr*self.Nt).T
             h = np.exp(1j * theta_k) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * h_NLoS)
         else:
             raise ValueError(f"Unknown component '{component}' for plotting the autocorrelation. Choose between: 'LoS', 'NLoS' and 'LoS + NLoS'.")
 
+        # 1.2 Compute empirical autocorrelation.
+        h = h[[0]] if not average else h
+        Rh_simulation = []
+        for h_i in h:
+            Rh_i = (1 / len(h_i)) * np.correlate(h_i, h_i, mode='full')[(len(h_i)-1) - (N_Tc//2 * M_SVPTC) : (len(h_i)-1) + (N_Tc//2 * M_SVPTC)]
+            Rh_simulation.append(np.real(Rh_i / Rh_i[N_Tc//2 * M_SVPTC]))
+        Rh_simulation = np.mean(Rh_simulation, axis=0)
+
         tau = np.arange(-N_Tc//2 * M_SVPTC, N_Tc//2 * M_SVPTC)
-        Rh_simulation = (1 / len(h)) * np.correlate(h, h, mode='full')[(len(h)-1) - (N_Tc//2 * M_SVPTC) : (len(h)-1) + (N_Tc//2 * M_SVPTC)]
-        Rh_simulation /= Rh_simulation[N_Tc//2 * M_SVPTC]
 
 
         # 2. Compute the analytical autocorrelation.
@@ -561,12 +569,12 @@ class RiceanIIDFadingChannel(ChannelModel):
 
         ax.set_xlabel(r"$\tau \; [s]$")
         ax.set_ylabel(r"$R_h(\tau)$")
-        ax.set_title(f"Autocorrelation of a {component} process")
+        ax.set_title(f"Autocorrelation of a {component} process" + ("\naveraged across all propagation links" if average else ""))
         ax.legend()
         ax.grid(True, which="both", linestyle="--")
         plt.tight_layout()
 
-        plot_Rh_filename = f"Rh {component} process ({N_Tc} coherence periods).png"
+        plot_Rh_filename = f"Rh {component} process ({N_Tc} coherence periods)" + (" (averaged)" if average else "") + ".png"
         plot_Rh_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ricean time-correlated fading channel" / "autocorrelation"
         plot_Rh_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_Rh_dir / plot_Rh_filename, dpi=300, bbox_inches="tight")
@@ -576,7 +584,7 @@ class RiceanIIDFadingChannel(ChannelModel):
 
         return fig, ax
 
-    def plot_NLoS_PSD(self, length_segments: int, num_segments: int, averaged: bool = True) -> tuple[plt.Figure, plt.Axes]:
+    def plot_NLoS_PSD(self, length_segments: int, num_segments: int, average: bool = True) -> tuple[plt.Figure, plt.Axes]:
         r"""
         Plot the power spectral density (PSD) of the generated NLoS process and compare it to the analytical expression.
 
@@ -602,8 +610,8 @@ class RiceanIIDFadingChannel(ChannelModel):
         num_segments : int
             The number of independent segments to average over when computing the simulated PSD using Bartlett's method.\\
             It controls the variance of the PSD estimate. A larger value gives a smoother PSD. Default is 10.
-        averaged : bool
-            If this is True, the PSDs will be averaged over all propagation links.
+        average : bool
+            If this is True, the PSDs will be average over all propagation links.
 
         Returns
         -------
@@ -626,7 +634,7 @@ class RiceanIIDFadingChannel(ChannelModel):
         # 1. Generate NLoS process and compute the PSD (Bartlett's method).
         H_NLoS = self._generate_NLoS(num_samples)
 
-        if averaged:
+        if average:
             h = H_NLoS
             h_segments = h.reshape(num_segments, length_segments, self.K*self.Nr, self.Nt)
         else:
@@ -636,7 +644,7 @@ class RiceanIIDFadingChannel(ChannelModel):
         H_fft = np.fft.fft(h_segments, axis=1)
         periodogram = (self.fD_times_Tc * self.Tsymbol_2_Tc / length_segments) * np.abs(H_fft)**2
 
-        S_simulation = np.fft.fftshift(np.mean(periodogram, axis=(0 if not averaged else (0, 2, 3))))
+        S_simulation = np.fft.fftshift(np.mean(periodogram, axis=(0 if not average else (0, 2, 3))))
         f_simulation = np.fft.fftshift(np.fft.fftfreq(length_segments, d=self.fD_times_Tc * self.Tsymbol_2_Tc))
 
 
@@ -680,12 +688,12 @@ class RiceanIIDFadingChannel(ChannelModel):
         ax.set_ylabel(r"$S_h(f) \cdot f_D$")
         ax.set_xlim(-1.25, 1.25)
         ax.set_ylim(0, 4.0)
-        ax.set_title("PSD of a NLoS process" + ("\naveraged across all propagation links" if averaged else ""))
+        ax.set_title("PSD of a NLoS process" + ("\naveraged across all propagation links" if average else ""))
         ax.legend()
         ax.grid(True, which="both", linestyle="--")
         plt.tight_layout()
 
-        plot_psd_filename = f"PSD NLoS process ({num_segments} segments, {length_segments} samples per segment)" + (" (averaged)" if averaged else "") + ".png"
+        plot_psd_filename = f"PSD NLoS process ({num_segments} segments, {length_segments} samples per segment)" + (" (average)" if average else "") + ".png"
         plot_psd_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "ricean time-correlated fading channel" / "PSD"
         plot_psd_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(plot_psd_dir / plot_psd_filename, dpi=300, bbox_inches="tight")
@@ -817,17 +825,21 @@ if __name__ == "__main__":
 
     channel_model = RiceanIIDFadingChannel(Nt=8, Nr=2, K=4, K_rice=10**(5/10), Trtt_2_Tc=0, Msv=500, Tc_scale=1)
 
-    # channel_model.plot_channel_gain_process(N_Tc=5)
+    # channel_model.plot_channel_gain_process()
     # channel_model.plot_channel_gain_process(N_Tc=20)
     # channel_model.plot_channel_gain_process(N_Tc=5, uncorrelated_process_ref=True)
     # channel_model.plot_channel_gain_process(N_Tc=5, block_fading_assumption_ref=True)
 
-    # channel_model.plot_autocorrelation(component="NLoS")
-    # channel_model.plot_autocorrelation(N_Tc=50, component="NLoS")
+    # channel_model.plot_autocorrelation()
+    # channel_model.plot_autocorrelation(average=True)
+    # channel_model.plot_autocorrelation(N_Tc=50)
+    # channel_model.plot_autocorrelation(N_Tc=50, average=True)
     # channel_model.plot_autocorrelation(component="LoS + NLoS")
+    # channel_model.plot_autocorrelation(component="LoS + NLoS", average=True)
     # channel_model.plot_autocorrelation(N_Tc=50, component="LoS + NLoS")
+    # channel_model.plot_autocorrelation(N_Tc=50, component="LoS + NLoS", average=True)
 
-    # channel_model.plot_NLoS_PSD(length_segments=400, num_segments=10, averaged=True)
-    # channel_model.plot_NLoS_PSD(length_segments=400, num_segments=10, averaged=False)
-    # channel_model.plot_NLoS_PSD(length_segments=200, num_segments=20, averaged=True)
-    # channel_model.plot_NLoS_PSD(length_segments=200, num_segments=20, averaged=False)
+    # channel_model.plot_NLoS_PSD(length_segments=400, num_segments=10, average=True)
+    # channel_model.plot_NLoS_PSD(length_segments=400, num_segments=10, average=False)
+    # channel_model.plot_NLoS_PSD(length_segments=200, num_segments=20, average=True)
+    # channel_model.plot_NLoS_PSD(length_segments=200, num_segments=20, average=False)
