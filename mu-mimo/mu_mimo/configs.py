@@ -505,7 +505,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 K = int(config_settings['K']), 
                 K_rice = 5, 
                 Trtt_2_Tc = float(config_settings['Round Trip Time To Coherence Time Ratio']),
-                Msv = 50, # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
+                Msv = 250, # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
                 Tc_scale = float(config_settings['Coherence Time Scaling Factor']),
             ) if config_settings['Channel Model'] == "Ricean IID Fading" else None,
         }

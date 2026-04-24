@@ -65,7 +65,7 @@ class SimulationRunner:
             channel_count = 0
 
             # Inner loop: Iterate over the channel realizations.
-            while (channel_count < self.sim_config.Mch_min or bit_error_count < self.sim_config.min_bit_errors) and channel_count < self.sim_config.Mch_max:
+            while (channel_count < self.sim_config.Mch_min or bit_error_count < self.sim_config.min_bit_errors) and channel_count <= self.sim_config.Mch_max:
 
                 # Configuration.
                 stream_Rs = self.mu_mimo_system.configure(snr)

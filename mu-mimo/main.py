@@ -49,10 +49,7 @@ if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["2"]
-    system_ref_numbers = []
-
-    system_ref_numbers_ZF_fixed = [f"2_{Tc_scale}_{RTT}.1.5.{SD}" for Tc_scale in ['1', '2', 'sl'] for RTT in [0, 1, 2, 3, 4, 5] for SD in [1, 2, 3]]
-    system_ref_numbers_WMMSE_fixed = [f"2_{Tc_scale}_{RTT}.4.5.{SD}" for Tc_scale in ['1', '2', 'sl'] for RTT in [0, 1, 2, 3, 4, 5] for SD in [1, 2, 3]]
+    system_ref_numbers = [f"2_{Tc_scale}_{RTT}.{PT}.5.{SD}" for Tc_scale in ['1', '2', 'sl'] for RTT in [0, 1, 2, 3, 4, 5] for SD in [1, 2, 3] for PT in [1, 4]]
 
     # RUN OR LOAD YOUR SIMULATIONS HERE.
     results = main(sim_ref_numbers, system_ref_numbers)
