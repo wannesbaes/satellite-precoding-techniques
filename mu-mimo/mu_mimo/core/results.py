@@ -205,10 +205,11 @@ class SimResultManager:
 
         # Create the results directory if it does not exist.
         results_dir = Path(__file__).resolve().parents[2] / "report" / "simulation_results"
+        if "test" in sim_configs.name: results_dir = results_dir / "test_simulation_results"
         results_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate the filename based on the system and simulation configurations.
-        filename = f"{system_configs.name} - {sim_configs.name}.npz"
+        filename = f"{system_configs.name}.npz"
 
         # Return the full file path.
         filepath = results_dir / filename
@@ -421,9 +422,19 @@ class SimResultManager:
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2_sl": "instant CSI (symbol-level)", "2_bl": "instant CSI (block-level)", "2_1": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{6}$", "2_2": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{3}$", "2_3": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{1}{2}$", "2_4": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{2}{3}$", "2_5": r"$\frac{T_{\text{RTT}}}{T_c} = \frac{5}{6}$"}
-            CH_number = reference_number.split(".")[0]
+            CH_mapping = {"1": "Rayleigh", "2": "Ricean TC Fading"}
+            CH_number = (reference_number.split(".")[0]).split("_")[0]
             label = CH_mapping.get(CH_number, None)
+        
+        elif label_type == "RTT":
+            RTT_mapping = {"0": "Instant CSI", "1": r"$T_{\text{RTT}} = \frac{1}{6} \, T_c$", "2": r"$T_{\text{RTT}} = \frac{1}{3} \, T_c$", "3": r"$T_{\text{RTT}} = \frac{1}{2} \, T_c$", "4": r"$T_{\text{RTT}} = \frac{2}{3} \, T_c$", "5": r"$T_{\text{RTT}} = \frac{5}{6} \, T_c$"}
+            RTT_number = (reference_number.split(".")[0]).split("_")[2]
+            label = RTT_mapping.get(RTT_number, None)
+        
+        elif label_type == "CE":
+            CE_mapping = {"1": "Perfect CSI", "2": "Outdated CSI", "3": "Predicted CSI"}
+            CE_number = (reference_number.split(".")[0]).split("_")[0]
+            label = CE_mapping.get(CE_number, None)
         
         elif label_type == "PT":
             PT_mapping = {"1": "ZF", "2": "ZF+LSV", "3": "BD", "4": "WMMSE"}
@@ -835,7 +846,7 @@ class SimResultManager:
             ax_ber.set_xlabel("SNR [dB]")
             ax_ber.set_ylabel("BER")
             ax_ber.set_yscale("log")
-            ax_ber.set_ylim(0.5e-5, 1)
+            ax_ber.set_ylim(None, 1)
             ax_ber.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_ber.legend()
             fig_ber.tight_layout()

@@ -493,16 +493,16 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         }
 
 
-        channel_estimator_mapping = {
-            None      : NeutralChannelEstimator,
-            "Neutral" : NeutralChannelEstimator,
-        }
+        channel_param_mapping = {
 
-        channel_predictor_mapping = {
-            None      : NeutralChannelPredictor,
-            "Neutral" : NeutralChannelPredictor,
-        }
+            "Ricean IID TC NLoS": {
+                "K_ricean": 5,
+                "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
+                "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
+                "Twindow_2_Tc": 2,
+            } if config_settings['Channel Model'] == "Ricean IID TC NLoS" else None,
 
+        }
 
         channel_model_mapping = {
 
@@ -524,15 +524,16 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 K = int(config_settings['K']),
             ) if config_settings['Channel Model'] == "IID Rayleigh" else None,
             
-            "Ricean IID Fading": RiceanIIDFadingChannel(
+            "Ricean IID TC NLoS": RiceanIIDTCChannel(
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']), 
                 K = int(config_settings['K']), 
-                K_rice = 5, 
-                Trtt_2_Tc = float(config_settings['Round Trip Time To Coherence Time Ratio']),
-                Msv = 250,  # Hard coded for now, but should ideally be derived from the SimConfig (number of symbol vector transmissions per channel realization).
-                Tc_scale = float(config_settings['Coherence Time Scaling Factor']),
-            ) if config_settings['Channel Model'] == "Ricean IID Fading" else None,
+                K_rice = channel_param_mapping["Ricean IID TC NLoS"]["K_ricean"],
+                Trtt_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Trtt_2_Tc"],
+                Tpilot_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Tpilot_2_Tc"],
+                Twindow_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Twindow_2_Tc"],
+            ) if config_settings['Channel Model'] == "Ricean IID TC NLoS" else None,
+            
         }
 
 
@@ -555,6 +556,28 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         }
 
         
+        channel_estimator_mapping = {
+            None      : NeutralChannelEstimator(),
+            "Neutral" : NeutralChannelEstimator(),
+        }
+
+        channel_predictor_mapping = {
+            
+            None      : NeutralChannelPredictor(
+
+            ) if config_settings['Channel Estimator'] == None else None,
+            
+            "Neutral" : NeutralChannelPredictor(
+
+            ) if config_settings['Channel Estimator'] == "Neutral" else None,
+            
+            "AR Predictor" : ARPredictor(
+                channel_model = config_settings['Channel Model'],
+                channel_params = channel_param_mapping[config_settings['Channel Model']],
+            ) if config_settings['Channel Predictor'] == "AR Predictor" else None,
+        }
+
+
         # constellation configurations.
         c_configs = ConstConfig(
             types                   = config_settings['Const. Type'],

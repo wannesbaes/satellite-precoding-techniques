@@ -810,8 +810,8 @@ class UserTerminal:
         self.Nr = Nr
 
         # Processing Components.
-        self.estimator: type[ChannelEstimator] = configs.estimator
-        self.predictor: type[ChannelPredictor] = configs.predictor
+        self.estimator: ChannelEstimator = configs.estimator
+        self.predictor: ChannelPredictor = configs.predictor
         self.combiner: type[Combiner] = configs.combiner
         self.equalizer: type[Equalizer] = configs.equalizer
         self.detector: type[Detector] = configs.detector

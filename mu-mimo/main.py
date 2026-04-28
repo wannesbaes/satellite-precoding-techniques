@@ -35,49 +35,10 @@ if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = []
-    system_ref_numbers = []
+    sys_ref_numbers = []
 
     # RUN OR LOAD YOUR SIMULATIONS HERE.
-    results = main(sim_ref_numbers, system_ref_numbers)
+    results = main(sim_ref_numbers, sys_ref_numbers)
     
     # PLOT THE RESULTS HERE.
-    SimResultManager.plot_system_performance_comparison(results, label_type="default", ibr=False)
-
-
-
-# 1. OUTDATED CSI
-
-# 1.1 TC SCALE = 1
-
-# Fixed Bitloader (16-QAM),  Underloaded System,  ZF
-system_ref_numbers = ["2_1_0.1.5.1", "2_1_1.1.5.1", "2_1_2.1.5.1", "2_1_3.1.5.1", "2_1_4.1.5.1", "2_1_5.1.5.1"]
-
-# Fixed Bitloader (16-QAM),  Underloaded System,  WMMSE
-system_ref_numbers = ["2_1_0.4.5.1", "2_1_1.4.5.1", "2_1_2.4.5.1", "2_1_3.4.5.1", "2_1_4.4.5.1", "2_1_5.4.5.1"]
-
-# Fixed Bitloader (16-QAM),  Underloaded System,  ZF vs WMMSE
-system_ref_numbers = [["2_1_0.1.5.1", "2_1_0.4.5.1"], ["2_1_1.1.5.1", "2_1_1.4.5.1"], ["2_1_2.1.5.1", "2_1_2.4.5.1"], ["2_1_3.1.5.1", "2_1_3.4.5.1"], ["2_1_4.1.5.1", "2_1_4.4.5.1"], ["2_1_5.1.5.1", "2_1_5.4.5.1"]]
-
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (2 UTs),  ZF
-system_ref_numbers = ["2_1_0.1.5.2", "2_1_1.1.5.2", "2_1_2.1.5.2", "2_1_3.1.5.2", "2_1_4.1.5.2", "2_1_5.1.5.2"]
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (2 UTs),  WMMSE
-system_ref_numbers = ["2_1_0.4.5.2", "2_1_1.4.5.2", "2_1_2.4.5.2", "2_1_3.4.5.2", "2_1_4.4.5.2", "2_1_5.4.5.2"]
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (2 UTs),  ZF vs WMMSE
-system_ref_numbers = [["2_1_0.1.5.2", "2_1_0.4.5.2"], ["2_1_1.1.5.2", "2_1_1.4.5.2"], ["2_1_2.1.5.2", "2_1_2.4.5.2"], ["2_1_3.1.5.2", "2_1_3.4.5.2"], ["2_1_4.1.5.2", "2_1_4.4.5.2"], ["2_1_5.1.5.2", "2_1_5.4.5.2"]]
-
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (4 UTs),  ZF
-system_ref_numbers = ["2_1_0.1.5.3", "2_1_1.1.5.3", "2_1_2.1.5.3", "2_1_3.1.5.3", "2_1_4.1.5.3", "2_1_5.1.5.3"]
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (4 UTs),  WMMSE
-system_ref_numbers = ["2_1_0.4.5.3", "2_1_1.4.5.3", "2_1_2.4.5.3", "2_1_3.4.5.3", "2_1_4.4.5.3", "2_1_5.4.5.3"]
-
-# Fixed Bitloader (16-QAM),  Fully Loaded System (4 UTs),  ZF vs WMMSE
-system_ref_numbers = [["2_1_0.1.5.3", "2_1_0.4.5.3"], ["2_1_1.1.5.3", "2_1_1.4.5.3"], ["2_1_2.1.5.3", "2_1_2.4.5.3"], ["2_1_3.1.5.3", "2_1_3.4.5.3"], ["2_1_4.1.5.3", "2_1_4.4.5.3"], ["2_1_5.1.5.3", "2_1_5.4.5.3"]]
-
-
-# 1.2 TC SCALE = 2
-
+    SimResultManager.plot_system_performance_comparison(results, label_type="default")

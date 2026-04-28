@@ -25,234 +25,122 @@
     "Channel Estimator" : 13,
     "Channel Predictor" : 14,
 
-    "Channel Model"                             : 15,
-    "Coherence Time Scaling Factor"             : 16,
-    "Round Trip Time To Coherence Time Ratio"   : 17,
+    "Channel Model"                                            : 15,
+    "Round Trip Time relative to the coherence time"           : 16,
+    "CSI feedback message rate relative to the coherence time" : 17,
     
     "Noise Model"       : 18
   },
 
   "configurations": [
 
-    ["1.1.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.1.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
     
-    ["1.1.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.1.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.1.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-
-
-    ["1.2.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-
-    ["1.2.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-
-    ["1.2.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-
-    ["1.2.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.2.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.1.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
 
-    ["1.3.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.3.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.3.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.3.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.3.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.2.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  "LSV",    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
 
-    ["1.4.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.4.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.4.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
-    ["1.4.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["1.4.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.3.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
 
+
+    ["1.4.1.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.1.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.1.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+    ["1.4.2.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.2.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.2.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  64,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+    ["1.4.3.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.3.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.3.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  1.00,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+    ["1.4.4.1",    1.0, 0.5,    8,  2,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.4.2",    1.0, 0.5,    8,  4,  2,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["1.4.4.3",    1.0, 0.5,    8,  2,  4,    "Adaptive",  0.75,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+
+
+
+
+    ["1_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["1_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["1_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["1_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
 
     
+    ["2_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["2_sl_1.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.166666,  0.041666,    "AWGN"],
+    ["2_sl_2.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.333333,  0.041666,    "AWGN"],
+    ["2_sl_3.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  0.041666,    "AWGN"],
+    ["2_sl_4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.666666,  0.041666,    "AWGN"],
+    ["2_sl_5.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.833333,  0.041666,    "AWGN"],
 
-    ["2_1_0.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-    ["2_1_0.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-    ["2_1_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-
-    ["2_1_1.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-    ["2_1_1.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-    ["2_1_1.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-
-    ["2_1_2.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-    ["2_1_2.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-    ["2_1_2.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-
-    ["2_1_3.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-    ["2_1_3.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-    ["2_1_3.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-
-    ["2_1_4.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-    ["2_1_4.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-    ["2_1_4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-
-    ["2_1_5.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
-    ["2_1_5.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
-    ["2_1_5.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
+    ["2_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["2_sl_1.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.166666,  0.041666,    "AWGN"],
+    ["2_sl_2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.333333,  0.041666,    "AWGN"],
+    ["2_sl_3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  0.041666,    "AWGN"],
+    ["2_sl_4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.666666,  0.041666,    "AWGN"],
+    ["2_sl_5.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.833333,  0.041666,    "AWGN"],
 
 
-    ["2_2_0.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
-    ["2_2_0.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
-    ["2_2_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
+    ["3_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["3_sl_1.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.166666,  0.041666,    "AWGN"],
+    ["3_sl_2.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.333333,  0.041666,    "AWGN"],
+    ["3_sl_3.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.500000,  0.041666,    "AWGN"],
+    ["3_sl_4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.666666,  0.041666,    "AWGN"],
+    ["3_sl_5.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.833333,  0.041666,    "AWGN"],
 
-    ["2_2_1.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-    ["2_2_1.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-    ["2_2_1.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-
-    ["2_2_2.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-    ["2_2_2.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-    ["2_2_2.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-
-    ["2_2_3.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-    ["2_2_3.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-    ["2_2_3.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-
-    ["2_2_4.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-    ["2_2_4.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-    ["2_2_4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-
-    ["2_2_5.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
-    ["2_2_5.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
-    ["2_2_5.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
+    ["3_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.000000,  0.041666,    "AWGN"],
+    ["3_sl_1.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.166666,  0.041666,    "AWGN"],
+    ["3_sl_2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.333333,  0.041666,    "AWGN"],
+    ["3_sl_3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.500000,  0.041666,    "AWGN"],
+    ["3_sl_4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.666666,  0.041666,    "AWGN"],
+    ["3_sl_5.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.833333,  0.041666,    "AWGN"]
 
 
-    ["2_sl_0.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-    ["2_sl_0.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-    ["2_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-
-    ["2_sl_1.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-    ["2_sl_1.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-    ["2_sl_1.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-
-    ["2_sl_2.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-    ["2_sl_2.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-    ["2_sl_2.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-
-    ["2_sl_3.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-    ["2_sl_3.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-    ["2_sl_3.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-
-    ["2_sl_4.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-    ["2_sl_4.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-    ["2_sl_4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-
-    ["2_sl_5.1.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"],
-    ["2_sl_5.1.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"],
-    ["2_sl_5.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"],
-
-
-
-    ["2_1_0.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-    ["2_1_0.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-    ["2_1_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0,    "AWGN"],
-
-    ["2_1_1.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-    ["2_1_1.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-    ["2_1_1.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.166666,    "AWGN"],
-
-    ["2_1_2.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-    ["2_1_2.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-    ["2_1_2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.333333,    "AWGN"],
-
-    ["2_1_3.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-    ["2_1_3.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-    ["2_1_3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.500000,    "AWGN"],
-
-    ["2_1_4.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-    ["2_1_4.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-    ["2_1_4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.666666,    "AWGN"],
-
-    ["2_1_5.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
-    ["2_1_5.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
-    ["2_1_5.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  1,  0.833333,    "AWGN"],
-
-
-    ["2_2_0.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
-    ["2_2_0.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
-    ["2_2_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0,    "AWGN"],
-
-    ["2_2_1.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-    ["2_2_1.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-    ["2_2_1.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.166666,    "AWGN"],
-
-    ["2_2_2.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-    ["2_2_2.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-    ["2_2_2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.333333,    "AWGN"],
-
-    ["2_2_3.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-    ["2_2_3.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-    ["2_2_3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.500000,    "AWGN"],
-
-    ["2_2_4.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-    ["2_2_4.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-    ["2_2_4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.666666,    "AWGN"],
-
-    ["2_2_5.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
-    ["2_2_5.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
-    ["2_2_5.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  2,  0.833333,    "AWGN"],
-
-
-    ["2_sl_0.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-    ["2_sl_0.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-    ["2_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0,    "AWGN"],
-
-    ["2_sl_1.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-    ["2_sl_1.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-    ["2_sl_1.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.166666,    "AWGN"],
-
-    ["2_sl_2.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-    ["2_sl_2.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-    ["2_sl_2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.333333,    "AWGN"],
-
-    ["2_sl_3.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-    ["2_sl_3.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-    ["2_sl_3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.500000,    "AWGN"],
-
-    ["2_sl_4.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-    ["2_sl_4.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-    ["2_sl_4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.666666,    "AWGN"],
-
-    ["2_sl_5.4.5.1",    1.0, 0.5,    8,  2,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"],
-    ["2_sl_5.4.5.2",    1.0, 0.5,    8,  4,  2,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"],
-    ["2_sl_5.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null, null,    "Ricean IID Fading",  "inf",  0.833333,    "AWGN"]
 
   ]
 }

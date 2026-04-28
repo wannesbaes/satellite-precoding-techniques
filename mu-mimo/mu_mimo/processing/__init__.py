@@ -21,11 +21,11 @@ from .combining import Combiner, NeutralCombiner, LSVCombiner
 
 from .channel_estimation import (
     ChannelEstimator, NeutralChannelEstimator,
-    ChannelPredictor, NeutralChannelPredictor,
+    ChannelPredictor, NeutralChannelPredictor, ARPredictor
 )
 
 from .channel import (
-    ChannelModel, NeutralChannel, IIDRayleighChannel, RiceanIIDFadingChannel,
+    ChannelModel, NeutralChannel, IIDRayleighChannel, RiceanIIDTCChannel,
     NoiseModel, NeutralNoise, CSAWGNNoise
 )
 
@@ -40,7 +40,7 @@ __all__ = [
     "Precoder", "NeutralPrecoder", "SVDPrecoder", "ZFPrecoder", "BDPrecoder", "WMMSEPrecoder",
     "Combiner", "NeutralCombiner", "LSVCombiner",
     "ChannelEstimator", "NeutralChannelEstimator",
-    "ChannelPredictor", "NeutralChannelPredictor",
-    "ChannelModel", "NeutralChannel", "IIDRayleighChannel", "RiceanIIDFadingChannel",
+    "ChannelPredictor", "NeutralChannelPredictor", "ARPredictor",
+    "ChannelModel", "NeutralChannel", "IIDRayleighChannel", "RiceanIIDTCChannel",
     "NoiseModel", "NeutralNoise", "CSAWGNNoise",
 ]

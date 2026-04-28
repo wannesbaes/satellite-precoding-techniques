@@ -4,7 +4,7 @@
   "configurations": [
 
         {
-            "Description":                                  "Standard Simulation Configurations 1",
+            "Description":                                  "Standard Simulation Configurations",
             "Ref. Number":                                  "1",
             
             "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
@@ -19,38 +19,8 @@
         },
 
         {
-            "Description":                                  "Test Simulation Configurations 1",
+            "Description":                                  "Test Simulation Configurations",
             "Ref. Number":                                  "1.test",
-            
-            "SNR values (in dB)":                           [-10, -5, 0, 5, 10, 15, 20, 25, 30],
-
-            "Minimum bit errors per SNR value":             100,
-            "Scope of bit errors":                          "system-wide",
-            
-            "Minimum channel realizations per SNR value":   100,
-            "Maximum channel realizations per SNR value":   200,
-            
-            "Symbol vector transmissions per channel realization":   50
-        },
-        
-        {
-            "Description":                                  "Standard Simulation Configurations 2",
-            "Ref. Number":                                  "2",
-            
-            "SNR values (in dB)":                           [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30],
-            
-            "Minimum bit errors per SNR value":             250,
-            "Scope of bit errors":                          "system-wide",
-            
-            "Minimum channel realizations per SNR value":   1000,
-            "Maximum channel realizations per SNR value":   1500,
-            
-            "Symbol vector transmissions per channel realization":   250
-        },
-
-        {
-            "Description":                                  "Test Simulation Configurations 2",
-            "Ref. Number":                                  "2.test",
             
             "SNR values (in dB)":                           [-10, -5, 0, 5, 10, 15, 20, 25, 30],
 
@@ -58,10 +28,11 @@
             "Scope of bit errors":                          "system-wide",
             
             "Minimum channel realizations per SNR value":   100,
-            "Maximum channel realizations per SNR value":   150,
+            "Maximum channel realizations per SNR value":   200,
             
-            "Symbol vector transmissions per channel realization":   25
+            "Symbol vector transmissions per channel realization":   50
         }
-  ]
+
+    ]
 
 }
