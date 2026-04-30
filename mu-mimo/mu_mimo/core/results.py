@@ -422,18 +422,18 @@ class SimResultManager:
             label = reference_number
         
         elif label_type == "CH":
-            CH_mapping = {"1": "Rayleigh", "2": "Ricean TC Fading"}
+            CH_mapping = {"1": "Rayleigh", "2": "Ricean TC Fading", "3": "Ricean TC Fading", "2s": "Satellite Channel", "3s": "Satellite Channel"}
             CH_number = (reference_number.split(".")[0]).split("_")[0]
             label = CH_mapping.get(CH_number, None)
         
         elif label_type == "RTT":
-            RTT_mapping = {"0": "Instant CSI", "1": r"$T_{\text{RTT}} = \frac{1}{6} \, T_c$", "2": r"$T_{\text{RTT}} = \frac{1}{3} \, T_c$", "3": r"$T_{\text{RTT}} = \frac{1}{2} \, T_c$", "4": r"$T_{\text{RTT}} = \frac{2}{3} \, T_c$", "5": r"$T_{\text{RTT}} = \frac{5}{6} \, T_c$"}
+            RTT_mapping = {"0": "Instant CSI", "1": r"$T_{\text{RTT}} = \frac{1}{6} \, T^{\text{NLoS}}_c$", "2": r"$T_{\text{RTT}} = \frac{1}{3} \, T^{\text{NLoS}}_c$", "3": r"$T_{\text{RTT}} = \frac{1}{2} \, T^{\text{NLoS}}_c$", "4": r"$T_{\text{RTT}} = \frac{2}{3} \, T^{\text{NLoS}}_c$", "5": r"$T_{\text{RTT}} = \frac{5}{6} \, T^{\text{NLoS}}_c$"}
             RTT_number = (reference_number.split(".")[0]).split("_")[2]
             label = RTT_mapping.get(RTT_number, None)
         
         elif label_type == "CE":
             CE_mapping = {"1": "Perfect CSI", "2": "Outdated CSI", "3": "Predicted CSI"}
-            CE_number = (reference_number.split(".")[0]).split("_")[0]
+            CE_number = (reference_number.split(".")[0]).split("_")[0][0]
             label = CE_mapping.get(CE_number, None)
         
         elif label_type == "PT":

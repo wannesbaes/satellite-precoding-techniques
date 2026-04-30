@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FuncFormatter
@@ -179,7 +180,7 @@ class RiceanIIDTCChannel(ChannelModel):
 
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rice: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2):
         r"""
         Instantiate the channel.
 
@@ -192,7 +193,7 @@ class RiceanIIDTCChannel(ChannelModel):
         K : int
             The number of user terminals.
         
-        K_rice : float
+        K_rician : float
             The Rice factor. It quantifies the strength of the deterministic LoS component relative to the scattered multipath.
         
         Trtt_2_Tc : float
@@ -208,13 +209,13 @@ class RiceanIIDTCChannel(ChannelModel):
         super().__init__(Nt, Nr, K)
 
         # Validate the parameters.
-        assert K_rice >= 0, f"The Rice factor K_rice must be non-negative.\nCurrent value: {K_rice}"
+        assert K_rician >= 0, f"The Rice factor K_rician must be non-negative.\nCurrent value: {K_rician}"
         assert 0 <= Trtt_2_Tc, f"The round trip time relative to the coherence time must be non-negative.\nCurrent value: {Trtt_2_Tc}"
         assert 0 < Tpilot_2_Tc <= Trtt_2_Tc or Trtt_2_Tc == 0, f"The time period between two CSI feedback messages relative to the coherence time must be positive and less than or equal to the round trip time.\nCurrent value: {Tpilot_2_Tc}"
         assert Twindow_2_Tc > 0, f"The time window relative to the coherence time must be positive.\nCurrent value: {Twindow_2_Tc}"
         
         # Store the channel parameters.
-        self.K_rice = K_rice
+        self.K_rician = K_rician
         self.Trtt_2_Tc = Trtt_2_Tc
         self.Tpilot_2_Tc = Tpilot_2_Tc
         self.Twindow_2_Tc = Twindow_2_Tc
@@ -234,7 +235,7 @@ class RiceanIIDTCChannel(ChannelModel):
         return
 
     def __str__(self) -> str:
-        return f"Ricean Channel with an IID time-correlated fading NLoS component.\n   K_rice = {self.K_rice}, RTT = {np.round(self.Trtt_2_Tc, 2)} Tc, CSI feedback rate = {np.round(1 / self.Tpilot_2_Tc, 2)} per Tc"
+        return f"Ricean Channel with an IID time-correlated fading NLoS component.\n   K_rician = {round(10 * np.log10(self.K_rician))} dB, RTT = {np.round(self.Trtt_2_Tc, 2)} Tc, CSI feedback rate = {np.round(1 / self.Tpilot_2_Tc, 1)} messages per Tc"
     
     def __eq__(self, other):
         
@@ -245,7 +246,7 @@ class RiceanIIDTCChannel(ChannelModel):
             self.Nt == other.Nt and
             self.Nr == other.Nr and
             self.K == other.K and
-            self.K_rice == other.K_rice and
+            self.K_rician == other.K_rician and
             self.Trtt_2_Tc == other.Trtt_2_Tc and
             self.Tpilot_2_Tc == other.Tpilot_2_Tc
         )
@@ -261,11 +262,11 @@ class RiceanIIDTCChannel(ChannelModel):
 
         # Compute the current channel matrix.
         H_NLoS = H_NLoS_process[-1]
-        H = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS)
+        H = np.exp(1j * theta) * (np.sqrt(self.K_rician / (self.K_rician + 1)) + np.sqrt(1 / (self.K_rician + 1)) * H_NLoS)
 
         # Compute the CSI corresponding to the current channel.
         H_NLoS_CSI = H_NLoS_process[:self.num_samples-self.CSI_delay]
-        H_CSI = np.exp(1j * theta) * (np.sqrt(self.K_rice / (self.K_rice + 1)) + np.sqrt(1 / (self.K_rice + 1)) * H_NLoS_CSI)
+        H_CSI = np.exp(1j * theta) * (np.sqrt(self.K_rician / (self.K_rician + 1)) + np.sqrt(1 / (self.K_rician + 1)) * H_NLoS_CSI)
         
         # Update the values of the current channel and the corresponding CSI.
         self._H = H
@@ -330,6 +331,619 @@ class RiceanIIDTCChannel(ChannelModel):
         H_NLoS = (L @ w).reshape(num_channel_samples, self.K*self.Nr, self.Nt)
 
         return H_NLoS
+
+class SatelliteChannel(ChannelModel):
+    """
+    Satellite Channel.
+    """
+
+    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2, L1: int = 2, w1: float = 0.75, L2: int = 2, w2: float = 0.25, dx_BS: float = 1, dy_BS: float = 1, dx_UT: float = 0.5, dy_UT: float = 0.5, theta_max: float = 30 * (np.pi / 180), sigma_theta: float = 4 * (np.pi / 180), sigma_phi: float = 4 * (np.pi / 180)):
+        r"""
+        Instantiate the Satellite Channel.
+
+        Parameters
+        ----------
+        Nt : int
+            Total number of transmit antennas at the BS.
+        Nr : int
+            Number of receive antennas per UT.
+        K : int
+            Number of user terminals.
+        K_rician : float
+            Rice factor.  Ratio of LoS power to scattered power.
+        Trtt_2_Tc : float
+            Round-trip time relative to the coherence time :math:`T_{\text{RTT}} / T_c`.
+        Tpilot_2_Tc : float
+            Time period between two CSI message acquisitions relative to the coherence time :math:`T_{\text{pilot}} / T_c`.
+        Twindow_2_Tc : float, optional
+            Length of the generated time window relative to :math:`T_c`.  Default: 2.
+        
+        L1 : int, optional
+            Number of NLoS rays per UT in the first cluster. Default: 2.
+        w1 : float, optional
+            Weight of the first cluster.  Default: 0.75.
+        L2 : int, optional
+            Number of NLoS rays per UT in the second cluster. Default: 2.
+        w2 : float, optional
+            Weight of the second cluster.  Default: 0.25.
+        dx_BS, dy_BS : float, optional
+            Normalised BS antenna spacings at the BS (satellite) :math:`d/\lambda`.  Default: 1.
+        dx_UT, dy_UT : float, optional
+            Normalised UT antenna spacings at the UT :math:`d/\lambda`.  Default: 0.5.
+        theta_max : float, optional
+            Maximum elevation angle [rad].  Default: 30°.
+        sigma_theta : float, optional
+            Laplace scale for NLoS elevation perturbations [rad].  Default: 4°.
+        sigma_phi : float, optional
+            Laplace scale for NLoS azimuth perturbations [rad].  Default: 4°.
+        """
+        super().__init__(Nt, Nr, K)
+
+        # Validate parameters.
+        assert K_rician >= 0,             f"K_rician must be non-negative. Got {K_rician}"
+        assert L1 >= 1,                   f"L1 must be >= 1. Got {L1}"
+        assert L2 >= 1,                   f"L2 must be >= 1. Got {L2}"
+        assert w1 + w2 == 1,              f"w1 and w2 must sum to 1. Got w1={w1}, w2={w2}"
+        assert Trtt_2_Tc >= 0,            f"Trtt_2_Tc must be non-negative. Got {Trtt_2_Tc}"
+        assert 0 < Tpilot_2_Tc <= Trtt_2_Tc or Trtt_2_Tc == 0, f"Tpilot_2_Tc must be in (0, Trtt_2_Tc]. Got {Tpilot_2_Tc}"
+        assert Twindow_2_Tc > 0,          f"Twindow_2_Tc must be positive. Got {Twindow_2_Tc}"
+
+        # Store channel parameters.
+        self.K_rician     = K_rician
+
+        self.Trtt_2_Tc    = Trtt_2_Tc
+        self.Tpilot_2_Tc  = Tpilot_2_Tc
+        self.Twindow_2_Tc = Twindow_2_Tc
+
+        self.L1            = L1
+        self.w1            = w1
+        self.L2            = L2
+        self.w2            = w2
+
+        self.dx_BS        = dx_BS
+        self.dy_BS        = dy_BS
+        self.dx_UT        = dx_UT
+        self.dy_UT        = dy_UT
+
+        self.theta_max    = theta_max
+        self.sigma_theta  = sigma_theta
+        self.sigma_phi    = sigma_phi
+
+        # Compute and store the helper parameters for the array response vector computations.
+        self.Nx_BS        = next(Nx_BS for Nx_BS in range(int(math.isqrt(Nt)), 0, -1) if Nt % Nx_BS == 0)
+        self.Ny_BS        = Nt // self.Nx_BS
+        self.Nx_UT        = next(Nx_UT for Nx_UT in range(int(math.isqrt(Nr)), 0, -1) if Nr % Nx_UT == 0)
+        self.Ny_UT        = Nr // self.Nx_UT
+
+        # Compute and store the helper parameters for the time-correlated fading of the NLoS component.
+        self.num_samples  = int((1 / Tpilot_2_Tc) * Twindow_2_Tc)
+        self.CSI_delay    = int(np.ceil(Trtt_2_Tc / Tpilot_2_Tc))
+        self.fD_times_Tc  = (1 / (2 * np.pi)) * brentq(lambda z: j0(z) - 0.5, 0, 2.5)
+
+    def __str__(self) -> str:
+        return f"Ricean Satellite Channel with space- and time-correlated fading NLoS component.\n   K_rician = {round(10 * np.log10(self.K_rician))} dB, RTT = {np.round(self.Trtt_2_Tc, 2)} Tc, CSI feedback rate = {np.round(1 / self.Tpilot_2_Tc, 1)} messages per Tc, {self.L1} and {self.L2} rays in the first and second clusters per UT"
+
+    def __eq__(self, other):
+        
+        if not isinstance(other, SatelliteChannel):
+            return NotImplemented
+        
+        return (
+            self.Nt == other.Nt and
+            self.Nr == other.Nr and
+            self.K == other.K and
+            self.K_rician == other.K_rician and
+            self.Trtt_2_Tc == other.Trtt_2_Tc and
+            self.Tpilot_2_Tc == other.Tpilot_2_Tc and
+            self.Twindow_2_Tc == other.Twindow_2_Tc and
+            self.L1 == other.L1 and
+            self.w1 == other.w1 and
+            self.L2 == other.L2 and
+            self.w2 == other.w2 and
+            self.dx_BS == other.dx_BS and
+            self.dy_BS == other.dy_BS and
+            self.dx_UT == other.dx_UT and
+            self.dy_UT == other.dy_UT and
+            self.theta_max == other.theta_max and
+            self.sigma_theta == other.sigma_theta and
+            self.sigma_phi == other.sigma_phi
+        )
+
+    def generate(self) -> ComplexArray:
+
+        # STEP 1: initialization.
+
+        # elevation angles
+        theta_BS_LoS     = self._sample_BS_LoS_elevation_angle(self.K, self.theta_max)                                   # shape: (K,)
+        theta_UT_LoS     = self._sample_UT_LoS_elevation_angle(self.K, theta_BS_LoS)                                     # shape: (K,)
+        theta_UT_NLoS_L1 = self._sample_UT_NLoS_elevation_angles_L1(self.K, self.L1, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
+        theta_UT_NLoS_L2 = self._sample_UT_NLoS_elevation_angles_L2(self.K, self.L2, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
+
+        # Azimuth angles
+        phi_BS_LoS     = self._sample_BS_azimuth_angle(self.K)                                                            # shape: (K,)
+        phi_UT_LoS     = self._sample_UT_LoS_azimuth_angle(self.K, phi_BS_LoS)                                            # shape: (K,)
+        phi_UT_NLoS_L1 = self._sample_UT_NLoS_azimuth_angles_L1(self.K, self.L1, phi_UT_LoS, self.sigma_phi)              # shape: (K, L)
+        phi_UT_NLoS_L2 = self._sample_UT_NLoS_azimuth_angles_L2(self.K, self.L2, phi_UT_LoS, self.sigma_phi)              # shape: (K, L)
+        
+        # channel gains
+        alpha_LoS          = self._sample_LoS_channel_gain(self.num_samples, self.K, theta_UT_LoS, self.fD_times_Tc, self.Tpilot_2_Tc)        # shape: (K,)
+        alpha_NLoS_process = self._sample_NLoS_channel_gains(self.num_samples, self.K, self.L1+self.L2, self.fD_times_Tc, self.Tpilot_2_Tc)   # shape: (T, K, L)
+
+        # array response vectors
+        a_BS          = np.array([self._array_response_vector(self.Nx_BS, self.Ny_BS, self.dx_BS, self.dy_BS, theta_BS_LoS[k], phi_BS_LoS[k]) for k in range(self.K)])                                              # (K, Nt)
+        a_UT_LoS      = np.array([self._array_response_vector(self.Nx_UT, self.Ny_UT, self.dx_UT, self.dy_UT, theta_UT_LoS[k], phi_UT_LoS[k]) for k in range(self.K)])                                              # (K, Nr)
+        a_UT_NLoS_L1  = np.array([[self._array_response_vector(self.Nx_UT, self.Ny_UT, self.dx_UT, self.dy_UT, theta_UT_NLoS_L1[k, l], phi_UT_NLoS_L1[k, l]) for l in range(self.L1)] for k in range(self.K)])       # (K, L, Nr)
+        a_UT_NLoS_L2  = np.array([[self._array_response_vector(self.Nx_UT, self.Ny_UT, self.dx_UT, self.dy_UT, theta_UT_NLoS_L2[k, l], phi_UT_NLoS_L2[k, l]) for l in range(self.L2)] for k in range(self.K)])       # (K, L, Nr)
+
+
+        # STEP 2: assembly.
+        
+        H_process = np.zeros((self.num_samples, self.K*self.Nr, self.Nt), dtype=complex)
+        
+        for k in range(self.K):
+
+            # LoS component
+            H_LoS_k = np.sqrt(self.K_rician / (self.K_rician + 1))  * alpha_LoS[:, k, np.newaxis, np.newaxis] * np.outer(a_UT_LoS[k], a_BS[k].conj())[np.newaxis]
+
+            # NLoS component
+            v_NLoS_L1_k = np.einsum('tl,li->ti', alpha_NLoS_process[:, k, : self.L1], a_UT_NLoS_L1[k])
+            H_NLoS_L1_k = np.sqrt(1 / (self.K_rician + 1)) * np.sqrt(self.w1 / self.L1)  *  np.einsum('ti,j->tij', v_NLoS_L1_k, a_BS[k].conj())
+
+            v_NLoS_L2_k = np.einsum('tl,li->ti', alpha_NLoS_process[:, k, self.L1 : self.L1+self.L2], a_UT_NLoS_L2[k])
+            H_NLoS_L2_k = np.sqrt(1 / (self.K_rician + 1)) * np.sqrt(self.w2 / self.L2)  *  np.einsum('ti,j->tij', v_NLoS_L2_k, a_BS[k].conj())
+
+            H_NLoS_k = H_NLoS_L1_k + H_NLoS_L2_k
+
+            # channel matrix for UT k
+            H_k = H_LoS_k[np.newaxis, :, :] + H_NLoS_k
+            H_process[:, k*self.Nr : (k+1)*self.Nr, :] = H_k
+
+        
+        # STEP 3: termination.
+        
+        # retrieve the current channel and the corresponding CSI from the generated process.
+        H     = H_process[-1]
+        H_CSI = H_process[:self.num_samples - self.CSI_delay]
+
+        # Update the stored values.
+        self._H     = H
+        self._H_CSI = H_CSI
+
+        return H
+
+    
+    def autocorrelation_norm(self, tau: RealArray, nu_LoS: float = 0.0) -> ComplexArray:
+        r"""
+        Compute the theoretical normalized autocorrelation function of a single propagation link.
+
+        For a fixed LoS Doppler shift :math:`\nu^{\text{LoS}}`, the autocorrelation of the scalar channel :math:`h(t) = [\mathbf{H}_k(t)]_{n_r, n_t}` is:
+
+        .. math::
+
+            R_h(\tau)
+            = \left[ \frac{K}{K+1} \, e^{j 2\pi \nu^{\text{LoS}} \tau} + \frac{J_0\!\left(2\pi\, f_D T_{\text{pilot}}\, \tau\right)}{K+1} \right]
+
+        The two terms correspond to the LoS and NLoS contributions respectively.
+        The LoS term is a complex tone that rotates at the LoS Doppler rate; it does not
+        decay with lag.  
+        The NLoS term follows Jakes' autocorrelation.
+
+        When averaged over the random LoS Doppler direction :math:`\xi \sim \mathrm{U}[0, 2\pi)`, the expected value of the LoS tone becomes :math:`J_0(2\pi f_D T_{\text{pilot}} \tau)` as well, so the ensemble-averaged autocorrelation reduces to a pure Jakes function:
+
+        .. math::
+
+            \bar{R}_h(\tau) = \frac{J_0(2\pi\, f_D T_{\text{pilot}}\, \tau)}{N_t N_r}
+
+        Parameters
+        ----------
+        tau : RealArray
+            Lag values in number of pilot periods (i.e. samples).
+        nu_LoS : float, optional
+            Normalised LoS Doppler shift :math:`\nu^{\text{LoS}} = f_D T_{\text{pilot}} \cos(\xi)`.
+            Default: 0 (static LoS, reduces to a time-invariant model).
+
+        Returns
+        -------
+        R : ComplexArray, same shape as ``tau``
+            The autocorrelation values at the requested lags.
+        """
+        
+        R_LoS  = (self.K_rician / (self.K_rician + 1)) * np.exp(1j * 2*np.pi * nu_LoS * tau)
+        R_NLoS = (1  / (self.K_rician + 1)) * j0(2*np.pi * (self.fD_times_Tc * self.Tpilot_2_Tc) * tau)
+
+        return (R_LoS + R_NLoS)
+    
+    
+    @staticmethod
+    def _array_response_vector(Nx: int, Ny: int, dx: float, dy: float, theta: float, phi: float) -> ComplexArray:
+        """
+        Compute the UPA array response vector.
+
+        Parameters
+        ----------
+        Nx, Ny : int
+            Number of antennas along the x- and y-direction.
+        dx, dy : float
+            Normalized spacings between the antennas along the x- and y-direction, respectively, relative to the wavelength.
+        theta : float
+            Elevation angle [rad].
+        phi : float
+            Azimuth angle [rad].
+
+        Returns
+        -------
+        a : ComplexArray, shape (Nx * Ny,)
+            The UPA array response vector.
+        """
+
+        nx = np.arange(Nx)
+        ny = np.arange(Ny)
+
+        phase_x =  dx * np.sin(theta) * np.cos(phi)
+        phase_y =  dy * np.sin(theta) * np.sin(phi)
+
+        phases = (np.outer(nx, np.ones(Ny))*phase_x + np.outer(np.ones(Nx), ny)*phase_y).flatten()
+
+        a = (1 / np.sqrt(Nx*Ny)) * np.exp(1j * 2*np.pi * phases)
+        return a
+
+    
+    @staticmethod
+    def _sample_BS_LoS_elevation_angle(K: int, theta_max: float) -> RealArray:
+        r"""
+        Sample the LoS elevation angles :math:`\theta_k` for each UT k according to the following PDF derived from a uniform distribution of UTs on the circular ground disk of radius :math:`r_{\max} = h \tan(\theta_{\max})`:
+
+        .. math::
+
+            P_{\Theta^{\text{BS}}}(\theta)
+            = \frac{2\,\tan\theta}{\tan^2(\theta_{\max})\,\cos^2\theta}, \quad \theta \in [0, \theta_{\max}]
+
+        Samples are drawn via the inverse CDF method. The CDF is
+
+        .. math::
+
+            F_\Theta(\theta) = \frac{\tan^2\theta}{\tan^2(\theta_{\max})}
+
+        so that :math:`\theta = \arctan\!\bigl(\tan(\theta_{\max})\sqrt{U}\bigr)` with :math:`U \sim \mathrm{Uniform}[0, 1]`.
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        theta_max : float
+            The maximum elevation angle [rad].
+
+        Returns
+        -------
+        theta_BS_LoS : RealArray, shape (K,)
+            The sampled LoS elevation angles at the BS for each UT.
+        """
+        
+        U = np.random.uniform(0.0, 1.0, size=K)
+        theta_BS_LoS = np.arctan(np.tan(theta_max) * np.sqrt(U))
+        return theta_BS_LoS
+
+    @staticmethod
+    def _sample_UT_LoS_elevation_angle(K: int, theta_BS_LoS: RealArray) -> RealArray:
+        """
+        Sample the LoS elevation angles at the UT :math:`\theta_k^{\text{UT}}` for each UT k, given the LoS elevation angles at the BS :math:`\theta_k^{\text{BS}}`.
+
+        The elevation angle of the LoS path of UT k at the UT is identical to the elevation angle of the LoS path at the BS, i.e., :math:`\theta_k^{\text{UT}} = \theta_k^{\text{BS}}` for all k.
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        theta_BS_LoS : RealArray, shape (K,)
+            The LoS elevation angles at the BS for each user terminal.
+        
+        Returns
+        -------
+        theta_UT_LoS : RealArray, shape (K,)
+            The sampled LoS elevation angles at the UT for each user terminal.
+        """
+        theta_UT_LoS = theta_BS_LoS
+        return theta_UT_LoS
+    
+    @staticmethod
+    def _sample_UT_NLoS_elevation_angles_L1(K: int, L1: int, theta_UT_LoS: RealArray, sigma_theta: float) -> RealArray:
+        r"""
+        Sample the elevation angles of the rays at the UT :math:`\theta_{k,\ell}^{\text{UT}}` for each UT `k` and rays `l` of the first cluster.
+
+        The elevation angle of each ray l of UT k at the UT is modeled as a small perturbation around the LoS elevation angle :math:`\theta_k^{\text{UT}}`:
+
+        .. math::
+
+            \theta^{\text{UT}}_{k,\ell} = \theta^{\text{UT}}_k + \sigma_{\theta} \, u_{k,\ell} \quad \text{with} \quad u_{k,\ell} \sim \text{Laplace}(0, 1) \text{ and } \sigma_{\theta} \approx 4^\circ
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        L1 : int
+            The number of rays (bundle of NLoS propagation paths) per UT in the first cluster.
+        theta_UT_LoS : RealArray, shape (K,)
+            The elevation angles of the LoS path at the UT, for each UT.
+        sigma_theta : float
+            The scale parameter of the Laplace distribution modeling the deviation of the NLoS elevation angles from the LoS elevation angles.
+
+        Returns
+        -------
+        theta_UT_NLoS : RealArray, shape (K, L1)
+            The sampled NLoS elevation angles for all rays `l` of the first cluster at each UT `k`.
+        """
+        
+        u = np.random.laplace(loc=0.0, scale=1.0, size=(K, L1))
+        theta_UT_NLoS_L1 = theta_UT_LoS[:, np.newaxis] + (sigma_theta * u)
+        return theta_UT_NLoS_L1
+
+    @staticmethod
+    def _sample_UT_NLoS_elevation_angles_L2(K: int, L2: int, theta_UT_LoS: RealArray, sigma_theta: float) -> RealArray:
+        r"""
+        Sample the elevation angles of the rays at the UT :math:`\theta_{k,\ell}^{\text{UT}}` for each UT `k` and rays `l` of the second cluster.
+
+        The elevation angle of each ray l of UT k at the UT is modeled as a small perturbation around the LoS elevation angle :math:`\theta_k^{\text{UT}}`:
+
+        .. math::
+
+            \theta^{\text{UT}}_{k,\ell} = \theta^{\text{UT}}_k + \sigma_{\theta} \, u_{k,\ell} + \delta\theta_k \quad \text{with} \quad u_{k,\ell} \sim \text{Laplace}(0, 1) \text{ and } \sigma_{\theta} \approx 4^\circ \text{ and } \delta\theta_k \sim \mathrm{U}[2^\circ, 10^\circ]
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        L2 : int
+            The number of rays (bundle of NLoS propagation paths) per UT in the second cluster.
+        theta_UT_LoS : RealArray, shape (K,)
+            The elevation angles of the LoS path at the UT, for each UT.
+        sigma_theta : float
+            The scale parameter of the Laplace distribution modeling the deviation of the NLoS elevation angles from the LoS elevation angles.
+
+        Returns
+        -------
+        theta_UT_NLoS : RealArray, shape (K, L2)
+            The sampled NLoS elevation angles for all rays `l` of the second cluster at each UT `k`.
+        """
+        
+        u = np.random.laplace(loc=0.0, scale=1.0, size=(K, L2))
+        delta_theta = np.random.uniform(2*(np.pi/180), 10*(np.pi/180), size=K)
+        theta_UT_NLoS_L2 = theta_UT_LoS[:, np.newaxis] + (sigma_theta * u) + delta_theta[:, np.newaxis]
+        return theta_UT_NLoS_L2
+    
+
+    @staticmethod
+    def _sample_BS_azimuth_angle(K: int) -> RealArray:
+        r"""
+        Sample the azimuth angles at the BS :math:`\phi_k^{\text{BS}}` for each UT k.
+
+        The azimuth angle of the LoS path of UT :math:`k` at the BS is uniformly distributed within the UT's dedicated angular sector of width :math:`2\pi/K`:
+
+        .. math::
+
+            P_{\Phi^{\text{BS}}_k}(\phi) = \frac{K}{2\pi},
+            \quad \phi \in \left[k\,\frac{2\pi}{K},\; (k+1)\,\frac{2\pi}{K}\right)
+
+        Sampling directly:
+
+        .. math::
+
+            \phi_k^{\text{BS}} = \frac{2\pi}{K}\,(k + U_k), \quad U_k \sim \mathrm{Uniform}[0, 1)
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+
+        Returns
+        -------
+        phi_BS_LoS : RealArray, shape (K,)
+            The sampled LoS azimuth angles at the BS for each UT [rad].
+        """
+        k = np.arange(K)
+        U = np.random.uniform(0.0, 1.0, size=K)
+        phi_BS_LoS = (2 * np.pi / K) * (k + U)
+        return phi_BS_LoS
+
+    @staticmethod
+    def _sample_UT_LoS_azimuth_angle(K: int, phi_BS_LoS: RealArray) -> RealArray:
+        r"""
+        Sample the LoS azimuth angles at the UT :math:`\phi_k^{\text{UT}}` for each UT k.
+
+        The orientation of each UT's array relative to the satellite is determined by a rotation :math:`\rho_k` around the vertical axis, which is uniformly distributed in :math:`[0, 2\pi)`.
+        This makes the UT azimuth angle of the LoS path uniformly distributed over the full circle, independently of the BS azimuth angle:
+
+        .. math::
+
+            \phi_k^{\text{UT}} \sim \mathrm{Uniform}[0, 2\pi), \quad \text{i.i.d. across } k
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        phi_BS_LoS : RealArray, shape (K,)
+            The LoS azimuth angles at the BS for each UT.
+
+        Returns
+        -------
+        phi_UT_LoS : RealArray, shape (K,)
+            The sampled LoS azimuth angles [rad] at the UT, for each UT.
+        """
+        phi_UT_LoS = np.random.uniform(0.0, 2*np.pi, size=K)
+        return phi_UT_LoS
+    
+    @staticmethod
+    def _sample_UT_NLoS_azimuth_angles_L1(K: int, L1: int, phi_UT_LoS: RealArray, sigma_phi: float) -> RealArray:
+        r"""
+        Sample the NLoS azimuth angles at the UT :math:`\phi_{k,\ell}^{\text{UT}}` for each UT `k` and ray `l` of the first cluster.
+
+        The NLoS azimuth angles are modeled as Laplace-distributed deviations from the LoS azimuth angles for the corresponding UT `k` and ray `l`:
+
+        .. math::
+
+            \phi_{k,\ell}^{\text{UT}} = \phi_k^{\text{UT}} + \sigma_{\phi} \, u_{k,\ell}, \quad u_{k,\ell} \sim \text{Laplace}(0, 1), \quad \sigma_{\phi} \approx 4^\circ
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        L1 : int
+            The number of rays (bundle of NLoS propagation paths) per UT in the first cluster.
+        phi_UT_LoS : RealArray, shape (K,)
+            The LoS azimuth angles at the UT for each UT.
+        sigma_phi : float
+            The scale parameter of the Laplace distribution modeling the deviation of the NLoS azimuth angles from the LoS azimuth angles.
+
+        Returns
+        -------
+        phi_UT_NLoS : RealArray, shape (K, L1)
+            The sampled NLoS azimuth angles for all rays `l` at each UT `k` of the first cluster [rad].
+        """
+        
+        u = np.random.laplace(loc=0.0, scale=1.0, size=(K, L1))
+        phi_UT_NLoS = phi_UT_LoS[:, np.newaxis] + (sigma_phi * u)
+        return phi_UT_NLoS
+    
+    @staticmethod
+    def _sample_UT_NLoS_azimuth_angles_L2(K: int, L2: int, phi_UT_LoS: RealArray, sigma_phi: float) -> RealArray:
+        r"""
+        Sample the NLoS azimuth angles at the UT :math:`\phi_{k,\ell}^{\text{UT}}` for each UT `k` and ray `l` of the second cluster.
+
+        The NLoS azimuth angles are modeled as Laplace-distributed deviations from the LoS azimuth angles for the corresponding UT `k` and ray `l`:
+
+        .. math::
+
+            \phi_{k,\ell}^{\text{UT}} = \phi_k^{\text{UT}} + \sigma_{\phi} \, u_{k,\ell} + \delta\phi_k, \quad u_{k,\ell} \sim \text{Laplace}(0, 1), \quad \sigma_{\phi} \approx 4^\circ \text{ and } \delta\phi_k \sim \mathrm{U}[10^\circ, 30^\circ]
+
+        Parameters
+        ----------
+        K : int
+            The number of user terminals.
+        L2 : int
+            The number of rays (bundle of NLoS propagation paths) per UT in the second cluster.
+        phi_UT_LoS : RealArray, shape (K,)
+            The LoS azimuth angles at the UT for each UT.
+        sigma_phi : float
+            The scale parameter of the Laplace distribution modeling the deviation of the NLoS azimuth angles from the LoS azimuth angles.
+
+        Returns
+        -------
+        phi_UT_NLoS : RealArray, shape (K, L2)
+            The sampled NLoS azimuth angles for all rays `l` at each UT `k` of the second cluster [rad].
+        """
+        
+        u = np.random.laplace(loc=0.0, scale=1.0, size=(K, L2))
+        delta_phi = np.random.uniform(low=10*(np.pi/180), high=30*(np.pi/180), size=K)
+        phi_UT_NLoS = phi_UT_LoS[:, np.newaxis] + (sigma_phi * u) + delta_phi[:, np.newaxis]
+        return phi_UT_NLoS
+
+    
+    @staticmethod
+    def _sample_LoS_channel_gain(T: int, K: int, theta_k: RealArray, fD_times_Tc: float, Tpilot_2_Tc: float) -> ComplexArray:
+        r"""
+        Sample the time-varying LoS channel gains :math:`\alpha^{\text{LoS}}_k(t)` for each UT k.
+
+        The LoS path of a moving UT experiences a deterministic Doppler shift determined by the
+        projection of the UT's velocity onto the satellite direction.  The gain is modeled as a
+        complex tone with a random initial phase and a random (but fixed per realisation) normalised
+        Doppler frequency:
+
+        .. math::
+
+            \alpha^{\text{LoS}}_k(t) = e^{j\left(\psi_k + 2\pi \nu_k^{\text{LoS}} t\right)}
+
+        where
+
+        .. math::
+
+            \psi_k \sim \mathrm{Uniform}[0, 2\pi), \qquad
+            \nu_k^{\text{LoS}} = f_D T_{\text{pilot}} \cos(\pi/2 - \theta_k)
+
+        Here :math:`\theta_k` is the elevation angle of the LoS path at the UT, so that :math:`\nu_k^{\text{LoS}} \in [-f_D T_{\text{pilot}},\, f_D T_{\text{pilot}}]`.
+        Both :math:`\psi_k` and :math:`\theta_k` are drawn independently across users and held constant throughout the generated time window.
+
+        Parameters
+        ----------
+        T : int
+            Number of time samples to generate.
+        K : int
+            Number of user terminals.
+        theta_k : RealArray, shape (K,)
+            The elevation angles of the LoS path at the UT, for each UT.
+        fD_times_Tc : float
+            Maximum Doppler frequency times the coherence time :math:`f_D T_c`.
+        Tpilot_2_Tc : float
+            Time period between two CSI acquisitions relative to the coherence time
+            :math:`T_{\text{pilot}} / T_c`.
+
+        Returns
+        -------
+        alpha_LoS : ComplexArray, shape (T, K)
+            Time-varying LoS channel gains for every time instant and user.
+        """
+
+        psi    = np.random.uniform(0.0, 2*np.pi, size=K)
+        xi     = np.pi/2 - theta_k
+        nu_LoS = fD_times_Tc * Tpilot_2_Tc * np.cos(xi)
+        t      = np.arange(T)
+
+        alpha_LoS = np.exp(1j * (psi[np.newaxis, :] + 2*np.pi * np.outer(t, nu_LoS)))
+        return alpha_LoS
+        
+    @staticmethod
+    def _sample_NLoS_channel_gains(T: int, K: int, L: int, fD_times_Tc: float, Tpilot_2_Tc: float) -> ComplexArray:
+        r"""
+        Generate time-correlated NLoS channel gains :math:`\alpha^{\text{NLoS}}_{k,\ell}(t)` for all users, rays (bundle of NLoS propagation paths), and time instants using the Cholesky decomposition method.
+
+        Each gain is an i.i.d. (across users and rays) zero-mean unit-variance complex Gaussian process whose power spectral density follows Jakes' Doppler spectrum (Clarke's fading model):
+
+        .. math::
+
+            \alpha^{\text{NLoS}}_{k,\ell}(t) \sim \mathcal{CN}(0, 1), \quad S(f) = \frac{1}{\pi f_D \sqrt{1 - (f/f_D)^2}}, \quad |f| < f_D
+
+        For Clarke's model the autocorrelation function is :math:`R(\tau) = J_0(2\pi f_D \tau)`, so the :math:`T \times T` covariance matrix has entries :math:`C_{ij} = J_0\!\bigl(2\pi\,(f_D T_c)\,(i-j)\,T_\text{pilot}/T_c\bigr)`.
+
+        The Cholesky steps are:
+
+        1. Build the Toeplitz covariance matrix :math:`\mathbf{C}`.
+        2. Compute its Cholesky factor :math:`\mathbf{C} = \mathbf{L}\mathbf{L}^H`.
+        3. Draw :math:`K \times L` independent white :math:`\mathcal{CN}(0,1)` sequences :math:`\mathbf{w}` of length :math:`T`.
+        4. Obtain the correlated gains as :math:`\boldsymbol{\alpha} = \mathbf{L}\,\mathbf{w}`.
+
+        Parameters
+        ----------
+        T : int
+            Number of time samples to generate.
+        K : int
+            Number of user terminals.
+        L : int
+            Number of NLoS rays per user terminal.
+        fD_times_Tc : float
+            Maximum Doppler frequency times the coherence time :math:`f_D T_c`.
+        Tpilot_2_Tc : float
+            Time period between two CSI acquisitions relative to the coherence time :math:`T_\text{pilot}/T_c`.
+
+        Returns
+        -------
+        alpha_NLoS : ComplexArray, shape (T, K, L)
+            Time-correlated NLoS channel gains for every time instant, user, and ray.
+        """
+        
+        # STEP 1: build the covariance matrix.
+        lags = np.arange(T)
+        C = toeplitz(j0(2 * np.pi * fD_times_Tc * Tpilot_2_Tc * lags))
+        C += 1e-10 * np.eye(T)  # regularise for numerical stability
+
+        # STEP 2: cholesky decomposition
+        L_cholesky = np.linalg.cholesky(C)
+
+        # STEP 3: white gaussian samples
+        w = (1 / np.sqrt(2)) * (np.random.randn(T, K*L) + 1j * np.random.randn(T, K*L))
+
+        # STEP 4: impose the temporal correlation and reshape
+        alpha_NLoS = (L_cholesky @ w).reshape(T, K, L)
+
+        return alpha_NLoS
+    
 
 
 # NOISE MODELS

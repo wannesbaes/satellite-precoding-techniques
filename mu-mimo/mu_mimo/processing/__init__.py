@@ -25,7 +25,7 @@ from .channel_estimation import (
 )
 
 from .channel import (
-    ChannelModel, NeutralChannel, IIDRayleighChannel, RiceanIIDTCChannel,
+    ChannelModel, NeutralChannel, IIDRayleighChannel, RiceanIIDTCChannel, SatelliteChannel,
     NoiseModel, NeutralNoise, CSAWGNNoise
 )
 
@@ -41,6 +41,6 @@ __all__ = [
     "Combiner", "NeutralCombiner", "LSVCombiner",
     "ChannelEstimator", "NeutralChannelEstimator",
     "ChannelPredictor", "NeutralChannelPredictor", "ARPredictor",
-    "ChannelModel", "NeutralChannel", "IIDRayleighChannel", "RiceanIIDTCChannel",
+    "ChannelModel", "NeutralChannel", "IIDRayleighChannel", "RiceanIIDTCChannel", "SatelliteChannel",
     "NoiseModel", "NeutralNoise", "CSAWGNNoise",
 ]
