@@ -180,6 +180,8 @@ class ARPredictor(ChannelPredictor):
         
         elif channel_model == "Ricean IID TC NLoS":
             a = self._compute_optimal_coefficients_ricean_iid_tc_nlos(p, k, channel_params['K_ricean'], channel_params['Tpilot_2_Tc'])
+        elif channel_model == "Satellite Channel":
+            a = self._compute_optimal_coefficients_satellite_channel(p, k, channel_params)
         else:
             raise ValueError(f"Unsupported channel model for AR prediction!\n Channel Model: {channel_model}")
         
@@ -195,6 +197,57 @@ class ARPredictor(ChannelPredictor):
         r_k = (K_ricean / (K_ricean+1)) + (1 / (K_ricean+1)) * j0(2*np.pi * (fD_times_Tc * Tpilot_2_Tc) * (k + np.arange(p)))
 
         # STEP 3:
+        a = np.linalg.solve(R_p, r_k)
+
+        return a
+
+    def _compute_optimal_coefficients_satellite_channel(self, p: int, k: int, channel_params: dict) -> np.ndarray:
+
+        def _compute_fD_times_Tc(K_rician: float, theta: float | None) -> float:
+
+            # Coherence time of the NLoS component only.
+            fD_times_Tc__NLoS = (1 / (2*np.pi)) * brentq(lambda z: j0(z) - 0.5, 0, 2.5)
+
+            if theta is None:
+                return fD_times_Tc__NLoS
+
+            # Define the function whose root we want to find.
+            f = lambda x: (K_rician**2 + j0(x)**2 + 2 * K_rician * j0(x) * np.cos(x * np.sin(theta)) - ((K_rician + 1) / 2)**2)
+
+            # Coarse scan to locate the first sign change (first crossing of 0.5).
+            x_grid = np.linspace(1e-6, 20.0, 20_000)
+            f_grid = f(x_grid)
+            sign_changes = np.where(np.diff(np.sign(f_grid)))[0]
+
+            if len(sign_changes) == 0:
+                return fD_times_Tc__NLoS
+
+            # Refine the root with brentq
+            idx = sign_changes[0]
+            x_c = brentq(f, x_grid[idx], x_grid[idx + 1])
+            fD_times_Tc = x_c / (2 * np.pi)
+            return fD_times_Tc
+
+        Tpilot_2_Tc = channel_params['Tpilot_2_Tc']
+        K_rician    = channel_params['K_rician']
+        theta_k     = channel_params['theta']
+        fD_times_Tc = _compute_fD_times_Tc(K_rician, theta_k)
+
+        fD_Tpilot = fD_times_Tc * Tpilot_2_Tc
+        nu_LoS    = fD_Tpilot * np.sin(theta_k)
+
+        def R(tau):
+            return (K_rician / (K_rician + 1)) * np.exp(1j * 2*np.pi * nu_LoS * tau) + (1 / (K_rician + 1)) * j0(2*np.pi * fD_Tpilot * tau)
+
+        # STEP 1.
+        first_row = R(np.arange(p))
+        R_p = toeplitz(first_row, first_row.conj())
+        R_p += 1e-10 * np.eye(p)
+
+        # STEP 2.
+        r_k = R(k + np.arange(p))
+
+        # STEP 3.
         a = np.linalg.solve(R_p, r_k)
 
         return a

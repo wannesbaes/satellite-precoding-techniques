@@ -496,23 +496,24 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
         channel_param_mapping = {
 
             "Ricean IID TC NLoS": {
-                "K_ricean": 10**(5/10),   # 5 dB
+                "K_rician": 10**(5/10),   # 5 dB
                 "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
                 "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
                 "Twindow_2_Tc": 2,
             } if config_settings['Channel Model'] == "Ricean IID TC NLoS" else None,
 
             "Satellite Channel": {
-                "K_ricean": 10**(10/10),
+                "K_rician": 10**(5/10),
                 "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
                 "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
-                "Twindow_2_Tc": 2,
+                "Twindow_2_Tc": 3,
                 "L1": 2,
                 "L2": 2,
                 "dx_BS": 0.5,
                 "dy_BS": 0.5,
                 "dx_UT": 0.5,
                 "dy_UT": 0.5,
+                "theta": 15 * (np.pi / 180),
                 "theta_max": 30 * (np.pi / 180),
                 "sigma_theta": 4 * (np.pi / 180),
                 "sigma_phi": 4 * (np.pi / 180)
@@ -544,7 +545,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']), 
                 K = int(config_settings['K']), 
-                K_rician = channel_param_mapping["Ricean IID TC NLoS"]["K_ricean"],
+                K_rician = channel_param_mapping["Ricean IID TC NLoS"]["K_rician"],
                 Trtt_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Trtt_2_Tc"],
                 Tpilot_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Tpilot_2_Tc"],
                 Twindow_2_Tc = channel_param_mapping["Ricean IID TC NLoS"]["Twindow_2_Tc"],
@@ -554,7 +555,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 Nt = int(config_settings['Nt']), 
                 Nr = int(config_settings['Nr']), 
                 K = int(config_settings['K']),
-                K_rician = channel_param_mapping["Satellite Channel"]["K_ricean"],
+                K_rician = channel_param_mapping["Satellite Channel"]["K_rician"],
                 Trtt_2_Tc = channel_param_mapping["Satellite Channel"]["Trtt_2_Tc"],
                 Tpilot_2_Tc = channel_param_mapping["Satellite Channel"]["Tpilot_2_Tc"],
                 Twindow_2_Tc = channel_param_mapping["Satellite Channel"]["Twindow_2_Tc"],

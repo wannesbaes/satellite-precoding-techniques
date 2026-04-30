@@ -337,7 +337,7 @@ class SatelliteChannel(ChannelModel):
     Satellite Channel.
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2, L1: int = 2, w1: float = 0.75, L2: int = 2, w2: float = 0.25, dx_BS: float = 1, dy_BS: float = 1, dx_UT: float = 0.5, dy_UT: float = 0.5, theta_max: float = 30 * (np.pi / 180), sigma_theta: float = 4 * (np.pi / 180), sigma_phi: float = 4 * (np.pi / 180)):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2, L1: int = 2, w1: float = 0.75, L2: int = 2, w2: float = 0.25, dx_BS: float = 1, dy_BS: float = 1, dx_UT: float = 0.5, dy_UT: float = 0.5, theta: float = None, theta_max: float = 30 * (np.pi / 180), sigma_theta: float = 4 * (np.pi / 180), sigma_phi: float = 4 * (np.pi / 180)):
         r"""
         Instantiate the Satellite Channel.
 
@@ -370,6 +370,8 @@ class SatelliteChannel(ChannelModel):
             Normalised BS antenna spacings at the BS (satellite) :math:`d/\lambda`.  Default: 1.
         dx_UT, dy_UT : float, optional
             Normalised UT antenna spacings at the UT :math:`d/\lambda`.  Default: 0.5.
+        theta : float, optional
+            Elevation angle [rad].  Default: 15°.
         theta_max : float, optional
             Maximum elevation angle [rad].  Default: 30°.
         sigma_theta : float, optional
@@ -405,6 +407,7 @@ class SatelliteChannel(ChannelModel):
         self.dx_UT        = dx_UT
         self.dy_UT        = dy_UT
 
+        self.theta        = theta
         self.theta_max    = theta_max
         self.sigma_theta  = sigma_theta
         self.sigma_phi    = sigma_phi
@@ -418,7 +421,7 @@ class SatelliteChannel(ChannelModel):
         # Compute and store the helper parameters for the time-correlated fading of the NLoS component.
         self.num_samples  = int((1 / Tpilot_2_Tc) * Twindow_2_Tc)
         self.CSI_delay    = int(np.ceil(Trtt_2_Tc / Tpilot_2_Tc))
-        self.fD_times_Tc  = (1 / (2 * np.pi)) * brentq(lambda z: j0(z) - 0.5, 0, 2.5)
+        self.fD_times_Tc = self._compute_fD_times_Tc(K_rician, theta)
 
     def __str__(self) -> str:
         return f"Ricean Satellite Channel with space- and time-correlated fading NLoS component.\n   K_rician = {round(10 * np.log10(self.K_rician))} dB, RTT = {np.round(self.Trtt_2_Tc, 2)} Tc, CSI feedback rate = {np.round(1 / self.Tpilot_2_Tc, 1)} messages per Tc, {self.L1} and {self.L2} rays in the first and second clusters per UT"
@@ -444,6 +447,7 @@ class SatelliteChannel(ChannelModel):
             self.dy_BS == other.dy_BS and
             self.dx_UT == other.dx_UT and
             self.dy_UT == other.dy_UT and
+            self.theta == other.theta and   
             self.theta_max == other.theta_max and
             self.sigma_theta == other.sigma_theta and
             self.sigma_phi == other.sigma_phi
@@ -454,7 +458,7 @@ class SatelliteChannel(ChannelModel):
         # STEP 1: initialization.
 
         # elevation angles
-        theta_BS_LoS     = self._sample_BS_LoS_elevation_angle(self.K, self.theta_max)                                   # shape: (K,)
+        theta_BS_LoS     = self._sample_BS_LoS_elevation_angle(self.K, self.theta, self.theta_max)                       # shape: (K,)
         theta_UT_LoS     = self._sample_UT_LoS_elevation_angle(self.K, theta_BS_LoS)                                     # shape: (K,)
         theta_UT_NLoS_L1 = self._sample_UT_NLoS_elevation_angles_L1(self.K, self.L1, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
         theta_UT_NLoS_L2 = self._sample_UT_NLoS_elevation_angles_L2(self.K, self.L2, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
@@ -512,6 +516,71 @@ class SatelliteChannel(ChannelModel):
         return H
 
     
+    @staticmethod
+    def _compute_fD_times_Tc(K_rician: float, theta: float | None) -> float:
+        r"""
+        Compute the maximum Doppler frequency times the coherence time, :math:`f_D T_c`, by numerically solving :math:`|R_h(T_c)| = 0.5`.
+
+        When ``theta`` is ``None`` (random elevation angle), the ensemble-averaged ACF is a pure Jakes function independent of :math:`K_\text{rician}`, and the condition reduces to:
+
+        .. math::
+
+            J_0(2\pi f_D T_c) = 0.5 \implies f_D T_c = \frac{z_{0.5}}{2\pi} \approx 0.2421
+
+        When ``theta`` is specified (deterministic elevation angle), the ACF is:
+
+        .. math::
+
+            R_h(\tau) = \frac{K}{K+1}\,e^{j 2\pi f_D T_c \sin(\theta)\,\tau} + \frac{1}{K+1}\,J_0(2\pi f_D T_c\,\tau)
+
+        and the condition :math:`|R_h(T_c)| = 0.5` gives:
+
+        .. math::
+
+            f(x_c) \;\triangleq\; K^2 + J_0^2(x_c) + 2K\,J_0(x_c)\cos(x_c\sin\theta) - \frac{(K+1)^2}{4} = 0
+
+        where :math:`x_c = 2\pi f_D T_c`.  
+        
+        A coarse grid scan locates the first sign change (first lag where :math:`|R_h| = 0.5`), and ``brentq`` refines it.
+
+        If no crossing exists within the search range (which can happen when :math:`K/(K+1) \geq 0.5`, i.e. :math:`K \geq 1`, because the LoS tone keeps the channel correlated above 0.5 indefinitely), the method falls back to the NLoS-only definition.
+
+        Parameters
+        ----------
+        K_rician : float
+            Rice factor.
+        theta : float or None
+            Deterministic elevation angle [rad].  Pass ``None`` for the random-angle case.
+
+        Returns
+        -------
+        fD_times_Tc : float
+            The value of :math:`f_D T_c`.
+        """
+
+        # Coherence time of the NLoS component only.
+        fD_times_Tc__NLoS = (1 / (2*np.pi)) * brentq(lambda z: j0(z) - 0.5, 0, 2.5)
+
+        if theta is None:
+            return fD_times_Tc__NLoS
+
+        # Define the function whose root we want to find.
+        f = lambda x: (K_rician**2 + j0(x)**2 + 2 * K_rician * j0(x) * np.cos(x * np.sin(theta)) - ((K_rician + 1) / 2)**2)
+
+        # Coarse scan to locate the first sign change (first crossing of 0.5).
+        x_grid = np.linspace(1e-6, 20.0, 20_000)
+        f_grid = f(x_grid)
+        sign_changes = np.where(np.diff(np.sign(f_grid)))[0]
+
+        if len(sign_changes) == 0:
+            return fD_times_Tc__NLoS
+
+        # Refine the root with brentq
+        idx = sign_changes[0]
+        x_c = brentq(f, x_grid[idx], x_grid[idx + 1])
+        fD_times_Tc = x_c / (2 * np.pi)
+        return fD_times_Tc
+    
     def autocorrelation_norm(self, tau: RealArray, nu_LoS: float = 0.0) -> ComplexArray:
         r"""
         Compute the theoretical normalized autocorrelation function of a single propagation link.
@@ -548,11 +617,14 @@ class SatelliteChannel(ChannelModel):
             The autocorrelation values at the requested lags.
         """
         
-        R_LoS  = (self.K_rician / (self.K_rician + 1)) * np.exp(1j * 2*np.pi * nu_LoS * tau)
-        R_NLoS = (1  / (self.K_rician + 1)) * j0(2*np.pi * (self.fD_times_Tc * self.Tpilot_2_Tc) * tau)
+        fD_Tpilot = self.fD_times_Tc * self.Tpilot_2_Tc
+        nu_LoS = fD_Tpilot * np.sin(self.theta)
 
-        return (R_LoS + R_NLoS)
-    
+        R_LoS  = (self.K_rician / (self.K_rician + 1)) * np.exp(1j * 2*np.pi * nu_LoS * tau)
+        R_NLoS = (1 / (self.K_rician + 1)) * j0(2*np.pi * fD_Tpilot * tau)
+
+        return R_LoS + R_NLoS
+        
     
     @staticmethod
     def _array_response_vector(Nx: int, Ny: int, dx: float, dy: float, theta: float, phi: float) -> ComplexArray:
@@ -589,9 +661,9 @@ class SatelliteChannel(ChannelModel):
 
     
     @staticmethod
-    def _sample_BS_LoS_elevation_angle(K: int, theta_max: float) -> RealArray:
+    def _sample_BS_LoS_elevation_angle(K: int, theta: float, theta_max: float) -> RealArray:
         r"""
-        Sample the LoS elevation angles :math:`\theta_k` for each UT k according to the following PDF derived from a uniform distribution of UTs on the circular ground disk of radius :math:`r_{\max} = h \tan(\theta_{\max})`:
+        If no elevation angle is given, sample the LoS elevation angles :math:`\theta_k` for each UT k according to the following PDF derived from a uniform distribution of UTs on the circular ground disk of radius :math:`r_{\max} = h \tan(\theta_{\max})`:
 
         .. math::
 
@@ -610,6 +682,8 @@ class SatelliteChannel(ChannelModel):
         ----------
         K : int
             The number of user terminals.
+        theta : float
+            The elevation angle [rad].
         theta_max : float
             The maximum elevation angle [rad].
 
@@ -619,8 +693,12 @@ class SatelliteChannel(ChannelModel):
             The sampled LoS elevation angles at the BS for each UT.
         """
         
-        U = np.random.uniform(0.0, 1.0, size=K)
-        theta_BS_LoS = np.arctan(np.tan(theta_max) * np.sqrt(U))
+        if theta is None:
+            U = np.random.uniform(0.0, 1.0, size=K)
+            theta_BS_LoS = np.arctan(np.tan(theta_max) * np.sqrt(U))
+        else:
+            theta_BS_LoS = np.full(K, theta)
+
         return theta_BS_LoS
 
     @staticmethod
