@@ -499,7 +499,7 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 "K_rician": 10**(5/10),   # 5 dB
                 "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
                 "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
-                "Twindow_2_Tc": 2,
+                "Twindow_2_Tc": 1 + float(config_settings['Round Trip Time relative to the coherence time']),
             } if config_settings['Channel Model'] == "Ricean IID TC NLoS" else None,
 
             "Satellite Channel": {

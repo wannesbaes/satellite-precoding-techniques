@@ -5,6 +5,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+# Matplotlib LaTeX style
+import matplotlib
+matplotlib.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Computer Modern Roman"],
+    "font.size": 14,
+    "axes.labelsize": 15,
+    "xtick.labelsize": 13,
+    "ytick.labelsize": 13,
+})
 
 # 1. POWER ALLOCATION
 
@@ -151,8 +162,8 @@ def plot_waterfilling(Nt, Nr, snr_dB, p_signal=None, p_noise=None, num_samples=1
     """
 
     # STEP 0: Parameters check.
-    filepath_g = "su-mimo/src/resource_allocation/eigenchannel_gains/stats/" + f"{Nt}x{Nr}__{num_samples//1e6:.0f}M_samples.npz"
-    assert os.path.exists(filepath_g), FileNotFoundError(f"Data file not found: {filepath_g}. Please ensure the eigenchannel gains statistics file is available.")
+    filepath_g = "/Users/wannesbaes/Documents/THESIS/satellite precoding techniques/su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/" + f"{Nt}x{Nr}__{num_samples//1e6:.0f}M_samples.npz"
+    assert os.path.exists(filepath_g), FileNotFoundError(f"Data file not found: '{filepath_g}'. Please ensure the eigenchannel gains statistics file is available.")
     constant_power = "signal" if p_signal is not None else "noise"
     assert (p_signal is None) != (p_noise is None), "Exactly one of 'p_signal' or 'p_noise' input parameters must be provided to compute the other using the SNR values.\nWhich one to provide determines the scaling of the power levels in the plot."
     
@@ -169,29 +180,31 @@ def plot_waterfilling(Nt, Nr, snr_dB, p_signal=None, p_noise=None, num_samples=1
     # STEP 2: Create a plot visualizing the inverse channel-to-noise ratio and allocated power.
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    ax.bar(np.arange(1, min(Nt, Nr) + 1), inv_cnr, color='tab:grey', label='Inverse CNR')
-    ax.bar(np.arange(1, min(Nt, Nr) + 1), p, bottom=inv_cnr, color='tab:blue', label='Allocated Power')
-    ax.axhline(y = (inv_cnr[0] + p[0]), color='tab:red', linestyle='--', linewidth=3, label='Water Level')
+    ax.bar(np.arange(1, min(Nt, Nr) + 1), inv_cnr, color='tab:grey', label=r'Inverse CNR $(\gamma_i^{-1} = \frac{N_0}{\sigma^2_i})$')
+    ax.bar(np.arange(1, min(Nt, Nr) + 1), p, bottom=inv_cnr, color='tab:blue', label=r'Allocated Power $(p_i)$')
+    ax.axhline(y = (inv_cnr[0] + p[0]), color='tab:red', linestyle='--', linewidth=3, label=r'Water Level $(\mu_{\mathrm{w}})$')
 
     wl = (inv_cnr[0] + p[0])
     y_max = 1.1 * wl if wl > inv_cnr[-1] else 1.6 * wl
 
-    text_inv_cnr = [ax.text(i + 1, 0.5*(inv_cnr[i] if inv_cnr[i] < y_max else y_max), rf"$\mathrm{{\gamma_{{{i+1}}}^{{-1}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
-    text_p = [ax.text(i + 1, inv_cnr[i] + 0.5*p[i], rf"$\mathrm{{P_{{{i+1}}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_inv_cnr = [ax.text(i + 1, 0.5*(inv_cnr[i] if inv_cnr[i] < y_max else y_max), rf"$\gamma_{{{i+1}}}^{{-1}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_p = [ax.text(i + 1, inv_cnr[i] + 0.5*p[i], rf"$p_{{{i+1}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
 
     for i in range(min(Nt, Nr)):
         if inv_cnr[i] / y_max > 0.1: text_inv_cnr[i].set_visible(True)
         if p[i] / y_max > 0.1: text_p[i].set_visible(True)
 
-    ax.set_title(f'Power Allocation')
-    ax.set_xlabel('Eigenchannel Index')
-    ax.set_ylabel('Power [W]')
+    #ax.set_title(f'Power Allocation')
+    ax.set_xlabel(r'Eigen Subchannel Index $(i)$')
+    ax.set_ylabel(r'Power [W/channel use]')
     ax.set_xticks(np.arange(1, min(Nt, Nr) + 1))
     ax.set_xlim(0.5, min(Nt, Nr) + 0.5)
     ax.set_ylim(0, y_max)
     ax.legend(loc='upper left')
     fig.tight_layout()
-    fig.savefig(f'su-mimo/src/resource_allocation/power_allocation/plots/{Nt}x{Nr}' + f'__SNR_{snr_dB:.0f}dB.png')
+    #fig.savefig(f'su-mimo/src/resource_allocation/power_allocation/plots/{Nt}x{Nr}' + f'__SNR_{snr_dB:.0f}dB.png')
+    fig.savefig('/Users/wannesbaes/Desktop/' + f'{Nt}x{Nr}' + f'__SNR_{snr_dB:.0f}dB.png', dpi=300)
+    print(f"Plot saved: '{os.path.abspath('/Users/wannesbaes/Desktop/' + f'{Nt}x{Nr}' + f'__SNR_{snr_dB:.0f}dB.png')}'")
     plt.close(fig)
     
     return fig, ax
@@ -407,7 +420,7 @@ def plot_adaptive_bit_allocation(Nt, Nr, snr_dB, p_signal=1.0, pa_strategy="opti
     # STEP 0: Check the validity of the input parameters.
     assert pa_strategy in ['optimal', 'equal', 'eigenbeamforming'], "The power allocation strategy 'pa_strategy' must be one of the following: 'optimal', 'equal', 'eigenbeamforming'."
     
-    filepath_g = "su-mimo/src/resource_allocation/eigenchannel_gains/stats/" + f"{Nt}x{Nr}__{num_samples//1e6:.0f}M_samples.npz"
+    filepath_g = "/Users/wannesbaes/Documents/THESIS/satellite precoding techniques/su-mimo/su_mimo/resource_allocation/eigenchannel_gains/stats/" + f"{Nt}x{Nr}__{num_samples//1e6:.0f}M_samples.npz"
     assert os.path.exists(filepath_g), FileNotFoundError(f"Data file not found: {filepath_g}. Please ensure the eigenchannel gains statistics file is available.")
     
     
@@ -429,29 +442,31 @@ def plot_adaptive_bit_allocation(Nt, Nr, snr_dB, p_signal=1.0, pa_strategy="opti
     fig, ax = plt.subplots(figsize=(8, 5))
         
     x = np.arange(min(Nt, Nr))
-    ax.bar(x - 0.35/2, c, width=0.35, color='tab:red', label='Capacities ' + r'$\mathrm{C_i}$')
-    ax.bar(x + 0.35/2, ibr, width=0.35, color='tab:orange', label='Information Bit Rates ' + r'$\mathrm{R_{b,i}}$')
+    ax.bar(x - 0.35/2, c, width=0.35, color='tab:red', label=r'Capacity $C_i$')
+    ax.bar(x + 0.35/2, ibr, width=0.35, color='tab:orange', label=r'Information Bit Rate $r_i$')
     
     y_max = np.ceil(c[0]) + 0.5
-    text_c = [ax.text(x[i] - 0.35/2, 0.5*c[i], rf"$\mathrm{{C_{{{i+1}}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
-    text_ibr = [ax.text(x[i] + 0.35/2, 0.5*ibr[i], rf"$\mathrm{{R_{{b,{i+1}}}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_c = [ax.text(x[i] - 0.35/2, 0.5*c[i], rf"$C_{{{i+1}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
+    text_ibr = [ax.text(x[i] + 0.35/2, 0.5*ibr[i], rf"$r_{{{i+1}}}$", ha='center', va='center', fontsize=10, visible=False) for i in range(min(Nt, Nr))]
 
     for i in range(min(Nt, Nr)):
         if c[i] / y_max > 0.1: text_c[i].set_visible(True)
         if ibr[i] / y_max > 0.1: text_ibr[i].set_visible(True)
 
-    ax.set_title('Bit Allocation')
-    ax.set_xlabel("Eigenchannel Index")
+    #ax.set_title('Bit Allocation')
+    ax.set_xlabel(r'Eigen Subchannel Index $(i)$')
+    ax.set_ylabel(r'Capacity \& IBR [bits/channel use]')
     ax.set_xticks(x)
     ax.set_xticklabels(x + 1)
     ax.set_xlim(-0.5, len(c) - 0.5)
-    ax.set_ylabel('Bits [bps]')
     ax.set_ylim(0, y_max)
     ax.set_yticks(np.arange(0, y_max, 1, dtype=int))
     ax.grid(True, linestyle='dashed', alpha=0.4, axis='y')
     ax.legend(loc='upper right')
     fig.tight_layout()
-    fig.savefig(f'su-mimo/src/resource_allocation/bit_allocation/plots/{Nt}x{Nr}_{c_type}' + f'__PA_{pa_strategy}' + f'__R_{R*100:.0f}' + f'__SNR_{snr_dB:.0f}dB.png')
+    #fig.savefig(f'su-mimo/src/resource_allocation/bit_allocation/plots/{Nt}x{Nr}_{c_type}' + f'__PA_{pa_strategy}' + f'__R_{R*100:.0f}' + f'__SNR_{snr_dB:.0f}dB.png')
+    fig.savefig('/Users/wannesbaes/Desktop/' + f'{Nt}x{Nr}_{c_type}' + f'__PA_{pa_strategy}' + f'__R_{R*100:.0f}' + f'__SNR_{snr_dB:.0f}dB.png', dpi=300)
+    print(f"Plot saved: '{os.path.abspath('/Users/wannesbaes/Desktop/' + f'{Nt}x{Nr}_{c_type}' + f'__PA_{pa_strategy}' + f'__R_{R*100:.0f}' + f'__SNR_{snr_dB:.0f}dB.png')}'")
     plt.close(fig)
     
     return fig, ax
@@ -582,14 +597,15 @@ def demo_adaptive_bit_allocation(Nt, Nr, snr_dB_list, p_signal=1.0, pa_strategy=
 if __name__ == "__main__":
 
     for snr_dB in range(-10, 31, 5):
-        plot_waterfilling(Nt=4, Nr=4, snr_dB=snr_dB, p_signal=1)
+        #plot_waterfilling(Nt=4, Nr=4, snr_dB=snr_dB, p_signal=1)
+        plot_adaptive_bit_allocation(Nt=4, Nr=4, snr_dB=snr_dB, c_type='QAM')
 
-    demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_signal=1)
-    demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_noise=0.05)
+    # demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_signal=1)
+    # demo_waterfilling(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), p_noise=0.05)
 
-    for c_type in ['QAM', 'PSK']:
+    # for c_type in ['QAM', 'PSK']:
     
-        for snr_dB in range(-10, 31, 5):
-            plot_adaptive_bit_allocation(Nt=4, Nr=4, snr_dB=snr_dB, c_type=c_type)
+    #     for snr_dB in range(-10, 31, 5):
+    #         plot_adaptive_bit_allocation(Nt=4, Nr=4, snr_dB=snr_dB, c_type=c_type)
 
-        demo_adaptive_bit_allocation(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), c_type=c_type)
+    #     demo_adaptive_bit_allocation(Nt=4, Nr=4, snr_dB_list=np.arange(-10.00, 30.05, 0.05), c_type=c_type)

@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 
 from ..types import ComplexArray, RealArray
 from ..configs import SystemConfig, setup_sys_configs
-from ..processing import ChannelModel
+from ..processing.channel import ChannelModel
+from ..processing.precoding import *
 
 SYSTEM_CONFIG_PATH = Path(__file__).parent.parent.parent / 'system_configs.json'
 
@@ -129,7 +130,7 @@ class ChannelStatistics:
         """
         
         # Generate a unique file name based on the system parameters and the used precoding technique.
-        filename = Path(f"{self.system_config.name} -- {str(self.system_config.channel_configs.channel_model)} -- ({self.num_channel_samples//1_000_000}M samples)")
+        filename = Path(f"{self.system_config.name} -- IID Rayleigh Fading Channel -- (1M samples)")
 
         return filename
 
@@ -185,8 +186,8 @@ class ChannelStatistics:
         loaded = np.load(pathname, allow_pickle=True)
         data = ChannelStatisticsData(
             
-            system_configs           = loaded["system_configs"].item(),
-            num_channel_samples      = int(loaded["num_channel_samples"].item()),
+            system_configs           = None, #loaded["system_configs"].item(),
+            num_channel_samples      = None, #int(loaded["num_channel_samples"].item()),
             
             mean       = np.asarray(loaded["mean"], dtype=float),
             var        = np.asarray(loaded["var"], dtype=float),
@@ -196,8 +197,8 @@ class ChannelStatistics:
             quantiles  = np.asarray(loaded["quantiles"], dtype=float),
         )
 
-        if (data.system_configs != self.system_config or data.num_channel_samples != self.num_channel_samples):
-            raise ValueError("The configuration settings of the loaded channel statistics data do not match the configuration settings of the current ChannelStatistics instance. Please check the file name and the configuration settings of the current ChannelStatistics instance to solve this issue.")
+        #if (data.system_configs != self.system_config or data.num_channel_samples != self.num_channel_samples):
+        #    raise ValueError("The configuration settings of the loaded channel statistics data do not match the configuration settings of the current ChannelStatistics instance. Please check the file name and the configuration settings of the current ChannelStatistics instance to solve this issue.")
 
         return data
 
@@ -212,7 +213,7 @@ class ChannelStatistics:
         """
         
         channel_model: ChannelModel = self.system_config.channel_configs.channel_model
-        H = channel_model.proceed()
+        H = channel_model.generate()
         return H
 
     def _compute_streamchannel_gains(self, H: ComplexArray) -> RealArray:
@@ -370,7 +371,7 @@ class ChannelStatistics:
             # Channel gain g_(k,nr) ~ Gamma(alpha = Nt - K*Nr + 1, beta = 1)
             alpha = self.system_config.Nt - (self.system_config.K * self.system_config.Nr) + 1
             rv_gamma = sp.stats.gamma(a=alpha, scale=1.0)
-            label = rf"$Gamma(\alpha={alpha}, \beta=1)$" if nr == 0 else None
+            label = rf"$\Gamma(\alpha={alpha}, \beta=1)$" if nr == 0 else None
             return rv_gamma.pdf, rv_gamma.cdf, label
 
         else:
@@ -427,7 +428,7 @@ class ChannelStatistics:
                 # The Probability Density Function (PDF) using histograms.
                 edges = bin_edges[nr]
                 centers = 0.5 * (edges[:-1] + edges[1:])
-                ax.plot(centers, histograms[nr], label=f"UT {k+1}, Stream {nr+1}")
+                ax.plot(centers, histograms[nr], label=f"Subchannel {nr+1} (UT {k+1})")
 
                 # The mean line
                 ax.axvline(mean[nr], linestyle="--", linewidth=1, color=ax.lines[-1].get_color())
@@ -436,17 +437,19 @@ class ChannelStatistics:
                 ax.axvspan(mean[nr] - np.sqrt(var[nr]), mean[nr] + np.sqrt(var[nr]), alpha=0.10, color=ax.lines[-1].get_color())
 
             # Plot settings.
-            ax.set_xlabel("Virtual Channel Gain")
+            ax.set_xlabel("Subchannel Gain")
             ax.set_ylabel("Probability Density")
-            ax.set_title(f"UT {k+1}" if seperate_plots and num_uts > 1 else "")
+            #ax.set_title(f"UT {k+1}" if seperate_plots and num_uts > 1 else "")
             ax.grid(True, alpha=0.3)
-            ax.set_xlim(xmax = (bin_edges[1][-1] + 0.25 * (bin_edges[0][-1] - bin_edges[1][-1])) if Nr > 1 else (bin_edges[0][-1]) )
+            ax.set_xlim(xmin=-0.25, xmax=15)
+            #ax.set_xlim(xmax = (bin_edges[1][-1] + 0.25 * (bin_edges[0][-1] - bin_edges[1][-1])) if Nr > 1 else (bin_edges[0][-1]) )
             ax.legend()
 
         # 3. Save the plot.
         plot_pdf_filename = Path(str(self._generate_filename()) + f" ({num_uts} UTs plotted)" + ".png")
-        plot_pdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "virtual streamchannel gains - pdf"
-        plot_pdf_dir.mkdir(parents=True, exist_ok=True)
+        # plot_pdf_dir = Path(__file__).parents[2] / "report" / "analytical_results" / "channel_statistics" / "plots" / "virtual streamchannel gains - pdf"  
+        # plot_pdf_dir.mkdir(parents=True, exist_ok=True)
+        plot_pdf_dir = Path("/Users/wannesbaes/Desktop/")
         plot_pdf.savefig(plot_pdf_dir / plot_pdf_filename, dpi=300, bbox_inches="tight")
         return
 
@@ -532,14 +535,14 @@ def main_ch_stats(sys_ref_numbers: list[str]) -> None:
         channel_statistics_data = channel_statistics.evaluate()
 
         channel_statistics.plot_streamchannel_gains_pdf()
-        channel_statistics.plot_streamchannel_gains_ecdf()
+        #channel_statistics.plot_streamchannel_gains_ecdf()
     
     return
 
 if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION HERE.
-    system_ref_numbers = []
+    system_ref_numbers = ["1.1.1.2", "1.2.1.2", "1.3.1.2"]
 
     # RUN OR LOAD YOUR SIMULATIONS HERE.
     main_ch_stats(system_ref_numbers)

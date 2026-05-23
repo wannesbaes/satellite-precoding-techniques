@@ -179,7 +179,7 @@ class ARPredictor(ChannelPredictor):
             a = np.concatenate( (np.ones(1), np.zeros(p-1)) )
         
         elif channel_model == "Ricean IID TC NLoS":
-            a = self._compute_optimal_coefficients_ricean_iid_tc_nlos(p, k, channel_params['K_ricean'], channel_params['Tpilot_2_Tc'])
+            a = self._compute_optimal_coefficients_ricean_iid_tc_nlos(p, k, channel_params['K_rician'], channel_params['Tpilot_2_Tc'])
         elif channel_model == "Satellite Channel":
             a = self._compute_optimal_coefficients_satellite_channel(p, k, channel_params)
         else:
@@ -187,14 +187,14 @@ class ARPredictor(ChannelPredictor):
         
         return a
 
-    def _compute_optimal_coefficients_ricean_iid_tc_nlos(self, p: int, k: int, K_ricean: float, Tpilot_2_Tc: float) -> np.ndarray:
+    def _compute_optimal_coefficients_ricean_iid_tc_nlos(self, p: int, k: int, K_rician: float, Tpilot_2_Tc: float) -> np.ndarray:
         
         # STEP 1:
         fD_times_Tc = (1 / (2*np.pi)) * brentq(lambda z: j0(z) - 0.5, 0, 2.5)
-        R_p = toeplitz( (K_ricean / (K_ricean+1)) + (1 / (K_ricean+1)) * j0(2*np.pi * (fD_times_Tc * Tpilot_2_Tc) * np.arange(p))  )
+        R_p = toeplitz( (K_rician / (K_rician+1)) + (1 / (K_rician+1)) * j0(2*np.pi * (fD_times_Tc * Tpilot_2_Tc) * np.arange(p))  )
 
         # STEP 2:
-        r_k = (K_ricean / (K_ricean+1)) + (1 / (K_ricean+1)) * j0(2*np.pi * (fD_times_Tc * Tpilot_2_Tc) * (k + np.arange(p)))
+        r_k = (K_rician / (K_rician+1)) + (1 / (K_rician+1)) * j0(2*np.pi * (fD_times_Tc * Tpilot_2_Tc) * (k + np.arange(p)))
 
         # STEP 3:
         a = np.linalg.solve(R_p, r_k)

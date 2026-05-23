@@ -10,8 +10,9 @@
 # 1. Simulation Results
 #   1.1. Resource Allocation Strategies
 #       1.1.0 Scatter Plot
-#       1.1.1 Different Data Rates (Optimal Power Allocation)
-#       1.1.2 Different Power Allocation Strategies (Optimal vs Equal vs Eigenbeamforming)
+#       1.1.1 Different Data Rates (Adaptive Bit Allocation & Optimal Power Allocation)
+#       1.1.2 Different Data Rates (Fixed Bit Allocation & Optimal Power Allocation)
+#       1.1.3 Different Power Allocation Strategies (Optimal vs Equal vs Eigenbeamforming)
 #   1.2. Antenna Count
 #       1.2.0 Scatter Plot
 #       1.2.1 Constant Data Rates
@@ -38,6 +39,18 @@ import itertools
 import datetime
 
 from su_mimo import *
+
+# Matplotlib LaTeX style
+import matplotlib
+matplotlib.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Computer Modern Roman"],
+    "font.size": 13,
+    "axes.labelsize": 14,
+    "xtick.labelsize": 12,
+    "ytick.labelsize": 12,
+})
 
 
 ### HELPER FUNCTIONS ###
@@ -97,28 +110,28 @@ def plot_performance(SNRs, BERs, IBRs, settings):
             y_data = BERs
             title = titles[plot]
             x_label = 'SNR [dB]'
-            y_label = 'Bit Error Rate (BER)'
+            y_label = 'BER'
             y_scale = 'log'
-            y_lim_bottom, y_lim_top = 1e-7, 1
+            y_lim_bottom, y_lim_top = 1e-5, 1
         elif plot == 'IBR vs SNR':
             y_data = IBRs
             title = titles[plot]
             x_label = 'SNR [dB]'
-            y_label = r'Information Bit Rate ($R_b$) [bits per symbol vector]'
+            y_label = r'IBR [bits/channel use]'
             y_scale = 'linear'
             y_lim_bottom, y_lim_top = None, None
         elif plot == 'BER vs Eb_N0':
             y_data = BERs
             title = titles[plot]
             x_label = r'$E_b/N_0$ [dB]'
-            y_label = 'Bit Error Rate (BER)'
+            y_label = 'BER'
             y_scale = 'log'
             y_lim_bottom, y_lim_top = 1e-7, 1
         elif plot == 'IBR vs Eb_N0':
             y_data = IBRs
             title = titles[plot]
             x_label = r'$E_b/N_0$ [dB]'
-            y_label = r'Information Bit Rate ($R_b$) [bits per symbol vector]'
+            y_label = r'IBR [bits/channel use]'
             y_scale = 'linear'
             y_lim_bottom, y_lim_top = None, None
         else: 
@@ -150,10 +163,10 @@ def plot_performance(SNRs, BERs, IBRs, settings):
                 ax.plot([], [], label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-')
             
             else:
-                ax.plot(x_data_i, y_data_i, label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-', alpha =1.0)
+                ax.plot(x_data_i, y_data_i, label=(labels[i] if i < len(labels) else None), color=colors[i], marker=markers[i], markeredgecolor=marker_colors[i], markerfacecolor=marker_colors[i], linestyle='-', alpha=1.0)
         
         # Set the plot settings.
-        ax.set_title(title)
+        #ax.set_title(title)
         ax.set_yscale(y_scale)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
@@ -163,7 +176,8 @@ def plot_performance(SNRs, BERs, IBRs, settings):
         fig.tight_layout()
         
         # Store the plot.
-        location = 'su-mimo/report/plots/' + settings.get('location', '')
+        #location = 'su-mimo/report/plots/' + settings.get('location', '')
+        location = '/Users/wannesbaes/Desktop/'
         filename = f'{plot.replace(" ", "_")}.png'
         fig.savefig(location + filename, dpi=300, bbox_inches='tight')
         plots[plot] = (fig, ax)
@@ -321,7 +335,7 @@ def test_0_2_2(Nt, Nr, c_types, SNRs):
     settings = {
         'location': '1_simulation/0_basics/2_2__' + f'{Nt}x{Nr}_' + '_'.join(c_types) + '__',
         'titles': {'BER vs SNR': title, 'IBR vs SNR': title, 'BER vs Eb_N0': title, 'IBR vs Eb_N0': title},
-        'labels': ['PAM', 'PSK', 'QAM'],
+        'labels': ['16--PAM per stream', '16--PSK per stream', '16--QAM per stream'],
         'colors': ['tab:green']*3,
         'markers': ['|', 'o', 's'],
         'opacity': [],
@@ -331,7 +345,7 @@ def test_0_2_2(Nt, Nr, c_types, SNRs):
             
         # Initialization.
         location = 'su-mimo/report/plots/simulation_results/'
-        filename = f'{Nt}x{Nr}_{c_type}' + f'__pa_equal__ba_fixed__M_4' + '.npz'
+        filename = f'{Nt}x{Nr}_{c_type}' + f'__pa_equal__ba_fixed__M_16' + '.npz'
 
         # Simulation.
         if os.path.exists(location + filename): 
@@ -375,9 +389,10 @@ def test_1_1_1(Nt, Nr, c_type, SNRs, data_rates):
     settings = {
         'location': '1_simulation/1_resource_allocation_strategies/data_rates/' + f'1__{Nt}x{Nr}_{c_type}__R' + '_'.join([str(R) for R in data_rates]) + '__',
         'titles': {'BER vs SNR': title, 'IBR vs SNR': title, 'BER vs Eb_N0': title, 'IBR vs Eb_N0': title},
-        'colors': ['tab:blue', 'cornflowerblue', 'skyblue', 'lightskyblue'],
-        'labels': [r'$R \approx $' + f'{R/100:.0%}' for R in data_rates],
-        'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*3,
+        'colors': ['#175282', '#1f77b4', '#3c94dd'],
+        'labels': [r'$r_i \approx $' + f' {R:.0f}' + r'\% of $C_i$' for R in data_rates],
+        'markers': ['o', 's', '^'],
+        #'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*3,
         'opacity': [],
     }
 
@@ -408,7 +423,48 @@ def test_1_1_1(Nt, Nr, c_type, SNRs, data_rates):
     plots = plot_performance(SNRs=SNRs, BERs=BERs_list, IBRs=IBRs_list, settings=settings)
     return plots
 
-def test_1_1_2(Nt, Nr, c_type, SNRs):
+def test_1_1_2(Nt, Nr, c_type, SNRs, c_sizes):
+    
+    su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, SNR=SNRs[0])
+    title = 'RAS Performance Comparison\n' + str(su_mimo_svd)
+
+    BERs_list = []
+    IBRs_list = []
+    settings = {
+        'location': '1_simulation/1_resource_allocation_strategies/data_rates/' + f'2__{Nt}x{Nr}_{c_type}__R_fixed__' + '_'.join([f'M_{M}' for M in c_sizes]) + '__',
+        'titles': {'BER vs SNR': title, 'IBR vs SNR': title, 'BER vs Eb_N0': title, 'IBR vs Eb_N0': title},
+        'colors': ['darkgreen', 'tab:green', 'seagreen'],
+        'labels': ['64--QAM per stream', '16--QAM per stream', '4--QAM per stream'],
+        'markers': ['o', 's', '^'],
+        #'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*3,
+        'opacity': [],
+    }
+
+    for c_size in c_sizes:
+            
+        # Initialization.
+        location = 'su-mimo/report/plots/simulation_results/'
+        filename = f'{Nt}x{Nr}_{c_type}' + f'__pa_equal__ba_fixed__M_{c_size}' + '.npz'
+
+        # Simulation.
+        if os.path.exists(location + filename): 
+            BERs, IBRs, ARs = load_results(location, filename, SNRs)
+        else:
+            su_mimo_svd = SuMimoSVD(Nt, Nr, c_type)
+            su_mimo_svd.set_RAS({'power allocation': 'equal', 'bit allocation': 'fixed', 'data rate': None, 'constellation sizes': c_size, 'control channel': True}) 
+            
+            BERs, IBRs, ARs = su_mimo_svd.BERs_simulation(SNRs=SNRs, num_channels=300)
+            np.savez(location + filename, SNRs=SNRs, BERs=BERs, IBRs=IBRs, ARs=ARs)
+
+        # Termination.
+        BERs_list.append(BERs)
+        IBRs_list.append(IBRs)
+        settings['opacity'].append(ARs)
+
+    plots = plot_performance(SNRs=SNRs, BERs=BERs_list, IBRs=IBRs_list, settings=settings)
+    return plots
+
+def test_1_1_3(Nt, Nr, c_type, SNRs):
 
     # Initialization.
     su_mimo_svd = SuMimoSVD(Nt, Nr, c_type, SNR=0)
@@ -494,9 +550,10 @@ def test_1_2_1(c_type, SNRs, antenna_counts):
     settings = {
         'location': '1_simulation/2_antenna_count/1__' + '_'.join([f'{Nt}x{Nr}' for Nt, Nr in antenna_counts]) + f'_{c_type}__',
         'titles': {'BER vs SNR': title, 'IBR vs SNR': title, 'BER vs Eb_N0': title, 'IBR vs Eb_N0': title},
-        'colors': ['tab:orange', 'tab:blue', 'tab:green', 'tab:olive', 'tab:red'],
-        'labels': [f'{Nt}x{Nr} Antennas' for Nt, Nr in antenna_counts],
-        'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*len(antenna_counts),
+        'colors': ['#0f3757', '#175282', '#1f77b4', '#3c94dd', '#7db8e8'],
+        'labels': [f'$(N_T, N_R) = ({Nt}, {Nr})$' for Nt, Nr in antenna_counts],
+        #'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*len(antenna_counts),
+        'markers': ['s', 'o', '^', 'v', 'd'],
         'opacity': [],
     } 
 
@@ -534,9 +591,10 @@ def test_1_2_2(c_type, SNRs, antenna_counts_data_rates):
     settings = {
         'location': '1_simulation/2_antenna_count/2__' + '_'.join([f'{Nt}x{Nr}_R_{data_rate}' for Nt, Nr, data_rate in antenna_counts_data_rates]) + f'_{c_type}__',
         'titles': {'BER vs SNR': title, 'IBR vs SNR': title, 'BER vs Eb_N0': title, 'IBR vs Eb_N0': title},
-        'colors': ['navy', 'tab:blue', 'cornflowerblue', 'skyblue', 'lightskyblue'],
-        'labels': [f'{Nt}x{Nr} Antennas' + r', $R \approx $'+f'{(data_rate/100):.0%}' for Nt, Nr, data_rate in antenna_counts_data_rates],
-        'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*len(antenna_counts_data_rates),
+        'colors': ['#0f3757', '#175282', '#1f77b4', '#3c94dd'],
+        'labels': [f'$(N_T, N_R) = ({Nt}, {Nr})$' + r', $r \approx $' + f' {data_rate:.0f}' + r'\% of $C$' for Nt, Nr, data_rate in antenna_counts_data_rates],
+        #'markers': ['s' if c_type == 'QAM' else 'o' if c_type == 'PSK' else '|']*len(antenna_counts_data_rates),
+        'markers': ['s', 'o', '^', 'v'],
         'opacity': [],
     }
 
@@ -707,7 +765,7 @@ def test_2_0_2(Nt, Nr, c_type, SNRs, modes):
         
         # Initialization.
         location = 'su-mimo/report/plots/simulation_results/' if mode == 'simulation' else 'su-mimo/report/plots/analytical_results/' + (mode.replace(' ', '_') + 's/')
-        filename = f'{Nt}x{Nr}_{c_type}' + f'__pa_equal__ba_fixed__M_4' + '.npz'
+        filename = f'{Nt}x{Nr}_{c_type}' + f'__pa_equal__ba_fixed__M_2' + '.npz'
 
         # Simulation.
         if os.path.exists(location + filename):
@@ -715,7 +773,7 @@ def test_2_0_2(Nt, Nr, c_type, SNRs, modes):
         
         else:
             su_mimo_svd = SuMimoSVD(Nt, Nr, c_type)
-            su_mimo_svd.set_RAS({'power allocation': 'equal', 'bit allocation': 'fixed', 'data rate': None, 'constellation sizes': 2**4, 'control channel': True})
+            su_mimo_svd.set_RAS({'power allocation': 'equal', 'bit allocation': 'fixed', 'data rate': None, 'constellation sizes': 2**2, 'control channel': True})
             
             if mode == 'simulation': BERs, IBRs, ARs = su_mimo_svd.BERs_simulation(SNRs=SNRs)
             else: BERs, IBRs, ARs = su_mimo_svd.BERs_analytical(SNRs=SNRs, num_channels=500, settings={'mode': mode, 'eigenchannels': False})
@@ -885,8 +943,21 @@ def test_2_2_2(Nt, Nr, c_type, SNRs, modes, mc):
 
 ### TESTS ###
 if __name__ == "__main__":
+    
+    # impact of constellation
+    # test_0_2_1(Nt=4, Nr=4, c_types=['QAM', 'QAM', 'QAM'], SNRs=np.arange(0, 31, 5))
+    # test_0_2_2(Nt=2, Nr=2, c_types=['PAM', 'PSK', 'QAM'], SNRs=np.arange(0, 31, 2.5))
+    
+    # impact of IBR
+    # test_1_1_1(Nt=4, Nr=4, c_type='QAM', SNRs=np.arange(0, 31, 5), data_rates=[100, 80, 60])
+    # test_1_1_2(Nt=2, Nr=2, c_type='QAM', SNRs=np.arange(0, 31, 2.5), c_sizes=[64, 16, 4])
+    
+    # impact of antenna count
+    # test_1_2_1(c_type='QAM', SNRs=np.arange(0, 31, 5), antenna_counts=[(1, 1), (4, 4), (4, 8), (8, 4), (8, 8)])
+    # test_1_2_2(c_type='QAM', SNRs=np.arange(0, 31, 5), antenna_counts_data_rates=[(3, 3, 133), (4, 4, 100), (5, 5, 80), (6, 6, 67)])
 
-    # example:
-    # plots = test_0_2_1(Nt=4, Nr=4, c_types=['PAM', 'PSK', 'QAM'], SNRs=np.arange(0, 31, 5))
-    # plt.show()
+    # analytical validation
+    # test_2_0_1(Nt=4, Nr=4, c_type='QAM', SNRs=np.arange(0, 31, 5), modes=['simulation', 'approximation', 'upper bound'])
+    # test_2_0_2(Nt=4, Nr=4, c_type='QAM', SNRs=np.arange(0, 41, 2.5), modes=['simulation', 'approximation', 'upper bound'])
+
     pass
