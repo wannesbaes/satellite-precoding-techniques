@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["1.test"]
-    sys_ref_numbers = ["1s_sl_0.4.5.4", "1s_sl_0.1.5.4"
+    sys_ref_numbers = ["1s_sl_0.4.5.4", "1s_sl_0.1.5.4",
                        "2s_sl_0.1.5.4", "2s_sl_1on4.1.5.4", "2s_sl_2on4.1.5.4", "2s_sl_3on4.1.5.4", "2s_sl_4on4.1.5.4", "2s_sl_5on4.1.5.4",
                        "2s_sl_0.4.5.4", "2s_sl_1on4.4.5.4", "2s_sl_2on4.4.5.4", "2s_sl_3on4.4.5.4", "2s_sl_4on4.4.5.4", "2s_sl_5on4.4.5.4",
                        "3s_sl_0.1.5.4", "3s_sl_1on4.1.5.4", "3s_sl_2on4.1.5.4", "3s_sl_3on4.1.5.4", "3s_sl_4on4.1.5.4", "3s_sl_5on4.1.5.4",
