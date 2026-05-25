@@ -48,8 +48,9 @@ if __name__ == "__main__":
     # CHOOSE THE SIMULATION AND SYSTEM CONFIGURATIONS HERE.
     sim_ref_numbers = ["1.test"]
     system_ref_numbers = [
-        "3_sl_2on4.4.5.3", "3_sl_3on4.4.5.3", "3_sl_4on4.4.5.3", "3_sl_5on4.4.5.3", "3_sl_6on4.4.5.3", "3_sl_7on4.4.5.3", "3_sl_8on4.4.5.3",
-        "3_sl_2on4.1.5.3", "3_sl_3on4.1.5.3", "3_sl_4on4.1.5.3", "3_sl_5on4.1.5.3", "3_sl_6on4.1.5.3", "3_sl_7on4.1.5.3", "3_sl_8on4.1.5.3",
+        "1_sl_0.4.5.3", "3_sl_2on4.4.5.3", "3_sl_3on4.4.5.3", "3_sl_4on4.4.5.3", "3_sl_5on4.4.5.3", "3_sl_6on4.4.5.3", "3_sl_7on4.4.5.3", "3_sl_8on4.4.5.3",
+        "1_sl_0.3.5.3", "3_sl_2on4.3.5.3", "3_sl_3on4.3.5.3", "3_sl_4on4.3.5.3", "3_sl_5on4.3.5.3", "3_sl_6on4.3.5.3", "3_sl_7on4.3.5.3", "3_sl_8on4.3.5.3",
+        "1_sl_0.1.5.3", "3_sl_2on4.1.5.3", "3_sl_3on4.1.5.3", "3_sl_4on4.1.5.3", "3_sl_5on4.1.5.3", "3_sl_6on4.1.5.3", "3_sl_7on4.1.5.3", "3_sl_8on4.1.5.3",
     ]
     
     # RUN OR LOAD YOUR SIMULATIONS HERE.

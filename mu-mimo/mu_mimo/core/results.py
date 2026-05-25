@@ -383,6 +383,7 @@ class SimResultManager:
         # Generate the filename based on the system and simulation configurations, and the type of plot.
         system_names = [f"{sim_result.system_configs.name}" for sim_result in sim_results]
         filename = f"{' - '.join(system_names)}" + f" -- {plot_type}" + f" -- {sim_results[0].sim_configs.name}" + ".png"
+        filename = "new_plot.png" if len(filename) > 100 else filename
 
         # Return the full file path.
         filepath = plots_dir / filename
@@ -903,7 +904,8 @@ class SimResultManager:
 
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("SR [bits/channel use]")
-            ax_R.set_ylim(0, 30)
+            ax_R.set_ylim(0, None)
+            ax_R.set_xlim(-1, None)
             ax_R.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_R.legend()
             fig_R.tight_layout()
