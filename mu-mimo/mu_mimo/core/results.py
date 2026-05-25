@@ -828,8 +828,8 @@ class SimResultManager:
         """
         
         # Validate the simulation configuration settings.
-        # if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
-        #     raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
+        if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
+            raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
         
         # BER vs SNR.
         if ber:
@@ -903,7 +903,7 @@ class SimResultManager:
 
             ax_R.set_xlabel("SNR [dB]")
             ax_R.set_ylabel("SR [bits/channel use]")
-            ax_R.set_ylim(0, None)
+            ax_R.set_ylim(0, 30)
             ax_R.grid(True, which="both", linestyle="--", alpha=0.6)
             ax_R.legend()
             fig_R.tight_layout()
