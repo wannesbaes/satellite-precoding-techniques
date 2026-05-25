@@ -337,7 +337,7 @@ class SatelliteChannel(ChannelModel):
     Satellite Channel.
     """
 
-    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2, L1: int = 2, w1: float = 0.75, L2: int = 2, w2: float = 0.25, dx_BS: float = 1, dy_BS: float = 1, dx_UT: float = 0.5, dy_UT: float = 0.5, theta: float = None, theta_max: float = 30 * (np.pi / 180), sigma_theta: float = 4 * (np.pi / 180), sigma_phi: float = 4 * (np.pi / 180)):
+    def __init__(self, Nt: int, Nr: int, K: int, K_rician: float, Trtt_2_Tc: float, Tpilot_2_Tc: float, Twindow_2_Tc: float = 2, L1: int = 2, w1: float = 0.75, L2: int = 2, w2: float = 0.25, dx_BS: float = 1, dy_BS: float = 1, dx_UT: float = 0.5, dy_UT: float = 0.5, theta: float = 15 * (np.pi / 180), theta_max: float = 30 * (np.pi / 180), sigma_theta: float = 4 * (np.pi / 180), sigma_phi: float = 4 * (np.pi / 180)):
         r"""
         Instantiate the Satellite Channel.
 
@@ -458,8 +458,14 @@ class SatelliteChannel(ChannelModel):
         # STEP 1: initialization.
 
         # elevation angles
-        theta_BS_LoS     = self._sample_BS_LoS_elevation_angle(self.K, self.theta, self.theta_max)                       # shape: (K,)
-        theta_UT_LoS     = self._sample_UT_LoS_elevation_angle(self.K, theta_BS_LoS)                                     # shape: (K,)
+        # theta_BS_LoS     = self._sample_BS_LoS_elevation_angle(self.K, self.theta, self.theta_max)                       # shape: (K,)
+        # theta_UT_LoS     = self._sample_UT_LoS_elevation_angle(self.K, theta_BS_LoS)                                     # shape: (K,)
+        # theta_UT_NLoS_L1 = self._sample_UT_NLoS_elevation_angles_L1(self.K, self.L1, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
+        # theta_UT_NLoS_L2 = self._sample_UT_NLoS_elevation_angles_L2(self.K, self.L2, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
+
+        # elevation angles
+        theta_BS_LoS     = np.full(self.K, self.theta)
+        theta_UT_LoS     = np.full(self.K, self.theta)
         theta_UT_NLoS_L1 = self._sample_UT_NLoS_elevation_angles_L1(self.K, self.L1, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
         theta_UT_NLoS_L2 = self._sample_UT_NLoS_elevation_angles_L2(self.K, self.L2, theta_UT_LoS, self.sigma_theta)     # shape: (K, L)
 
@@ -568,7 +574,7 @@ class SatelliteChannel(ChannelModel):
         f = lambda x: (K_rician**2 + j0(x)**2 + 2 * K_rician * j0(x) * np.cos(x * np.sin(theta)) - ((K_rician + 1) / 2)**2)
 
         # Coarse scan to locate the first sign change (first crossing of 0.5).
-        x_grid = np.linspace(1e-6, 20.0, 20_000)
+        x_grid = np.linspace(1e-6, 50.0, 20_000)
         f_grid = f(x_grid)
         sign_changes = np.where(np.diff(np.sign(f_grid)))[0]
 

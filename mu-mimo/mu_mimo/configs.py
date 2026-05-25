@@ -499,14 +499,14 @@ def setup_sys_configs(ref_numbers: list[str], filepath: Path) -> dict[str, Syste
                 "K_rician": 10**(5/10),   # 5 dB
                 "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
                 "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
-                "Twindow_2_Tc": 1 + float(config_settings['Round Trip Time relative to the coherence time']),
+                "Twindow_2_Tc": float(config_settings['AR window size relative to the coherence time']) + float(config_settings['Round Trip Time relative to the coherence time']),
             } if config_settings['Channel Model'] == "Ricean IID TC NLoS" else None,
 
             "Satellite Channel": {
                 "K_rician": 10**(5/10),
                 "Trtt_2_Tc": float(config_settings['Round Trip Time relative to the coherence time']),
-                "Tpilot_2_Tc": float(config_settings['CSI feedback message rate relative to the coherence time']),
-                "Twindow_2_Tc": 3,
+                "Tpilot_2_Tc": 0.2, #float(config_settings['CSI feedback message rate relative to the coherence time']),
+                "Twindow_2_Tc": float(config_settings['AR window size relative to the coherence time']) + float(config_settings['Round Trip Time relative to the coherence time']),
                 "L1": 2,
                 "L2": 2,
                 "dx_BS": 0.5,

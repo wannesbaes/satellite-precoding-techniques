@@ -30,7 +30,7 @@
             "Minimum channel realizations per SNR value":   750,
             "Maximum channel realizations per SNR value":   1000,
             
-            "Symbol vector transmissions per channel realization":   250
+            "Symbol vector transmissions per channel realization":   10
         }
 
     ]

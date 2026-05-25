@@ -432,8 +432,7 @@ class SimResultManager:
             label = CH_mapping.get(CH_number, None)
         
         elif label_type == "RTT":
-            # RTT_mapping = {"0": "Instant CSI", "1on6": r"$\tau_{\mathrm{CSI}} = \frac{1}{6} \, T_c$", "1on4": r"$\tau_{\mathrm{CSI}} = \frac{1}{4} \, T_c$", "1on3": r"$\tau_{\mathrm{CSI}} = \frac{1}{3} \, T_c$", "1on2": r"$\tau_{\mathrm{CSI}} = \frac{3}{4} \, T_c$", "2on3": r"$\tau_{\mathrm{CSI}} = \frac{2}{3} \, T_c$", "3on4": r"$\tau_{\mathrm{CSI}} = \frac{3}{4} \, T_c$", "5on6": r"$\tau_{\mathrm{CSI}} = \frac{5}{6} \, T_c$", "1": r"$\tau_{\mathrm{CSI}} = \frac{4}{4} \, T_c$", "5on4": r"$\tau_{\mathrm{CSI}} = \frac{5}{4} \, T_c$", "3on2": r"$\tau_{\mathrm{CSI}} = \frac{3}{2} \, T_c$", "2": r"$\tau_{\mathrm{CSI}} = 2 \, T_c$"}
-            RTT_mapping = {"0": "Instant CSI", "1on4": r"$\tau_{\mathrm{CSI}} = \frac{1}{4} \, T^{\mathrm{NLoS}}_c$", "1on2": r"$\tau_{\mathrm{CSI}} = \frac{2}{4} \, T^{\mathrm{NLoS}}_c$", "3on4": r"$\tau_{\mathrm{CSI}} = \frac{3}{4} \, T^{\mathrm{NLoS}}_c$", "1": r"$\tau_{\mathrm{CSI}} = \frac{4}{4} \, T^{\mathrm{NLoS}}_c$", "5on4": r"$\tau_{\mathrm{CSI}} = \frac{5}{4} \, T^{\mathrm{NLoS}}_c$"}
+            RTT_mapping = {"0": "Instant CSI", "1on4": r"$\tau_{\mathrm{CSI}} = \frac{1}{4} \, T^{\mathrm{NLoS}}_c$", "2on4": r"$\tau_{\mathrm{CSI}} = \frac{2}{4} \, T^{\mathrm{NLoS}}_c$", "3on4": r"$\tau_{\mathrm{CSI}} = \frac{3}{4} \, T^{\mathrm{NLoS}}_c$", "4on4": r"$\tau_{\mathrm{CSI}} =  T^{\mathrm{NLoS}}_c$", "5on4": r"$\tau_{\mathrm{CSI}} = \frac{5}{4} \, T^{\mathrm{NLoS}}_c$", "6on4": r"$\tau_{\mathrm{CSI}} = \frac{6}{4} \, T^{\mathrm{NLoS}}_c$", "7on4": r"$\tau_{\mathrm{CSI}} = \frac{7}{4} \, T^{\mathrm{NLoS}}_c$", "8on4": r"$\tau_{\mathrm{CSI}} = 2 \, T^{\mathrm{NLoS}}_c$", "10on4": r"$\tau_{\mathrm{CSI}} = 2,5 \, T^{\mathrm{NLoS}}_c$", "12on4": r"$\tau_{\mathrm{CSI}} = 3 \, T^{\mathrm{NLoS}}_c$", "14on4": r"$\tau_{\mathrm{CSI}} = 3,5 \, T^{\mathrm{NLoS}}_c$", "16on4": r"$\tau_{\mathrm{CSI}} = 4 \, T^{\mathrm{NLoS}}_c$", "20on4": r"$\tau_{\mathrm{CSI}} = 5 \, T^{\mathrm{NLoS}}_c$", "24on4": r"$\tau_{\mathrm{CSI}} = 6 \, T^{\mathrm{NLoS}}_c$", "28on4": r"$\tau_{\mathrm{CSI}} = 7 \, T^{\mathrm{NLoS}}_c$", "32on4": r"$\tau_{\mathrm{CSI}} = 8 \, T^{\mathrm{NLoS}}_c$"}
             RTT_number = (reference_number.split(".")[0]).split("_")[2]
             label = RTT_mapping.get(RTT_number, None)
         
@@ -829,8 +828,8 @@ class SimResultManager:
         """
         
         # Validate the simulation configuration settings.
-        if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
-            raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
+        # if not all(sim_result.sim_configs == sim_results[0].sim_configs for sim_result in sim_results):
+        #     raise ValueError("All results must have the same simulation configuration settings to be compared in the same plot.")
         
         # BER vs SNR.
         if ber:
@@ -1054,6 +1053,33 @@ class SimResultManager:
 
         figs = (fig_ber if ber else None, fig_ibr if ibr else None, fig_R if R else None)
         return figs
+
+    @staticmethod
+    def plot_tabs_comparison(sim_results: list[SimResult], ber: bool = True, ibr: bool = True, R: bool = True, label_type: str = "default", ana_results: list[AnaResult] | None = None):
+        fig_R, ax_R = plt.subplots(figsize=(6, 5))
+
+        x = np.array([2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7])
+        y = []
+
+        for i, sim_result in enumerate(sim_results):
+            R = sim_result.simulation_results[0].R
+            y.append(R)
+        
+        ax_R.plot(x, y, marker="o", linestyle="-")
+        
+        ax_R.set_xlabel(r"CSI feedback rate [messages/$T_c$]")
+        ax_R.set_ylabel(r"SR [bits/channel use]")
+        ax_R.set_xlim(1.5, 7.5)
+        ax_R.set_ylim(0, None)
+        ax_R.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_R.legend()
+        fig_R.tight_layout()
+
+        plot_filename = Path(__file__).resolve().parents[2] / "report" / "plots" / "tabs_comparison.png"
+        fig_R.savefig(plot_filename, dpi=300)
+        print(f"\n Saved system R comparison plot to:\n {plot_filename}")
+
+        return fig_R
 
 class AnaResultManager:
     """
