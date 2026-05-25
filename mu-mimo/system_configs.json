@@ -170,6 +170,79 @@
 
 
 
+    ["1s_sl_0.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.000000,  0.041666,  1.0,    "AWGN"],
+    ["1s_sl_0.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.000000,  0.041666,  1.0,    "AWGN"],
+    ["1s_sl_0.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.000000,  0.041666,  1.0,    "AWGN"],
+
+    
+    ["2s_sl_1on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_2on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_3on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_4on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_5on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.25,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_6on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.50,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_7on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.75,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_8on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  2.00,  0.041666,  1.0,    "AWGN"],
+
+    ["2s_sl_1on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_2on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_3on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_4on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_5on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.25,  0.041666,  1.0,	   "AWGN"],
+    ["2s_sl_6on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.50,  0.041666,  1.0,	   "AWGN"],
+    ["2s_sl_7on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.75,  0.041666,  1.0,	   "AWGN"],
+    ["2s_sl_8on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",   null,   null,   null,   "Satellite Channel",	 2.00,	0.041666,  1.0,	   "AWGN"],
+
+    ["2s_sl_1on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_2on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_3on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_4on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_5on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.25,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_6on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.50,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_7on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.75,  0.041666,  1.0,    "AWGN"],
+    ["2s_sl_8on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  2.00,  0.041666,  1.0,    "AWGN"],
+
+
+    ["3s_sl_1on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_2on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_3on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_4on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_5on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.25,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_6on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.50,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_7on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.75,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_8on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  2.00,  0.199,  1.0,    "AWGN"],
+
+    ["3s_sl_1on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_2on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_3on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_4on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_5on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.25,	0.199,	1.0,    "AWGN"],
+    ["3s_sl_6on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.50,  0.199,	1.0,    "AWGN"],
+    ["3s_sl_7on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.75,	0.199,	1.0,    "AWGN"],
+    ["3s_sl_8on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 2.00,	0.199,	1.0,    "AWGN"],
+
+    ["3s_sl_1on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_2on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_3on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_4on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_5on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.25,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_6on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.50,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_7on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.75,  0.199,  1.0,    "AWGN"],
+    ["3s_sl_8on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  2.00,  0.199,  1.0,    "AWGN"],
+
+
+
+    ["special1",    1.0, 0.5,    6,  2,  1,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "SVD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+    ["2special1",    1.0, 0.5,    8,  2,  1,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["2special2",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["2special3",    1.0, 0.5,    8,  2,  3,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+    ["2special4",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
+
+
+
+
+
     ["3_sl_2on4_p2.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.500000,  0.499,  1,    "AWGN"],
     ["3_sl_2on4_p25.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.500000,  0.399,  1,    "AWGN"],
     ["3_sl_2on4_p3.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.500000,  0.333,  1,    "AWGN"],
@@ -301,79 +374,7 @@
     ["3_sl_5on4_4w075.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  1.25,  0.1875,  0.75,    "AWGN"],
     ["3_sl_5on4_4w100.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  1.25,  0.25,  1.00,    "AWGN"],
     ["3_sl_5on4_4w125.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  1.25,  0.3125,  1.25,    "AWGN"],
-    ["3_sl_5on4_4w150.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  1.25,  0.375,  1.50,    "AWGN"],
-    
+    ["3_sl_5on4_4w150.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  1.25,  0.375,  1.50,    "AWGN"]
 
-
-
-
-
-    ["1s_sl_0.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.000000,  0.041666,    "AWGN"],
-    ["1s_sl_0.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.000000,  0.041666,    "AWGN"],
-
-    
-    ["2s_sl_1on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["2s_sl_2on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["2s_sl_3on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["2s_sl_4on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["2s_sl_5on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.25,  0.041666,    "AWGN"],
-    ["2s_sl_6on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.50,  0.041666,    "AWGN"],
-    ["2s_sl_7on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  1.75,  0.041666,    "AWGN"],
-    ["2s_sl_8on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Satellite Channel",  2.00,  0.041666,    "AWGN"],
-
-    ["2s_sl_1on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["2s_sl_2on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["2s_sl_3on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["2s_sl_4on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["2s_sl_5on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.25,  0.041666,	   "AWGN"],
-    ["2s_sl_6on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.50,  0.041666,	   "AWGN"],
-    ["2s_sl_7on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,   null,   "Satellite Channel",  1.75,  0.041666,	   "AWGN"],
-    ["2s_sl_8on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",   null,   null,   null,   "Satellite Channel",	 2.00,	0.041666,	   "AWGN"],
-
-    ["2s_sl_1on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["2s_sl_2on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["2s_sl_3on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["2s_sl_4on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["2s_sl_5on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.25,  0.041666,    "AWGN"],
-    ["2s_sl_6on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.50,  0.041666,    "AWGN"],
-    ["2s_sl_7on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  1.75,  0.041666,    "AWGN"],
-    ["2s_sl_8on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Satellite Channel",  2.00,  0.041666,    "AWGN"],
-
-
-    ["3s_sl_1on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["3s_sl_2on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["3s_sl_3on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["3s_sl_4on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["3s_sl_5on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.25,  0.041666,    "AWGN"],
-    ["3s_sl_6on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.50,  0.041666,    "AWGN"],
-    ["3s_sl_7on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  1.75,  0.041666,    "AWGN"],
-    ["3s_sl_8on4.1.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Satellite Channel",  2.00,  0.041666,    "AWGN"],
-
-    ["3s_sl_1on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["3s_sl_2on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["3s_sl_3on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["3s_sl_4on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["3s_sl_5on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.25,	0.041666,	   "AWGN"],
-    ["3s_sl_6on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.50,  0.041666,	   "AWGN"],
-    ["3s_sl_7on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 1.75,	0.041666,	   "AWGN"],
-    ["3s_sl_8on4.3.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  	4,	"QAM",	  "Gray Code",	"Symbol MD",	  "BD",	null,  	 null,	"AR Predictor",	   "Satellite Channel",	 2.00,	0.041666,	   "AWGN"],
-
-    ["3s_sl_1on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.25,  0.041666,    "AWGN"],
-    ["3s_sl_2on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.50,  0.041666,    "AWGN"],
-    ["3s_sl_3on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  0.75,  0.041666,    "AWGN"],
-    ["3s_sl_4on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.00,  0.041666,    "AWGN"],
-    ["3s_sl_5on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.25,  0.041666,    "AWGN"],
-    ["3s_sl_6on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.50,  0.041666,    "AWGN"],
-    ["3s_sl_7on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  1.75,  0.041666,    "AWGN"],
-    ["3s_sl_8on4.4.5.4",    1.0, 0.5,    8,  1,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  "AR Predictor",    "Satellite Channel",  2.00,  0.041666,    "AWGN"],
-
-
-
-    ["special1",    1.0, 0.5,    6,  2,  1,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "SVD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
-
-    ["2special1",    1.0, 0.5,    8,  2,  1,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["2special2",    1.0, 0.5,    8,  2,  2,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["2special3",    1.0, 0.5,    8,  2,  3,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"],
-    ["2special4",    1.0, 0.5,    8,  2,  4,    "Fixed",  4,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "IID Rayleigh",  null,  null,    "AWGN"]
   ]
 }
