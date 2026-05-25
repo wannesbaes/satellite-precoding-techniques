@@ -105,27 +105,27 @@
 
 
 
-    ["1_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  null,  null,    "AWGN"],
-    ["1_sl_0.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  null,  null,    "AWGN"],
-    ["1_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  null,  null,    "AWGN"],
+    ["1_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.199,  1.0,    "AWGN"],
+    ["1_sl_0.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.199,  1.0,    "AWGN"],
+    ["1_sl_0.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.000000,  0.199,  1.0,    "AWGN"],
 
-    ["2_sl_1on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  null,  null,    "AWGN"],
-    ["2_sl_2on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  null,  null,    "AWGN"],
-    ["2_sl_3on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  null,  null,    "AWGN"],
-    ["2_sl_4on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  null,  null,    "AWGN"],
-    ["2_sl_5on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  null,  null,    "AWGN"],
+    ["2_sl_1on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_2on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_3on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_4on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_5on4.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  0.199,  1.0,    "AWGN"],
 
-    ["2_sl_1on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  null,  null,    "AWGN"],
-    ["2_sl_2on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  null,  null,    "AWGN"],
-    ["2_sl_3on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  null,  null,    "AWGN"],
-    ["2_sl_4on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  null,  null,    "AWGN"],
-    ["2_sl_5on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  null,  null,    "AWGN"],
+    ["2_sl_1on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_2on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_3on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_4on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_5on4.3.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "BD",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  0.199,  1.0,    "AWGN"],
     
-    ["2_sl_1on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  null,  null,    "AWGN"],
-    ["2_sl_2on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  null,  null,    "AWGN"],
-    ["2_sl_3on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  null,  null,    "AWGN"],
-    ["2_sl_4on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  null,  null,    "AWGN"],
-    ["2_sl_5on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  null,  null,    "AWGN"],
+    ["2_sl_1on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.250000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_2on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.500000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_3on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  0.750000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_4on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  1.000000,  0.199,  1.0,    "AWGN"],
+    ["2_sl_5on4.4.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "WMMSE",  null,    null,  null,    "Ricean IID TC NLoS",  1.250000,  0.199,  1.0,    "AWGN"],
     
 
     ["3_sl_0.1.5.3",    1.0, 0.5,    8,  2,  4,    "Fixed",  16,  "QAM",    "Gray Code",  "Symbol MD",    "ZF",  null,    null,  "AR Predictor",    "Ricean IID TC NLoS",  0.000000,  0.199,  1.5,    "AWGN"],
