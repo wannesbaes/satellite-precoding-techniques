@@ -56,7 +56,7 @@ if __name__ == "__main__":
     results = main(sim_ref_numbers, system_ref_numbers)
     
     # PLOT THE RESULTS HERE.
-    SimResultManager.plot_system_performance_comparison(results, label_type="RTT", ibr=False, ber=False)
+    # SimResultManager.plot_system_performance_comparison(results, label_type="RTT", ibr=False, ber=False)
 
     
     
