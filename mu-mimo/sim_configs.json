@@ -27,10 +27,10 @@
             "Minimum bit errors per SNR value":             250,
             "Scope of bit errors":                          "system-wide",
             
-            "Minimum channel realizations per SNR value":   750,
-            "Maximum channel realizations per SNR value":   1000,
+            "Minimum channel realizations per SNR value":   1000,
+            "Maximum channel realizations per SNR value":   1001,
             
-            "Symbol vector transmissions per channel realization":   10
+            "Symbol vector transmissions per channel realization":   256
         }
 
     ]
