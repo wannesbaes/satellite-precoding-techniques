@@ -65,16 +65,27 @@ if __name__ == "__main__":
         "2s_sl_1on4.3.5.4", "2s_sl_2on4.3.5.4", "2s_sl_3on4.3.5.4", "2s_sl_4on4.3.5.4", "2s_sl_5on4.3.5.4", "2s_sl_6on4.3.5.4", "2s_sl_7on4.3.5.4", "2s_sl_8on4.3.5.4",
         "2s_sl_1on4.4.5.4", "2s_sl_2on4.4.5.4", "2s_sl_3on4.4.5.4", "2s_sl_4on4.4.5.4", "2s_sl_5on4.4.5.4", "2s_sl_6on4.4.5.4", "2s_sl_7on4.4.5.4", "2s_sl_8on4.4.5.4",
 
-        "3s_sl_1on4.1.5.4", "3s_sl_2on4.1.5.4", "3s_sl_3on4.1.5.4", "3s_sl_4on4.1.5.4", "3s_sl_5on4.1.5.4", "3s_sl_6on4.1.5.4", "3s_sl_7on4.1.5.4", "3s_sl_8on4.1.5.4",
-        "3s_sl_1on4.3.5.4", "3s_sl_2on4.3.5.4", "3s_sl_3on4.3.5.4", "3s_sl_4on4.3.5.4", "3s_sl_5on4.3.5.4", "3s_sl_6on4.3.5.4", "3s_sl_7on4.3.5.4", "3s_sl_8on4.3.5.4",
-        "3s_sl_1on4.4.5.4", "3s_sl_2on4.4.5.4", "3s_sl_3on4.4.5.4", "3s_sl_4on4.4.5.4", "3s_sl_5on4.4.5.4", "3s_sl_6on4.4.5.4", "3s_sl_7on4.4.5.4", "3s_sl_8on4.4.5.4",
+        "3s_sl_1on4.1.5.4", "3s_sl_2on4.1.5.4", "3s_sl_3on4.1.5.4", "3s_sl_4on4.1.5.4", "3s_sl_5on4.1.5.4", "3s_sl_6on4.1.5.4", "3s_sl_7on4.1.5.4", "3s_sl_8on4.1.5.4", "3s_sl_12on4.1.5.4", "3s_sl_16on4.1.5.4"
+        "3s_sl_1on4.3.5.4", "3s_sl_2on4.3.5.4", "3s_sl_3on4.3.5.4", "3s_sl_4on4.3.5.4", "3s_sl_5on4.3.5.4", "3s_sl_6on4.3.5.4", "3s_sl_7on4.3.5.4", "3s_sl_8on4.3.5.4", "3s_sl_12on4.3.5.4", "3s_sl_16on4.3.5.4"
+        "3s_sl_1on4.4.5.4", "3s_sl_2on4.4.5.4", "3s_sl_3on4.4.5.4", "3s_sl_4on4.4.5.4", "3s_sl_5on4.4.5.4", "3s_sl_6on4.4.5.4", "3s_sl_7on4.4.5.4", "3s_sl_8on4.4.5.4", "3s_sl_12on4.4.5.4", "3s_sl_16on4.4.5.4"
     ]
+
+    # system_ref_numbers = ["1s_sl_0.1.5.4", "2s_sl_1on4.1.5.4", "2s_sl_2on4.1.5.4", "2s_sl_3on4.1.5.4", "2s_sl_4on4.1.5.4", "2s_sl_5on4.1.5.4"] #, "2s_sl_6on4.1.5.4", "2s_sl_7on4.1.5.4", "2s_sl_8on4.1.5.4"]
+    # system_ref_numbers = ["2s_sl_0on4.1.5.4", "3s_sl_1on4.1.5.4", "3s_sl_2on4.1.5.4", "3s_sl_3on4.1.5.4", "3s_sl_4on4.1.5.4", "3s_sl_5on4.1.5.4", "3s_sl_6on4.1.5.4", "3s_sl_7on4.1.5.4", "3s_sl_8on4.1.5.4"]
+    # system_ref_numbers = ["2s_sl_0on4.1.5.4", "3s_sl_4on4.1.5.4", "3s_sl_8on4.1.5.4", "3s_sl_12on4.1.5.4", "3s_sl_16on4.1.5.4"] #, "3s_sl_5on4.1.5.4", "3s_sl_6on4.1.5.4", "3s_sl_7on4.1.5.4", "3s_sl_8on4.1.5.4"]
+
+
+    # system_ref_numbers = ["1s_sl_0.3.5.4", "2s_sl_1on4.3.5.4", "2s_sl_2on4.3.5.4", "2s_sl_3on4.3.5.4", "2s_sl_4on4.3.5.4", "2s_sl_5on4.3.5.4", "2s_sl_6on4.3.5.4", "2s_sl_7on4.3.5.4", "2s_sl_8on4.3.5.4"]
+    # system_ref_numbers = ["1s_sl_0.3.5.4", "3s_sl_1on4.3.5.4", "3s_sl_2on4.3.5.4", "3s_sl_3on4.3.5.4", "3s_sl_4on4.3.5.4", "3s_sl_5on4.3.5.4", "3s_sl_6on4.3.5.4", "3s_sl_7on4.3.5.4", "3s_sl_8on4.3.5.4"]
+
+    # system_ref_numbers = ["1s_sl_0.4.5.4", "2s_sl_1on4.4.5.4", "2s_sl_2on4.4.5.4", "2s_sl_3on4.4.5.4", "2s_sl_4on4.4.5.4", "2s_sl_5on4.4.5.4", "2s_sl_6on4.4.5.4", "2s_sl_7on4.4.5.4", "2s_sl_8on4.4.5.4"]
+    # system_ref_numbers = ["1s_sl_0.4.5.4", "3s_sl_1on4.4.5.4", "3s_sl_2on4.4.5.4", "3s_sl_3on4.4.5.4", "3s_sl_4on4.4.5.4", "3s_sl_5on4.4.5.4", "3s_sl_6on4.4.5.4", "3s_sl_7on4.4.5.4", "3s_sl_8on4.4.5.4"]
 
     # RUN OR LOAD YOUR SIMULATIONS HERE.
     results = main(sim_ref_numbers, system_ref_numbers)
     
     # PLOT THE RESULTS HERE.
-    # SimResultManager.plot_system_performance_comparison(results, label_type="RTT", ibr=False, ber=False)
+    # SimResultManager.plot_system_performance_comparison(results, label_type="RTT", ibr=False, R=False)
 
     
     
